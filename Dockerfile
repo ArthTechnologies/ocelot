@@ -14,5 +14,7 @@ COPY . .
 
 EXPOSE 4000
 
+EXPOSE 8090
+
 # Run the app
 CMD ["./pocketbase", "serve", "&", "node", "run" ]
