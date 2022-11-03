@@ -3,7 +3,7 @@ const router = express.Router();
 let techname;
 
 let name = "MySurvival Server";
-router.get(`/`, function(req, res) {
+router.post(`/`, function(req, res) {
 	techname = req.headers.techname;
 	res.status(200).json({
 		server_technical_name: `${techname}`,
