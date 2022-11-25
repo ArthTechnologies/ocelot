@@ -4,6 +4,8 @@ let techname;
 
 let name = "MySurvival Server";
 router.post(`/`, function(req, res) {
+	//add cors header
+	res.header("Access-Control-Allow-Origin", "*");
 	techname = req.headers.techname;
 	res.status(200).json({
 		server_technical_name: `${techname}`,
@@ -27,13 +29,26 @@ router.get(`/change-state`, function(req, res) {
 });
 
 router.post(`/new`, function(req, res) {
-	//console.log(req.body.software)
 
+
+	var fs = require('fs');
+
+	//add cors header
+	res.header("Access-Control-Allow-Origin", "*");
+
+
+	var id = 0;
+	//set id to a uuid
+	var uuid = require("uuid");
+	id = uuid.v4();
+	console.log(id);
 	var fs = require('fs')
-	var store = (req.body.software + ", " + req.body.version + ", " + req.body.name + "\n")
+	var store = (req.body.name + "," + req.body.software + "," + req.body.version + "," + id + "\n")
+
+
 	console.log(store)
-	if(req.body.software != "undefined" && req.body.version != "undefined" && req.body.name != "undefined") {
-	fs.appendFile('servers.txt', store, function(err) {
+	if(req.body.software !== "undefined" && req.body.version !== "undefined" && req.body.name !== "undefined") {
+	fs.appendFile('servers.csv', store, function(err) {
 		if (err) {
 			// append failed
 			console.log("failed to write to file.")
