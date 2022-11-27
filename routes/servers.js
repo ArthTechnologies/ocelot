@@ -21,7 +21,7 @@ function checkServers(em) {
   var n = [];
   var s = [];
   var v = [];
-  for (i = 0; i < arraylength - 1; i++) {
+  for (i = 0; i < arraylength; i++) {
     if (array[i].indexOf(em) > 0) {
       n.push(array[i].split(",")[0]);
       s.push(array[i].split(",")[1]);
