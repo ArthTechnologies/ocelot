@@ -4,8 +4,16 @@ const app = express();
 const path = require("path");
 const cors = require("cors");
 
+//create servers.csv if it doesn't exist
+var fs = require("fs");
+if (!fs.existsSync("servers.csv")) {
+  fs.writeFile("servers.csv", "", function (err) {
+    if (err) throw err;
+    console.log("File is created successfully.");
+  });
+}
 app.get("/", (req, res) => {
-	res.status(200).sendFile(path.join(__dirname, "index.html"));
+  res.status(200).sendFile(path.join(__dirname, "index.html"));
 });
 
 // middlewares
@@ -19,16 +27,16 @@ const port = process.env.PORT || 4000;
 app.listen(port, () => console.log(`Listening on Port: ${port}`));
 
 app.use((err, req, res, next) => {
-	switch (err.message) {
-		case "NoCodeProvided":
-			return res.status(400).send({
-				status: "ERROR",
-				error: err.message,
-			});
-		default:
-			return res.status(500).send({
-				status: "ERROR",
-				error: err.message,
-			});
-	}
+  switch (err.message) {
+    case "NoCodeProvided":
+      return res.status(400).send({
+        status: "ERROR",
+        error: err.message,
+      });
+    default:
+      return res.status(500).send({
+        status: "ERROR",
+        error: err.message,
+      });
+  }
 });
