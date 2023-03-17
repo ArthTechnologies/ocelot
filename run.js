@@ -13,6 +13,7 @@ app.use(express.json(), cors());
 // adding routes
 app.use("/file", require("./routes/file"));
 app.use("/index", require("./routes/index"));
+app.use("/status", require("./routes/status"));
 
 // port
 const port = process.env.PORT || 5000;
