@@ -1,6 +1,4 @@
-
-
-This is the second version of the Arth privacy policy, published 11:00 AM Central Standard Time on January the 29th, 2022. This version will go into effect on Feb 28th, 2023.
+{"published":"11:00AM, 2023-01-29", "effective":"11:00AM, 2023-02-28", "version":2}
 
 # Your data on Arth Hosting
 

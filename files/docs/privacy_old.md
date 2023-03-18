@@ -1,0 +1,19 @@
+{"published":"1:49PM, 2022-10-20", "effective":"1:49PM, 2022-10-20", "version":1}
+
+# Right to be forgotten:
+
+- You have a right to have all traces of you wiped from all Arth databases, services, and all other means of storing data wether viewable by the public or just Arth upon request. Requests may be made via email, or via a from on our website in the future. 
+
+- Content removed via normal deletion may be stored for 30 days.
+
+# Your data:
+
+- While no automated algorithms or staff will view any sort of messages between two or more users, such as minecraft chat messages, we do not implement end-to-end encryption at this time, meaning the data will technically be stored on our systems.   
+- Communications between you and an employee, such as getting support may be stored to be accessed by other staff.  
+- We will not share any personal information with third party companies unless you authorize it. The app/website from the company would send you to arth’s website, where you would be shown what data would be shared, and given a button to allow that.  
+- Cookies are pieces of data stored on your browser. While these can help improve the experience, we will not store any information in your cookies that could be linked to you.  
+- If you use the Arth Hosting service, your server’s files and data will be stored. This is nesescary to make this service possible.
+We will never comply with any voluntary surveillance programs, and we will fight off legal requests when it’s feasible to do so.  
+
+# Changes to these terms:
+- If changes to these terms are needed, we will put them into effect 30 days after the changes are made visible.

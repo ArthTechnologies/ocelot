@@ -21,7 +21,7 @@ Router.get("/:posttype/:filename", (req, res) => {
 
 	} else {
 
-		res.send({"msg":"File no found"})
+		res.send({"msg":"File not found"})
 	}
 
 });
