@@ -7,24 +7,24 @@ const fs = require("fs");
 
 Router.post("/", (req, res) => {
 
-    let userAgent = req.body.userAgent;
+    let platform = req.body.platform;
     let analytics = JSON.parse(fs.readFileSync("analytics.json"));
     analytics.hits++;
     let device;
-console.log(userAgent)
-    if(userAgent.includes("Linux")){
+console.log(platform)
+    if(platform.includes("Linux")){
         device = "Linux";
         analytics.devices.linux++;
-    } else if (userAgent.includes("Windows")){
+    } else if (platform.includes("Windows")){
         device = "Windows";
         analytics.devices.windows++;
-    } else if (userAgent.includes("Macintosh")){
+    } else if (platform.includes("Macintosh")){
         device = "Macintosh";
         analytics.devices.macintosh++;
-    } else if (userAgent.includes("Android")){
+    } else if (platform.includes("Android")){
         device = "Android";
         analytics.devices.android++;
-    } else if (userAgent.includes("iP")){
+    } else if (platform.includes("iP")){
         device = "iOS";
         analytics.devices.ios++;
     } 
