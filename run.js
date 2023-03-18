@@ -7,7 +7,7 @@ const rsa = require("node-rsa");
 const fs = require("fs");
 const crypto = require("crypto");
 if (!fs.existsSync("analytics.json")) {
-  fs.writeFileSync("analytics.json", JSON.stringify({"hits":0, "devices":{"linux":0, "windows":0, "macintosh":0, "android":0, "iOS":0}}));
+  fs.writeFileSync("analytics.json", JSON.stringify({"max":0,"day":0,"days":{},"hits":0, "devices":{"linux":0, "windows":0, "macintosh":0, "android":0, "iOS":0}}));
 }
 // middlewares
 app.use(express.json(), cors());

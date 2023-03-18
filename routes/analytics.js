@@ -10,12 +10,25 @@ Router.get("/", (req, res) => {
 });
 
 Router.post("/", (req, res) => {
-
+    //how many days since 1970
+    let day = new Date().getTime() / 1000 / 60 / 60 / 24;
+    day = parseInt(day.toString().split('.')[0]);
+    
+    console.log(day)
     let platform = req.body.platform;
     let analytics = JSON.parse(fs.readFileSync("analytics.json"));
+    analytics.day = day;
     analytics.hits++;
-    let device;
-console.log(platform)
+    console.log(analytics.days[day]);
+    if (analytics.days[day] == undefined){
+        analytics.days[day] = 1;
+    } else {
+        analytics.days[day]++;
+        if (analytics.days[day] > analytics.max){
+            analytics.max = analytics.days[day];
+        }
+    }
+
     if(platform.includes("Linux")){
 
         analytics.devices.linux++;
