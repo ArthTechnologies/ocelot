@@ -6,7 +6,9 @@ const cors = require("cors");
 const rsa = require("node-rsa");
 const fs = require("fs");
 const crypto = require("crypto");
-
+if (!fs.existsSync("analytics.json")) {
+  fs.writeFileSync("analytics.json", JSON.stringify({"hits":0, "devices":{"linux":0, "windows":0, "macintosh":0, "android":0, "iOS":0}}));
+}
 // middlewares
 app.use(express.json(), cors());
 
@@ -14,6 +16,7 @@ app.use(express.json(), cors());
 app.use("/file", require("./routes/file"));
 app.use("/index", require("./routes/index"));
 app.use("/status", require("./routes/status"));
+app.use("/analytics", require("./routes/analytics"));
 
 // port
 const port = process.env.PORT || 5000;
