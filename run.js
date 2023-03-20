@@ -17,10 +17,31 @@ app.use("/file", require("./routes/file"));
 app.use("/index", require("./routes/index"));
 app.use("/status", require("./routes/status"));
 app.use("/analytics", require("./routes/analytics"));
+app.use("/rss", require("./routes/rss"));
 
 // port
 const port = process.env.PORT || 5000;
 app.listen(port, () => console.log(`Listening on Port: ${port}`));
+
+// put blog posts in rss
+let dir = fs.readdirSync("./files/posts")
+let rss = fs.readFileSync("arthblog.rss").toString();
+let rssp1 = rss.split("<item>")[0]
+let rssp2 = rss.split("<item>")[1,dir.length-1]
+for (i in dir) {
+let item = `<item>
+<title>Introducing Arth Panel</title>
+<description>
+Your gateway to running your own Minecraft servers.
+</description>
+
+<link>https://arthmc.xyz/blog/introducing-arth-panel</link>
+<guid isPermaLink="true">https://arthmc.xyz/blog/introducing-arth-panel</guid>
+<pubDate>Sun, 08 Jan 2023 12:00:00 +0000</pubDate>
+
+
+</item>`
+}
 
 app.use((err, req, res, next) => {
   switch (err.message) {

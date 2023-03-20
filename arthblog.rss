@@ -1,0 +1,39 @@
+<rss version="2.0">
+<channel>
+<title>Arth Blog</title>
+<description>
+Your gateway to running your own Minecraft servers.
+</description>
+<link>https://arthmc.xyz/blog</link>
+
+<lastBuildDate>Sun, 8 Jan 2023 16:30:05 +0000</lastBuildDate>
+<pubDate>Sun, 08 Jan 2023 02:00:00 +0000</pubDate>
+
+<category>Gaming</category>
+<category>Technology</category>
+<category>Linux</category>
+<copyright>Licensed under GPLv3, 2023.</copyright>
+<image>
+<url>
+https://arthmc.xyz/favicon.png
+</url>
+<title>Arth Blog</title>
+<link>https://arthmc.xyz/blog/</link>
+</image>
+<language>en-us</language>
+<item>
+<title>Introducing Arth Panel</title>
+<description>
+Your gateway to running your own Minecraft servers.
+</description>
+
+<link>https://arthmc.xyz/blog/introducing-arth-panel</link>
+<guid isPermaLink="true">https://arthmc.xyz/blog/introducing-arth-panel</guid>
+<pubDate>Sun, 08 Jan 2023 12:00:00 +0000</pubDate>
+
+
+</item>
+
+
+</channel>
+</rss>

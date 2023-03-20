@@ -8,7 +8,7 @@ Router.get("/", (req, res) => {
     let analytics = JSON.parse(fs.readFileSync("analytics.json"));
     res.send(analytics);
 });
-
+//note: disable until new pricay policy goes into effect
 Router.post("/", (req, res) => {
     //how many days since 1970
     let day = new Date().getTime() / 1000 / 60 / 60 / 24;
