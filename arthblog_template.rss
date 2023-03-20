@@ -22,24 +22,5 @@ https://arthmc.xyz/favicon.png
 </image>
 <language>en-us</language>
 <!-- Posts -->
-<item>
-<title>Arth Panel Update: Plugins</title>
-<description>
-Plugins, major bug fixes, and much more arrive in our beta 1.1 update.
-</description>
-
-<link>https://arthmc.xyz/blog/arth-panel-plugins</link>
-<guid isPermaLink="true">https://arthmc.xyz/blog/arth-panel-plugins</guid>
-
-</item><item>
-<title>Introducing Arth Panel</title>
-<description>
-Your gateway to running your own minecraft servers.
-</description>
-
-<link>https://arthmc.xyz/blog/introducing-arth-panel</link>
-<guid isPermaLink="true">https://arthmc.xyz/blog/introducing-arth-panel</guid>
-
-</item>
 </channel>
 </rss>

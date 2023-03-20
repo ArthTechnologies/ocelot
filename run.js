@@ -25,7 +25,7 @@ app.listen(port, () => console.log(`Listening on Port: ${port}`));
 
 // put blog posts in rss
 let posts = JSON.parse(fs.readFileSync("./files/posts/index.json").toString());
-let rss = fs.readFileSync("arthblog.rss").toString();
+let rss = fs.readFileSync("arthblog_template.rss").toString();
 let rssp1 = rss.split("<!-- Posts -->")[0]
 let rssp2 = rss.split("<!-- Posts -->")[1,posts.length-1]
 let items = [];
