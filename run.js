@@ -39,6 +39,7 @@ items.push(`<item>
 
 <link>https://backend.arthmc.xyz/view/post/`+posts[i].slug+`</link>
 <guid isPermaLink="true">https://backend.arthmc.xyz/view/post/`+posts[i].slug+`</guid>
+<pubDate>`+fs.readFileSync("./files/posts/"+posts[i].slug+".md").toString().split("\n")[2]+`</pubDate>
 
 </item>`);
 }
