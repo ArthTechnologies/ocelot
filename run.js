@@ -37,8 +37,8 @@ items.push(`<item>
 `+posts[i].desc+`
 </description>
 
-<link>https://backend.arthmc.xyz/view/post/`+posts[i].slug+`.md</link>
-<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/`+posts[i].slug+`.md</guid>
+<link>https://backend.arthmc.xyz/view/post/`+posts[i].slug+`</link>
+<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/`+posts[i].slug+`</guid>
 
 </item>`);
 }
