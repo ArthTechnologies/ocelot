@@ -12,7 +12,7 @@ Router.get("/post/:file", (req, res) => {
   text = marked.parse(text.split("\n").slice(6).join("\n"));
 
   //make sure images arent too big
-  text = text.replace(/<img/g, "<img style='max-width:80% max-height:80%'");
+  text = text.replace(/<img/g, "<img style='max-width:80%; max-height:80%'");
   res.send(text);
 });
 
