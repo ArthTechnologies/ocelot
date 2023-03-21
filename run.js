@@ -18,6 +18,7 @@ app.use("/index", require("./routes/index"));
 app.use("/status", require("./routes/status"));
 app.use("/analytics", require("./routes/analytics"));
 app.use("/rss", require("./routes/rss"));
+app.use("/view", require("./routes/view"));
 
 // port
 const port = process.env.PORT || 5000;
@@ -36,8 +37,8 @@ items.push(`<item>
 `+posts[i].desc+`
 </description>
 
-<link>https://arthmc.xyz/blog/`+posts[i].slug+`</link>
-<guid isPermaLink="true">https://arthmc.xyz/blog/`+posts[i].slug+`</guid>
+<link>https://backend.arthmc.xyz/view/post/`+posts[i].slug+`.md</link>
+<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/`+posts[i].slug+`.md</guid>
 
 </item>`);
 }
