@@ -45,8 +45,7 @@ for (i in posts) {
     .readFileSync("./files/posts/" + posts[i].slug + ".md")
     .toString()
     .split("\n")[2];
-  //convert date to rss-friendly format
-  let rssDate = new Date(date).toUTCString();
+
   items.push(
     `<item>
 <title>` +
@@ -65,7 +64,7 @@ for (i in posts) {
       posts[i].slug +
       `</guid>
 <pubDate>` +
-      rssDate +
+      date +
       `</pubDate>
 
 </item>`
