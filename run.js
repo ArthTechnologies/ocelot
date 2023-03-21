@@ -7,7 +7,16 @@ const rsa = require("node-rsa");
 const fs = require("fs");
 const crypto = require("crypto");
 if (!fs.existsSync("analytics.json")) {
-  fs.writeFileSync("analytics.json", JSON.stringify({"max":0,"day":0,"days":{},"hits":0, "devices":{"linux":0, "windows":0, "macintosh":0, "android":0, "iOS":0}}));
+  fs.writeFileSync(
+    "analytics.json",
+    JSON.stringify({
+      max: 0,
+      day: 0,
+      days: {},
+      hits: 0,
+      devices: { linux: 0, windows: 0, macintosh: 0, android: 0, iOS: 0 },
+    })
+  );
 }
 // middlewares
 app.use(express.json(), cors());
@@ -27,24 +36,45 @@ app.listen(port, () => console.log(`Listening on Port: ${port}`));
 // put blog posts in rss
 let posts = JSON.parse(fs.readFileSync("./files/posts/index.json").toString());
 let rss = fs.readFileSync("arthblog_template.rss").toString();
-let rssp1 = rss.split("<!-- Posts -->")[0]
-let rssp2 = rss.split("<!-- Posts -->")[1,posts.length-1]
+let rssp1 = rss.split("<!-- Posts -->")[0];
+let rssp2 = rss.split("<!-- Posts -->")[(1, posts.length - 1)];
 let items = [];
+
 for (i in posts) {
-items.push(`<item>
-<title>`+posts[i].title+`</title>
+  let date = fs
+    .readFileSync("./files/posts/" + posts[i].slug + ".md")
+    .toString()
+    .split("\n")[2];
+  //convert date to rss-friendly format
+  let rssDate = new Date(date).toUTCString();
+  items.push(
+    `<item>
+<title>` +
+      posts[i].title +
+      `</title>
 <description>
-`+posts[i].desc+`
+` +
+      posts[i].desc +
+      `
 </description>
 
-<link>https://backend.arthmc.xyz/view/post/`+posts[i].slug+`</link>
-<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/`+posts[i].slug+`</guid>
-<pubDate>`+fs.readFileSync("./files/posts/"+posts[i].slug+".md").toString().split("\n")[2]+`</pubDate>
+<link>https://backend.arthmc.xyz/view/post/` +
+      posts[i].slug +
+      `</link>
+<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/` +
+      posts[i].slug +
+      `</guid>
+<pubDate>` +
+      rssDate +
+      `</pubDate>
 
-</item>`);
+</item>`
+  );
 }
-fs.writeFileSync("arthblog.rss", rssp1+"<!-- Posts -->\n"+items.join("")+rssp2);
-
+fs.writeFileSync(
+  "arthblog.rss",
+  rssp1 + "<!-- Posts -->\n" + items.join("") + rssp2
+);
 
 app.use((err, req, res, next) => {
   switch (err.message) {
