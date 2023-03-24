@@ -21,19 +21,6 @@ https://arthmc.xyz/favicon.png
 <link>https://arthmc.xyz/blog/</link>
 </image>
 <language>en-us</language>
-<item>
-<title>Introducing Arth Panel</title>
-<description>
-Your gateway to running your own Minecraft servers.
-</description>
-
-<link>https://arthmc.xyz/blog/introducing-arth-panel</link>
-<guid isPermaLink="true">https://arthmc.xyz/blog/introducing-arth-panel</guid>
-<pubDate>Sun, 08 Jan 2023 12:00:00 +0000</pubDate>
-
-
-</item>
-
-
+<!-- Posts -->
 </channel>
 </rss>

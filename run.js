@@ -7,7 +7,16 @@ const rsa = require("node-rsa");
 const fs = require("fs");
 const crypto = require("crypto");
 if (!fs.existsSync("analytics.json")) {
-  fs.writeFileSync("analytics.json", JSON.stringify({"max":0,"day":0,"days":{},"hits":0, "devices":{"linux":0, "windows":0, "macintosh":0, "android":0, "iOS":0}}));
+  fs.writeFileSync(
+    "analytics.json",
+    JSON.stringify({
+      max: 0,
+      day: 0,
+      days: {},
+      hits: 0,
+      devices: { linux: 0, windows: 0, macintosh: 0, android: 0, iOS: 0 },
+    })
+  );
 }
 // middlewares
 app.use(express.json(), cors());
@@ -18,30 +27,53 @@ app.use("/index", require("./routes/index"));
 app.use("/status", require("./routes/status"));
 app.use("/analytics", require("./routes/analytics"));
 app.use("/rss", require("./routes/rss"));
+app.use("/view", require("./routes/view"));
 
 // port
 const port = process.env.PORT || 5000;
 app.listen(port, () => console.log(`Listening on Port: ${port}`));
 
 // put blog posts in rss
-let dir = fs.readdirSync("./files/posts")
-let rss = fs.readFileSync("arthblog.rss").toString();
-let rssp1 = rss.split("<item>")[0]
-let rssp2 = rss.split("<item>")[1,dir.length-1]
-for (i in dir) {
-let item = `<item>
-<title>Introducing Arth Panel</title>
+let posts = JSON.parse(fs.readFileSync("./files/posts/index.json").toString());
+let rss = fs.readFileSync("arthblog_template.rss").toString();
+let rssp1 = rss.split("<!-- Posts -->")[0];
+let rssp2 = rss.split("<!-- Posts -->")[(1, posts.length - 1)];
+let items = [];
+
+for (i in posts) {
+  let date = fs
+    .readFileSync("./files/posts/" + posts[i].slug + ".md")
+    .toString()
+    .split("\n")[2];
+
+  items.push(
+    `<item>
+<title>` +
+      posts[i].title +
+      `</title>
 <description>
-Your gateway to running your own Minecraft servers.
+` +
+      posts[i].desc +
+      `
 </description>
 
-<link>https://arthmc.xyz/blog/introducing-arth-panel</link>
-<guid isPermaLink="true">https://arthmc.xyz/blog/introducing-arth-panel</guid>
-<pubDate>Sun, 08 Jan 2023 12:00:00 +0000</pubDate>
-
+<link>https://backend.arthmc.xyz/view/post/` +
+      posts[i].slug +
+      `</link>
+<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/` +
+      posts[i].slug +
+      `</guid>
+<pubDate>` +
+      date +
+      `</pubDate>
 
 </item>`
+  );
 }
+fs.writeFileSync(
+  "arthblog.rss",
+  rssp1 + "<!-- Posts -->\n" + items.join("") + rssp2
+);
 
 app.use((err, req, res, next) => {
   switch (err.message) {

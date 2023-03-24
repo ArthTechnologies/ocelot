@@ -8,9 +8,12 @@ Router.get("/", (req, res) => {
     let analytics = JSON.parse(fs.readFileSync("analytics.json"));
     res.send(analytics);
 });
-//note: disable until new pricay policy goes into effect
+
+//disabled until new privacy policy goes into effect
 Router.post("/", (req, res) => {
-    //how many days since 1970
+    //if it's april 17th 2023 or later...
+    if (new Date().getTime() > 1671424000000) {
+        //how many days since 1970
     let day = new Date().getTime() / 1000 / 60 / 60 / 24;
     day = parseInt(day.toString().split('.')[0]);
     
@@ -48,7 +51,10 @@ Router.post("/", (req, res) => {
 
  
     fs.writeFileSync("analytics.json", JSON.stringify(analytics));
-    res.send({"msg":"ok"});
+    res.send({"msg":"ok"})
+    } else {
+        res.send({"msg":"Analytics are disabled until the new privacy policy goes into effect"});
+    }
 });
 
 module.exports = Router;
