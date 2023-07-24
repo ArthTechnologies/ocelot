@@ -1,7 +1,7 @@
 <h2 class="text-center font-bold">Choose your edition</h2>
 <p class="text-center font-bold">If the title screen says "Minecraft" instead of "Minecraft: Java Edition", you are playing on bedrock edition.</p>
- <div class="flex place-content-center space-x-2 mb-10"><a href="#how-to-join-on-bedrock-edition-xbox-ps4-or-nintendo-switch"><button class="btn btn-sm mt-2 w-1/16" style="width:9rem; height: 3rem;">Bedrock Edition on a Switch, 
- Xbox, or PlayStation</button></a><a href="#how-to-join-on-java-edition"><button class="btn  btn-sm w-1/16 mt-2">Java Edition</button></a><a href="#how-to-join-on-bedrock-edition-mobile-or-windows"><button class="btn  btn-sm w-1/16 mt-2"  style="width:9rem; height: 3rem;">Bedrock Edition on Mobile or Windows</button></a></div>
+ <div class="flex place-content-center space-x-2 mb-10"><a href="#how-to-join-on-bedrock-edition-xbox-ps4-or-nintendo-switch"><button class="btn btn-sm mt-2 w-1/16" style="width:8rem; height: 5rem;">Bedrock Edition on a Switch, 
+ Xbox, or PlayStation</button></a><a href="#how-to-join-on-java-edition"><button class="btn  btn-sm w-1/16 mt-2">Java Edition</button></a><a href="#how-to-join-on-bedrock-edition-mobile-or-windows"><button class="btn  btn-sm w-1/16 mt-2"  style="width:8rem; height: 5rem;">Bedrock Edition on Mobile or Windows</button></a></div>
 
 # How to join on Java Edition
 
