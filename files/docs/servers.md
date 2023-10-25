@@ -48,6 +48,14 @@ This route lets you add a mod/plugin to your server.
 - `pluginId`: A unique identifier for your mod. For custom, its the lowercase name of the plugin, for github its author/repo, and for labrinth it's the project id.
 - `pluginName`: A human-readable name for your mod.
 
+### POST /`id`/version
+
+This route lets you change the server's version.
+
+**Query Parameters**
+
+- `version`: The Minecraft version you want your server to be on.
+
 ### POST /server/`id`/setInfo
 
 This route lets you set a description and icon for your server.
@@ -103,5 +111,61 @@ Get every server under a email address.
 ### GET /server/`id`/world
 
 Download a world.zip file containing your world
+
+**No Parameters**
+
+### POST /server/`id`/world
+
+This route lets you either generate a new world or replace your world with one from a file.
+
+**File Parameters (Not needed if you're regenerating)**
+
+- Send one file. It must be a valid archive/zip file.
+
+**Query Parameters (Not needed if you're uploading)**
+
+- `worldgenMods`: Optional. A list of any worldgen mods you want on the new world. Format Example: 'terralith,incendium'.
+- `seed`: Optional. A random seed will be used if you don't provide one.
+- `worldType(normal|flat|large_biomes)`: The worldtype. You may know flat as 'superflat'.
+
+### GET /server/`id`/file/`path`
+
+This route gets the contents of a text file within your server folder.
+
+**Path Parameters**
+
+- `path`: The path to the file you want to read. Use `*` instead of `/`, for example: 'config\*paper-global.yml`.
+
+### POST /server/`id`/file/`path`
+
+This route lets you set the contents of a text file within your server folder.
+
+**Path Parameters**:
+
+- `path`: The path to the file you want to write to. Use `*` instead of `/`, for example: 'config\*paper-global.yml`.
+
+**Body Parameters**:
+
+- `content`: The text that you want the file to contain.
+
+### DELETE /server/`id`/file/`path`
+
+This route lets you delete a text file within your server folder.
+
+**Path Parameters**
+
+- `path`: The path to the file you want to delete. Use `*` instead of `/`, for example: 'config\*paper-global.yml`.
+
+### POST /server/`id`/rename
+
+This route lets you rename your server.
+
+**Query Parameters**
+
+- `newName`: The new name you want your server to have.
+
+### GET /server/`id`/storageInfo
+
+This route gets the storage limit of your server as well as how much of it is used up.
 
 **No Parameters**
