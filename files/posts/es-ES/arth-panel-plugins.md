@@ -1,5 +1,5 @@
 Arth Panel Actualización de Plugins
-Plugins, correciones de errores mayores, y mucho más llegan en nuestro actualización beta 1.1.
+Plugins, correcciones de errores mayores y mucho más llegan en nuestra actualización beta 1.1.
 2023-02-14
 DiamonC
 https://floss.social/@DiamonC
@@ -22,7 +22,7 @@ El terminal ha estado la parte con más errores en la interfaz desde su introduc
 
 Hemos añadido muchas characterísticas pequeñas como el worldgen mod "Structory", atajos de commandos, código más eficiente, y UI más intuitivo. También hemos añadido opciones experimentales que se necesitan habilitar que te permitan eliminar pagos y autenticación en tu panel, un opción excelente si tu panel solo para tus amigos y personas en que confias.
 
-## A Futuro
+## El Futuro
 
 Ahora nuestra primer prioridad es mejorar la seguridad de los servidores de personas. Nunca recomedábamos ejecutar Arth Panel en producción (permitiendo personas en que no confias acceder tu panel) porque lo currentalmente no tiene seguridad de contraseñas propio. Haceramos un sistema de seguridad de contraseñas que probablemente significa sustituiendo pocketbase con neustro sistema propio también.
 	Otra prioridad es aumentar accesibilidad de instalar el panel. Queremos nuestra documentación explicar toda la informacción que necesitas saber para instalar nuestro panel, y también queremos iniciar trabajo en cuestiones de docker, después de tomar un descanso después cuestiones con dispositivos de ARM. Además, queremos mejorar la experiencia con dispositivos móviles y en el modo no auth, que está actualmente experimental. Mantene atento a nuestro Mastodon y blog para actualizaciones nuevas y como siempre, consideras consultar o colaborar con nosotros en [codeberg](https://codeberg.org/arth).

@@ -1,5 +1,5 @@
 Arth Panel Actulización Beta 1.2
-!Una sistema de cuentas, nuevas opciones, y mucho más!
+¡Un sistema de cuentas, nuevas opciones y mucho más!
 2023-04-02
 DiamonC 
 https://floss.social/@DiamonC 
@@ -9,7 +9,7 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 
 ![image-bordered](https://i.imgur.com/WQy6vdr.png)
 
-¡La actualización beta 1.2 de Arth Panel está aquí con una sistema de cuentas nueva, muchas correciones de errores y más! Si no estás familiarizado con Arth Panel, consideras consultar nuestro artículo Presentando Arth Panel.
+¡La actualización beta 1.2 de Arth Panel está aquí con una sistema de cuentas nueva, muchas correcciones de errores y más! Si no estás familiarizado con Arth Panel, consideras consultar nuestro artículo Presentando Arth Panel.
 
 ## Abandonar Pocketbase
 
@@ -38,7 +38,7 @@ algunos cambios menores incluyen:
 -  añadir información como el numero de descargas en resultados de buscar de plugins.
 -  sustituir la mayoría de las alertas molestas con alertas que solo existen para unos segundos
 
-## A Futuro
+## El Futuro
 Accesibilidad está una prioridad importante, así que añadiremos documentación explanar todo una principiante necesita saber installer el panel.
 
 Nuestro foco ahora está añadir compatibilidad con mods con forge y quilt, y compatibilidad con modpacks también. La mayoría de el tiempo de esa actualización fue pasaba trabajando en servidores con mods, pero hay muchos retos con implementando ellos y necesitamos demorar ese a la próxima actualización.
@@ -46,4 +46,4 @@ Nuestro foco ahora está añadir compatibilidad con mods con forge y quilt, y co
 Aunque esa actualización tiene muchos cambios que rompen la compatibilidad, como necesitamos sustituir todo nuestro sistema de cuentas, esperamos iniciar trabaja para una actualización estable pronto. Las cosas principales trabajar en son lo hacer fácil para actualizar servidores y hacer las rutas de el API más constante.
 
 ## Arth Hosting
-Estamos lanzando nuestro propio servicio con Arth Panel se llama Arth Hosting. Ofrecerá servidores de Minecraft a $3/mes por el resto de 2023, y $5/mes después. Si no tiene computadores de servidores o quiere mantenernos, considere consultarlo a [arthmc.xyz/hosting](https://arthmc.xyz/hosting).
+Estamos lanzando nuestro propio servicio con Arth Panel se llama Arth Hosting. Ofrecerá servidores de Minecraft a $3/mes por el resto de 2023, y $5/mes después. Si no tiene computadores de servidores o quiere mantenernos, considere consultarlo a [arthmc.xyz](https://arthmc.xyz/).

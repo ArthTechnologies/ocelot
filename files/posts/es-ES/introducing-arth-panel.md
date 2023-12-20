@@ -1,5 +1,5 @@
 Presentando Arth Panel
-Tu puerta de entrada a ejecutar tus propios servidores de Minecraft.
+Tu puerta de entrada para ejecutar tus propios servidores de Minecraft.
 2023-01-08
 DiamonC
 https://floss.social/@DiamonC

@@ -47,6 +47,6 @@ While this update has a large number of breaking changes, given we had to replac
 
 ## Arth Hosting
 
-We're launching our own instance of Arth Panel called Arth Hosting. It'll offer Minecraft servers at $3/mo for the rest of 2023, $5/mo after that. If you don't have any server computers to run Arth Panel on, or just want to support us, consider checking it out at [arthmc.xyz/hosting](https://arthmc.xyz/hosting).
+We're launching our own instance of Arth Panel called Arth Hosting. It'll offer Minecraft servers at $3/mo for the rest of 2023, $5/mo after that. If you don't have any server computers to run Arth Panel on, or just want to support us, consider checking it out at [arthmc.xyz](https://arthmc.xyz/).
 
  Keep an eye on our Mastodon and our blog for new updates, and as always, consider checking out/contributing to Arth Panel at [codeberg](https://codeberg.org/arth/).
