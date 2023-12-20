@@ -1,9 +1,7 @@
 <rss version="2.0">
 <channel>
 <title>Arth Blog</title>
-<description>
-Your gateway to running your own Minecraft servers.
-</description>
+<description></description>
 <link>https://arthmc.xyz/blog</link>
 
 <lastBuildDate>Sun, 8 Jan 2023 16:30:05 +0000</lastBuildDate>

@@ -1,0 +1,53 @@
+<rss version="2.0">
+<channel>
+<title>Arth Blog</title>
+<description>Tu puerta de entrada a ejecutar tus propios servidores de Minecraft.</description>
+<link>https://arthmc.xyz/blog</link>
+
+<lastBuildDate>Sun, 8 Jan 2023 16:30:05 +0000</lastBuildDate>
+<pubDate>Sun, 08 Jan 2023 02:00:00 +0000</pubDate>
+
+<category>Gaming</category>
+<category>Technology</category>
+<category>Linux</category>
+<copyright>Licensed under GPLv3, 2023.</copyright>
+<image>
+<url>
+https://arthmc.xyz/favicon.png
+</url>
+<title>Arth Blog</title>
+<link>https://arthmc.xyz/blog/</link>
+</image>
+<language>es-ES</language>
+<!-- Posts -->
+<item>
+<title>Arth Panel Actulización Beta 1.2</title>
+<description>
+!Una sistema de cuentas, nuevas opciones, y mucho más!
+</description>
+
+<link>https://backend.arthmc.xyz/view/post/arth-panel-beta-1.2</link>
+<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/arth-panel-beta-1.2</guid>
+<pubDate>2023-04-02</pubDate>
+
+</item><item>
+<title>Arth Panel Actualización de Plugins</title>
+<description>
+Plugins, correciones de errores mayores, y mucho más llegan en nuestro actualización beta 1.1.
+</description>
+
+<link>https://backend.arthmc.xyz/view/post/arth-panel-plugins</link>
+<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/arth-panel-plugins</guid>
+<pubDate>2023-02-14</pubDate>
+
+</item><item>
+<title>Presentando Arth Panel</title>
+<description>
+Tu puerta de entrada a ejecutar tus propios servidores de Minecraft.
+</description>
+
+<link>https://backend.arthmc.xyz/view/post/introducing-arth-panel</link>
+<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/introducing-arth-panel</guid>
+<pubDate>2023-01-08</pubDate>
+
+</item>

@@ -69,51 +69,56 @@ fs.readdirSync("./files/posts").forEach((item) => {
 fs.writeFileSync("./files/posts/index.json", JSON.stringify(postsIndex));
 
 // put blog posts in rss
-let posts = JSON.parse(fs.readFileSync("./files/posts/index.json").toString());
+let langs = JSON.parse(fs.readFileSync("./files/posts/index.json").toString());
 let rss = fs.readFileSync("arthblog_template.rss").toString();
-let rssp1 = rss.split("<!-- Posts -->")[0];
-let rssp2 = rss.split("<!-- Posts -->")[(1, posts.length - 1)];
-let items = [];
 
-for (i in posts) {
-  let langs = fs.readdirSync("./files/posts/");
-  for (j in langs) {
-    if (langs[j] == "en-US") {
-      let date = fs
-        .readFileSync("./files/posts/en-US/" + posts["en-US"][j].slug + ".md")
-        .toString()
-        .split("\n")[2];
+for (i in langs) {
+  let items = [];
+  let posts = langs[i];
+  for (j in posts) {
+    let date = fs
+      .readFileSync("./files/posts/" + i + "/" + langs[i][j].slug + ".md")
+      .toString()
+      .split("\n")[2];
 
-      items.push(
-        `<item>
+    items.push(
+      `<item>
 <title>` +
-          posts["en-US"][j].title +
-          `</title>
+        langs[i][j].title +
+        `</title>
 <description>
 ` +
-          posts["en-US"][j].desc +
-          `
+        langs[i][j].desc +
+        `
 </description>
 
 <link>https://backend.arthmc.xyz/view/post/` +
-          posts["en-US"][j].slug +
-          `</link>
+        langs[i][j].slug +
+        `</link>
 <guid isPermaLink="true">https://backend.arthmc.xyz/view/post/` +
-          posts["en-US"][j].slug +
-          `</guid>
+        langs[i][j].slug +
+        `</guid>
 <pubDate>` +
-          date +
-          `</pubDate>
+        date +
+        `</pubDate>
 
 </item>`
-      );
-    }
+    );
   }
+  let rssp1 = rss.split("<!-- Posts -->")[0];
+  let content = rssp1 + "<!-- Posts -->\n" + items.join("");
+  //replace <lang>en-us</lang> with <lang>${lang}</lang>
+  content = content.replace(
+    "<language>en-us</language>",
+    "<language>" + i + "</language>"
+  );
+  //replace <description>Arth Blog</description> with <description>${descriptionOfFirstPost}</description>
+  content = content.replace(
+    "<description></description>",
+    "<description>" + posts[posts.length - 1].desc + "</description>"
+  );
+  fs.writeFileSync(i + "_arthblog.rss", content);
 }
-fs.writeFileSync(
-  "arthblog.rss",
-  rssp1 + "<!-- Posts -->\n" + items.join("") + rssp2
-);
 
 app.use((err, req, res, next) => {
   switch (err.message) {
