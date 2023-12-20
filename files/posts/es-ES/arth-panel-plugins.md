@@ -9,7 +9,7 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 
 ![image-bordered](https://i.imgur.com/sHstVuD.png)  
 
-Después de poco más de un mes después de beta 1.0, ¡la actualización beta 1.1 de Arth Panel está aquí! Si no estás familiarizado con Arth Panel, consideras consultar nuestro artículo "Presentando Arth Panel".
+Después de poco más de un mes después de beta 1.0, ¡la actualización beta 1.1 de Arth Panel está aquí! Si no estás familiarizado con Arth Panel, consideras consultar nuestro artículo [Presentando Arth Panel](https://arthmc.xyz/blog/es-ES*presentando-arth-panel/).
 
 ## Plugins
 
