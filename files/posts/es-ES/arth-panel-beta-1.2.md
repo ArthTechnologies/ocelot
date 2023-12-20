@@ -9,7 +9,7 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 
 ![image-bordered](https://i.imgur.com/WQy6vdr.png)
 
-¡La actualización beta 1.2 de Arth Panel está aquí con una sistema de cuentas nueva, muchas correcciones de errores y más! Si no estás familiarizado con Arth Panel, consideras consultar nuestro artículo Presentando Arth Panel.
+¡La actualización beta 1.2 de Arth Panel está aquí con una sistema de cuentas nueva, muchas correcciones de errores y más! Si no estás familiarizado con Arth Panel, consideras consultar nuestro artículo [Presentando Arth Panel](https://arthmc.xyz/blog/es-ES*presentando-arth-panel/).
 
 ## Abandonar Pocketbase
 
