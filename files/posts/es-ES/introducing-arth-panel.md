@@ -1,4 +1,4 @@
-Presentando Arth Panel (es-es)
+Presentando Arth Panel
 Tu puerta de entrada a ejecutar tus propios servidores de Minecraft.
 2023-01-08
 DiamonC

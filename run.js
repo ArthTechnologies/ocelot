@@ -6,6 +6,7 @@ const cors = require("cors");
 const rsa = require("node-rsa");
 const fs = require("fs");
 const crypto = require("crypto");
+const { jar } = require("request");
 if (!fs.existsSync("analytics.json")) {
   fs.writeFileSync(
     "analytics.json",
@@ -33,6 +34,40 @@ app.use("/view", require("./routes/view"));
 const port = process.env.PORT || 5000;
 app.listen(port, () => console.log(`Listening on Port: ${port}`));
 
+let postsIndex = {};
+fs.readdirSync("./files/posts").forEach((item) => {
+  if (item != "index.json") {
+    if (postsIndex[item] == undefined) {
+      postsIndex[item] = [];
+    }
+    fs.readdirSync("./files/posts/" + item).forEach((item2) => {
+      if (item2 != "index.json") {
+        let text = fs.readFileSync(
+          "./files/posts/" + item + "/" + item2,
+          "utf-8"
+        );
+
+        let title = text.split("\n")[0];
+        let desc = text.split("\n")[1];
+        let date = text.split("\n")[2];
+
+        postsIndex[item].push({
+          title: title,
+          desc: desc,
+          date: date,
+          slug: item2.split(".md")[0],
+        });
+      }
+    });
+    //sort posts by date
+    postsIndex[item].sort((a, b) => {
+      return new Date(b.date) - new Date(a.date);
+    });
+  }
+});
+
+fs.writeFileSync("./files/posts/index.json", JSON.stringify(postsIndex));
+
 // put blog posts in rss
 let posts = JSON.parse(fs.readFileSync("./files/posts/index.json").toString());
 let rss = fs.readFileSync("arthblog_template.rss").toString();
@@ -41,34 +76,39 @@ let rssp2 = rss.split("<!-- Posts -->")[(1, posts.length - 1)];
 let items = [];
 
 for (i in posts) {
-  let date = fs
-    .readFileSync("./files/posts/" + posts[i].slug + ".md")
-    .toString()
-    .split("\n")[2];
+  let langs = fs.readdirSync("./files/posts/");
+  for (j in langs) {
+    if (langs[j] == "en-US") {
+      let date = fs
+        .readFileSync("./files/posts/en-US/" + posts["en-US"][j].slug + ".md")
+        .toString()
+        .split("\n")[2];
 
-  items.push(
-    `<item>
+      items.push(
+        `<item>
 <title>` +
-      posts[i].title +
-      `</title>
+          posts["en-US"][j].title +
+          `</title>
 <description>
 ` +
-      posts[i].desc +
-      `
+          posts["en-US"][j].desc +
+          `
 </description>
 
 <link>https://backend.arthmc.xyz/view/post/` +
-      posts[i].slug +
-      `</link>
+          posts["en-US"][j].slug +
+          `</link>
 <guid isPermaLink="true">https://backend.arthmc.xyz/view/post/` +
-      posts[i].slug +
-      `</guid>
+          posts["en-US"][j].slug +
+          `</guid>
 <pubDate>` +
-      date +
-      `</pubDate>
+          date +
+          `</pubDate>
 
 </item>`
-  );
+      );
+    }
+  }
 }
 fs.writeFileSync(
   "arthblog.rss",
