@@ -1,4 +1,4 @@
-Arth Panel Actulización 1.2
+Arth Panel Actulización Beta 1.2
 !Una sistema de cuentas, nuevas opciones, y mucho más!
 2023-04-02
 DiamonC 
