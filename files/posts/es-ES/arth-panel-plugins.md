@@ -14,7 +14,7 @@ Después de poco más de un mes después de beta 1.0, ¡la actualización beta 1
 ## Plugins
 
 Plugins son un camino grande para añadir funcionalidad para tu servidor, hacer más divertido el juego, o dar seguridad addiciónal con características como copias de seguridad. Modrinth es una platforma moderna y rapidísmo para obteber mods y plugins, así que decidimos añadir una sección para buscar y añadir plugins de Modrinth. Además, hay una sección para plugins presentados, que muestra algunos de los plugins más comunes de tanto Modrinth y GitHub.
-	Junto con Geyser, ahora Floodgate se encuentra preinstalado también. Floodgate les permita jugadores de la edición de Bedrock jugar sin necesidad de una cuenta de la edición Java. Finalmente, añadimos un botón de Administrar Plugins. Puedes ver y eliminar todos los plugins de Modrinth o GitHub y plugins preinstalados.
+	Junto con Geyser, ahora Floodgate se encuentra preinstalado también. Floodgate les permita jugadores de la edición de Bedrock jugar sin necesitar una cuenta de la edición Java. Finalmente, añadimos un botón de Administrar Plugins. Puedes ver y eliminar todos los plugins de Modrinth o GitHub y plugins preinstalados.
 
 ## Correcciones de Errores
 
