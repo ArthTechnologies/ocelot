@@ -1,5 +1,5 @@
-Arth Panel Beta 1.3 
-7 months of improvements culminate in the Beta 1.3 update. 
+Arth Panel Actualización Beta 1.3 
+¡7 meses de mejores llegan en la actualización Beta 1.3!
 2023-11-02
 DiamonC 
 https://floss.social/@DiamonC 
@@ -9,39 +9,39 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 
 ![image-bordered](https://i.imgur.com/7PD9CMz.png)
 
-After 7 months, Arth Panel's beta 1.3 update is finally here with a significantly more stable experience, support for proxies, modded servers, updating servers, a file explorer, and so much more. If you're not familiar with Arth Panel, consider checking out our [Introducing Arth Panel](https://arthmc.xyz/blog/introducing-arth-panel) article.
+¡Después de 7 meses, la actualización beta 1.3 de Arth Panel está finalmente aquí con una experiencia más estable, compatibilidad con proxies, servidores con mods, actualizar servidores, una explorador de archivos, y mucho más! Si no estás familiarizado con Arth Panel, considere consultar nuestro artículo [Presentando Arth Panel](https://arthmc.xyz/blog/es-ES*presentando-arth-panel].
 
-## Modded Servers
+## Servidores con mods
 
-While most of the work was done in the last update, the feature wasn't quite ready. Now, you can run a modded server with quilt, forge, or fabric, and you can create it with a modpack, and/or add mods manually. While the catalogue of mods is quite large on modrinth, Arth Panel doesn't support CurseForge mods yet, as they are much less open with their APIs and it will likely require some setup on the panel owner's part.
+Aunque la mayoría de el trabajo era hecho en la actualización previa, la característica no fue lista. Ahora puedes ejecutar un servidor con quilt, forge o fabric, y puedes crearlo con un modpack y o añadir mods tú mismo. Anque hay muchos mods en Modrinth, Arth Panel no supporte mods de CurseForge ya porque ellos no son abiertos con su API y problamente require algún configuración de tu parte.
 
 ## Proxies
 
-Proxies are a special type of server that connect multiple servers, making them appear as one. Most servers use this in order to have a minigames section, survival section, etc in one server. Arth Panel now supports these, with some convenience features not seen on most other panels. It'll automatically set up any sub-server you add with the proxy if it is on the same panel, and since proxies load so quickly, it'll automatically restart it if you add a sub-server to apply the change.
+Proxies son un tipo de servidor especial que connectan servidores multiplés, hacer ellos verse como uno. La mayoría de los servidores usan ese para tener secciónes como minigames, supervivencia y más en un servidor singular. Arth Panel ahora supporte con algún characterísticas de conveniencia no son visto en la mayoría de los otros panels. Va a aútomaticamente configura alguno sub-server que añades al proxy, y porqué proxies ejecutar tan rapidíamente va a aútomaticamente reiniciar cuando añades un sub-server. 
 
 ## Server Updates
 
-You can finally update your servers, which was the last basic feature missing. You can also change your server to any available version. Arth Panel will tell you when your worldgen mods wont work with a certain version, so you can delete them or not update accordingly.
+¡Finalmente puedes actualizar tus servidores, lo cual estaba la última characterística principal ausente! También puedes cambiar tu servidor a todas las versiones. Arth Panel notificara cuando tus worldgen mods no pueden funcionar con una versión cierta.
 
-## Jars System
+## El sistema de Jars
 
-When testing out the update feature, we found that for some reason, you couldn't update to 1.20 or above on paper servers. The cause turned out to be serverjars.com, which hasn't uploaded a 1.20+ jar for paper **to this day**. So, we created a software called jarsmc that arth panel uses as backup whenever a jar isn't on serverjars.com. By default Arth Panel is already setup with our instance of jarsmc, but you could instead run your own if you want to have a different catalog of jars, or faster speeds.
+Cuando probando la characterística actualizar, notamos que por alguna razón no puedías actualizar para 1.20 o superior en servidores con paper. La causa fue serverjars.com, que no ha subía un jar 1.20 o superior **a este diá**. Así que creábamos un software llamado JarsMC que Arth Panel usa de respaldo cuando un jar no está en serverjars.com. Por defecto Arth Panel es configurada con nuestra instancia de jarsmc pero podías ejecutar tu instancia propia si quieres tener un catálogo de jars diferente, o velocidades más rápido.
 
-## The World Menu
+## El Menú Mundo
 
-While you could previously download your world, you can now upload a world, or regenerate a world. You can choose what worldgen mods it'll have, its world type, and its seed.
+Anque podrías ya descargar tu mundo, ahora puedes subir un mondo o regenerarlo. Puedes elegir qué worldgen mods, tipo de mundo y semilla tendrá. 
 
-## File explorer
+## Explorador de Archivos
 
-You can now edit certain text files from the panel, allowing you to configure most plugins. For security, you can't edit files like server.properties, or delete/edit executable files.
+Ahora puedes editar ciertos archivos textos en el panel, pudiendo configurar la mayoría de plugins. Por seguridad, no puedes editar archivos como server.properties o elimiar/editar archivos ejecutables. 
 
 ## The Future
-CurseForge is by far the largest platform for Minecraft mods, and it will be supported in the next update. While Modrinth is often faster, and is better for client-side mods (mods that only change things on your end, so you can still play on non-modded servers), there are many big mods and Modpacks that just aren't on Modrinth. Along with CurseForge support, File History should also come to the next update, allowing you to edit files without worrying.
+CurseForge es por mucho la platforma más popular para mods de Minecraft y va a ser compatible con la próxima actualización. Aunque usualmente Modrinth está más rápido y mejor para mods de cliente(Mods que solo cambian cosas en tu parte así que puedes jugar en servidores sin mods), hay muchos mods grandes que no son en Modrinth. Junto con suporte para CurseForge, historia de archivos debe ser añadido a la próxima actualización, poder editar archivos sin preocuparte.
 
-We've been working on ocelot, a master backend that connects instances of quartz, the backend of Arth Panel. This allows for you to add capacity for more servers by adding more quartz instances on different computers. While it wasn't quite ready for this update, it should be supported soon.
+Hemos sido trabajando en ocelot, un "backend principal" que conecta instancias de Quartz (El software de API de Arth Panel). Este te permite añadir más capacidad para más servidores añadiendo más instancias de quartz en computadoras diferentes. Aunque no fue listo, debe ser compatible pronto.
 
-Accessibility is a major priority, and right now, to setup the panel you need to go into the stores folder, and edit values in various files. We want to put every setting you need into one unified file. On the frontend, you also have to dig through some folders in order to connect it to your own instance of quartz.
+Accesibilidad está una prioridad mayor, y actualmente para instalar el panel necesitas editar archivos múltiples en la carpeta "stores". Queremos hacer un archivo unificado para todos los ajustes que necesitas. En la interfaz, también necesitas buscar muchas carpetas para conectarlo a tu instancia de Quartz.
 
-To get out of beta, we need to do a variety of things. Firstly, we need to add more layers of security. While Arth Panel has security for accounts and servers, anyone who knows anything about cybersecurity knows that nothing is 100% safe. Therefore, we need to add additional layers of security, as well as backups to make sure no-one's data is lost (unless they want to delete it, of course). On the technical side of things, we need to re-organize, and re-name some API routes so they make the most sense, because after we get out of beta, changes like that require making a whole new version of the API. There's also many areas in the code that could be cleaned up, shortened, and have more comments.
+Para salir beta, necesitamos hacer muchas cosas. Primero, necesitamos añadir más capas de seguridad. Aunque Arth Panel tiene seguridad para cuentas y servidores, cualquiera que sabe cualquier cosa sobre seguridad sabe que nada está 100% seguro. Por lo tanto necesitamos añadir capas de seguridad adicionales y copias de seguridad para asegurar los datos de nadie está perdido (A menos que quieren para eliminarlo, claro). En la parte técnico de cosas, necesitamos reorganizar y renombrar algunos de las rutas de API porqué después de salir beta, cambios como ellos requiera hacer una versión de API nueva. Hay también muchas áreas en el código que podría ser limpiarse, acortarse, y tener más comentarios.
 
-Keep an eye on our Mastodon and our blog for new updates, and as always, consider checking out/contributing to Arth Panel at [codeberg](https://codeberg.org/arth/).
+Mantienes atento a nuestro Mastodon y blog para actualizaciones nuevas y como siempre, consideras consultar o colaborar con nosotros en [codeberg](https://codeberg.org/arth/).
