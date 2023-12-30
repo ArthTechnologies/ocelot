@@ -13,14 +13,14 @@ Después de poco más de un mes después de beta 1.0, ¡la actualización beta 1
 
 ## Plugins
 
-Plugins son un camino grande para añadir funcionalidad para tu servidor, hacer más divertido el juego, o dar seguridad addiciónal con características como copias de seguridad. Modrinth es una platforma moderna y rapidísmo para obteber mods y plugins, así que decidimos añadir una sección para buscar y añadir plugins de Modrinth. Además, hay una sección para plugins presentados, que muestra algunos de los plugins más comunes de tanto Modrinth y GitHub.
+Plugins son un camino grande para añadir funcionalidad para tu servidor, hacer más divertido el juego, o dar seguridad addiciónal con características como copias de seguridad. Modrinth es una platforma moderna y rapidísmo para obteber mods y plugins, así que decidimos añadir una sección para buscar y añadir plugins de Modrinth. Además, hay una sección para plugins presentados, que nuestra algunos de los plugins más comunes de tanto Modrinth y GitHub.
 	Junto con Geyser, ahora Floodgate se encuentra preinstalado también. Floodgate les permita jugadores de la edición de Bedrock jugar sin necesitar una cuenta de la edición Java. Finalmente, añadimos un botón de Administrar Plugins. Puedes ver y eliminar todos los plugins de Modrinth o GitHub y plugins preinstalados.
 
 ## Correcciones de Errores
 
 El terminal ha estado la parte con más errores en la interfaz desde su introducción. Un gran problema fue que todo fue en una línea, haciendo el terminal muy difícil para leer. Otra cuestión muy importante fue comandos no enviendo porque el API verificó si un commando nuevo fue enviado cada 200 segundos, así que si más que un solo comando eran enviado en ese tiempo el terminal podría romperse hasta que el servidor se reiniciaba. Tanto de estos errores han estado corregía, permitándonos centrarnos en characterísticas nuevas.
 
-Hemos añadido muchas characterísticas pequeñas como el worldgen mod "Structory", atajos de commandos, código más eficiente, y UI más intuitivo. También hemos añadido opciones experimentales que se necesitan habilitar que te permitan eliminar pagos y autenticación en tu panel, un opción excelente si tu panel solo para tus amigos y personas en que confias.
+Hemos añadido muchas characterísticas pequeñas como el worldgen mod "Structory", atajos de commandos, código más eficiente, y UI más intuitivo. También hemos añadido opciones experimentales que se necesitan habilitar que te permiten eliminar pagos y autenticación en tu panel, una opción excelente si tu panel solo para tus amigos y personas en que confias.
 
 ## El Futuro
 
