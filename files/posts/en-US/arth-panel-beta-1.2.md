@@ -45,8 +45,4 @@ Our main focus now is adding support for modded servers, such as forge and quilt
 
 While this update has a large number of breaking changes, given we had to replace our whole account system among other things, we hope to start putting the pieces in place for a stable release soon. The main things to work on are making it easy to upgrade servers to new versions and making the API routes more consistent.
 
-## Arth Hosting
-
-We're launching our own instance of Arth Panel called Arth Hosting. It'll offer Minecraft servers at $3/mo for the rest of 2023, $5/mo after that. If you don't have any server computers to run Arth Panel on, or just want to support us, consider checking it out at [arthmc.xyz](https://arthmc.xyz/).
-
  Keep an eye on our Mastodon and our blog for new updates, and as always, consider checking out/contributing to Arth Panel at [codeberg](https://codeberg.org/arth/).
