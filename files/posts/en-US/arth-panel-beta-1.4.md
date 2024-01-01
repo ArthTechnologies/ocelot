@@ -1,5 +1,5 @@
 Arth Panel Beta 1.4  
-CurseForge support, easy setup, security upgrades, discord accounts, and more are here in the beta 1.4 update.  
+CurseForge support, easy setup, security upgrades, discord accounts, and more is here in the beta 1.4 update.  
 2024-01-01
 DiamonC 
 https://floss.social/@DiamonC 
