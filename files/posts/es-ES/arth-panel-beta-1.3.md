@@ -1,5 +1,5 @@
 Arth Panel Actualización Beta 1.3 
-¡7 meses de mejores llegan en la actualización Beta 1.3!
+¡7 meses de mejoras llegan en la actualización Beta 1.3!
 2023-11-02
 DiamonC 
 https://floss.social/@DiamonC 
@@ -25,7 +25,7 @@ Proxies son un tipo de servidor especial que connectan servidores multiplés, ha
 
 ## El sistema de Jars
 
-Cuando probando la characterística actualizar, notamos que por alguna razón no puedías actualizar para 1.20 o superior en servidores con paper. La causa fue serverjars.com, que no ha subía un jar 1.20 o superior **a este diá**. Así que creábamos un software llamado JarsMC que Arth Panel usa de respaldo cuando un jar no está en serverjars.com. Por defecto Arth Panel es configurada con nuestra instancia de jarsmc pero podías ejecutar tu instancia propia si quieres tener un catálogo de jars diferente, o velocidades más rápido.
+Cuando probando la characterística actualizar, notamos que por alguna razón no puedías actualizar para 1.20 o superior en servidores con paper. La causa fue serverjars.com, que no ha subía un jar 1.20 o superior **a esta diá**. Así que creábamos un software llamado JarsMC que Arth Panel usa de respaldo cuando un jar no está en serverjars.com. Por defecto Arth Panel es configurada con nuestra instancia de jarsmc pero podías ejecutar tu instancia propia si quieres tener un catálogo de jars diferente, o velocidades más rápido.
 
 ## El Menú Mundo
 
