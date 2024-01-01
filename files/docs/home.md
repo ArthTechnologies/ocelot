@@ -2,8 +2,8 @@ Arth Quartz provides a REST api allowing frontends to create and manage serves, 
 
 # Universal Header Parameters
 
-These parameters will be needed to make a request on behalf of an account. The exceptions are `/accounts/email/signup` and `/accounts/email/signin`, which don't require universal headers.
+These parameters will be needed to make a request on behalf of an account. The exceptions are the signin and signup routes, which don't require universal headers.
 
-- `token`: A UUID that lets you send web requests on behalf of an account. This is returned by `/accounts/email/signup` and `/accounts/email/signin` upon a successful request.
+- `token`: A UUID that lets you send web requests on behalf of an account. This is returned by the signup and signin routes upon a successful request.
 
-- `email`: The email of a user's account.
+- `username`: Formatted as the account type (like email or discord), then a colon (:), then the username/email.

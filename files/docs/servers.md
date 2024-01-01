@@ -1,5 +1,8 @@
 # Servers
 
+### GET /server/claimId
+
+This route lets you claim a server id, which you can then create a server with
 ### GET /server/`id`
 
 This route lets you get a server's state (wether it's on, off or starting), as well as it's name, software, version, and worldgen mods.
@@ -48,7 +51,7 @@ This route lets you add a mod/plugin to your server.
 - `pluginId`: A unique identifier for your mod. For custom, its the lowercase name of the plugin, for github its author/repo, and for labrinth it's the project id.
 - `pluginName`: A human-readable name for your mod.
 
-### POST /`id`/version
+### POST /server/`id`/version
 
 This route lets you change the server's version.
 
@@ -75,13 +78,13 @@ This route lets you stop and delete a server, as well as get rid of all it's inf
 
 **No Parameters**
 
-### POST /server/new
+### POST /server/new/`id`
 
 This route lets you create a new server.
 
 **Query Parameters:**
 
-- `email`: The email of a user's account. If stripe is enabled, this email will be checked on stripe for an active subscription.
+- `username`: The username of a user's account, ex `email:john@gmail.com`. If stripe is enabled, this account's email (if the account is a non-email account, you should still just put the username here) will be checked on stripe for an active subscription.
 
 **Body Parameters:**
 
@@ -89,6 +92,9 @@ This route lets you create a new server.
 - `software` The software. Check https://serverjars.com for valid options.
 - `version`: The minecraft version. `latest` is also valid, and that makes it so a server automatically updates to the latest version.
 - `addons`: An array of worldgen mods. Valid items are `terralith`, `nullscape`, and `incendium`.
+- `modpackURL`: The download url of a modpack
+- `modpackID`: The CurseForge or Modrinth ID of that modpack
+- `modpackVersionID`: The CurseForge or Modrinth ID of the specific version you're using.
 
 ### POST /server/`id`/addplugin
 
@@ -100,13 +106,13 @@ This route lets you add a plugin from modrinth to a server.
 
 ### GET /servers
 
-Get every server under a email address.
+Get every server an account has.
 
 **No Parameters**
 
 **Query Parameters:**
 
-- `email`: An email of an account.
+- `username`: The username of an account.
 
 ### GET /server/`id`/world
 

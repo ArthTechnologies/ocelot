@@ -9,6 +9,7 @@ This route lets a user create an account with an email and password.
 - `password`: The password you want to use for the account. Must be at least 7 characters long.
 - `confirmPassword`: This should be the same as your password.
 - `email`: The email you want to use for the account.
+- `cloudflareVerifyToken`: If the instance has setup cloudflare turnstile, this is the token that is returned by cloudflare after it succesfully verifies a user is human.
 
 **Response:**
 
@@ -34,6 +35,7 @@ This route lets a user sign in to an already existing email-based account.
 
 - `password`
 - `email`
+- `cloudflareVerifyToken`: If the instance has setup cloudflare turnstile, this is the token that is returned by cloudflare after it succesfully verifies a user is human.
 
 **Response:**
 
@@ -47,3 +49,17 @@ This route deletes an account.
 **Query Parameters**
 
 - `Password`
+
+### POST /discord
+
+This is the combined signin and signup route for accounts with discord
+
+**Query Parameters**
+
+- `token`: The token returned by discord after the user authorizes your application.
+
+### DELETE /discord
+
+This lets you delete your account on the quartz instance that was created with discord.
+
+**No Parameters**
