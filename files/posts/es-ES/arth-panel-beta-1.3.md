@@ -9,15 +9,15 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 
 ![image-bordered](https://i.imgur.com/7PD9CMz.png)
 
-¡Después de 7 meses, la actualización beta 1.3 de Arth Panel está finalmente aquí con una experiencia más estable, compatibilidad con proxies, servidores con mods, actualizar servidores, una explorador de archivos, y mucho más! Si no estás familiarizado con Arth Panel, considere consultar nuestro artículo [Presentando Arth Panel](https://arthmc.xyz/blog/es-ES*presentando-arth-panel].
+¡Después de 7 meses, la actualización beta 1.3 de Arth Panel está finalmente aquí con una experiencia más estable, compatibilidad con proxies, servidores con mods, actualizar servidores, una explorador de archivos, y mucho más! Si no estás familiarizado con Arth Panel, considere consultar nuestro artículo [Presentando Arth Panel](https://arthmc.xyz/blog/es-ES*presentando-arth-panel).
 
 ## Servidores con mods
 
-Aunque la mayoría de el trabajo era hecho en la actualización previa, la característica no fue lista. Ahora puedes ejecutar un servidor con quilt, forge o fabric, y puedes crearlo con un modpack y o añadir mods tú mismo. Anque hay muchos mods en Modrinth, Arth Panel no supporte mods de CurseForge ya porque ellos no son abiertos con su API y problamente require algún configuración de tu parte.
+Aunque la mayoría de el trabajo era hecho en la actualización previa, la característica no fue lista. Ahora puedes ejecutar un servidor con quilt, forge o fabric, y puedes crearlo con un modpack y o añadir mods tú mismo. Aunque hay muchos mods en Modrinth, Arth Panel no supporte mods de CurseForge ya porque ellos no son abiertos con su API y problamente require algún configuración de tu parte.
 
 ## Proxies
 
-Proxies son un tipo de servidor especial que connectan servidores multiplés, hacer ellos verse como uno. La mayoría de los servidores usan ese para tener secciónes como minigames, supervivencia y más en un servidor singular. Arth Panel ahora supporte con algún characterísticas de conveniencia no son visto en la mayoría de los otros panels. Va a aútomaticamente configura alguno sub-server que añades al proxy, y porqué proxies ejecutar tan rapidíamente va a aútomaticamente reiniciar cuando añades un sub-server. 
+Proxies son un tipo de servidor especial que conectan servidores multiplés, hacer ellos verse como uno. La mayoría de los servidores usan ese para tener secciónes como minigames, supervivencia y más en un servidor singular. Arth Panel ahora supporte con algún characterísticas de conveniencia no son visto en la mayoría de los otros panels. Va a aútomaticamente configura alguno sub-server que añades al proxy, y porqué proxies ejecutar tan rapidíamente va a aútomaticamente reiniciar cuando añades un sub-server. 
 
 ## Server Updates
 
@@ -29,7 +29,7 @@ Cuando probando la characterística actualizar, notamos que por alguna razón no
 
 ## El Menú Mundo
 
-Anque podrías ya descargar tu mundo, ahora puedes subir un mondo o regenerarlo. Puedes elegir qué worldgen mods, tipo de mundo y semilla tendrá. 
+Aunque podrías ya descargar tu mundo, ahora puedes subir un mondo o regenerarlo. Puedes elegir qué worldgen mods, tipo de mundo y semilla tendrá. 
 
 ## Explorador de Archivos
 
