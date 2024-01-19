@@ -16,8 +16,8 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 Originalmente, Arth Panel usaba una aplicación llamada Pocketbase para administrar cuentas. El razón principal de abandonarlo es que tener una tercera aplicación (El API Quartz y la interfaz Observer siendo el primero dos) con una idioma de programación diferente, programadores diferentes, y su propio interfaz en línea y base de datos añada muchas complejidades a Arth Panel.
 	Además de seguridad, hace el panel menos accesible a tu usuario medio. Arth Panel fue creado ser lo mas accesible posible porque los alternativos fueron muy difícil para principiantes para instalar.
 
-## La sistema de cuentas nueva
-La sistema de cuentas nueva reserva cuentas en el archivo accounts.json. Todo lo que necesitas es un correo electrónico y contraseña para iniciar sesión o registrar. Como la mayoría de los sitos web, contraseñas son se reservan como hashes (texto que no puede ser rastrear a tu contraseña) así que si alguien hackeado en tu computadora servidor, no puede ver los contraseñas de tus usurarios. Sales (números o textos aleatorios que son añadido a cada hash) son también usa prevenir hackers buscando de contraseñas comunes como "contraseña123".
+## El sistema de cuentas nueva
+El sistema de cuentas nueva reserva cuentas en el archivo accounts.json. Todo lo que necesitas es un correo electrónico y contraseña para iniciar sesión o registrar. Como la mayoría de los sitos web, contraseñas son se reservan como hashes (texto que no puede ser rastrear a tu contraseña) así que si alguien hackeado en tu computadora servidor, no puede ver los contraseñas de tus usurarios. Sales (números o textos aleatorios que son añadido a cada hash) son también usa prevenir hackers buscando de contraseñas comunes como "contraseña123".
 
 Puedes restablecer tu contraseña y eliminar tu cuenta desde la pagina de administrar cuenta. Si olvidado tu contraseña, necesitaras ingresar los últimos 4 dígitos de tu tarjeta y tu contraseña nuevo. Para mantener seguridad, solo tienes 5 intentos.
 
