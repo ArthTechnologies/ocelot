@@ -35,7 +35,7 @@ Router.post("/", (req, res) => {
     if(platform.includes("Linux")){
 
         analytics.devices.linux++;
-    } else if (platform.includes("Windows")){
+    } else if (platform.includes("Win")){
 
         analytics.devices.windows++;
     } else if (platform.includes("Macintosh")){
@@ -47,7 +47,9 @@ Router.post("/", (req, res) => {
     } else if (platform.includes("iP")){
 
         analytics.devices.iOS++;
-    } 
+    } else {
+        analytics.devices.unknown++;
+    }
 
  
     fs.writeFileSync("analytics.json", JSON.stringify(analytics));
