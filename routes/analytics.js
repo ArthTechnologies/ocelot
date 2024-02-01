@@ -1,5 +1,4 @@
 
-
 const express = require("express");
 const Router = express.Router();
 const fs = require("fs");
@@ -11,18 +10,15 @@ Router.get("/", (req, res) => {
 
 //disabled until new privacy policy goes into effect
 Router.post("/", (req, res) => {
-    //if it's april 17th 2023 or later...
-    if (new Date().getTime() > 1671424000000) {
+
         //how many days since 1970
     let day = new Date().getTime() / 1000 / 60 / 60 / 24;
     day = parseInt(day.toString().split('.')[0]);
     
-    console.log(day)
     let platform = req.body.platform;
     let analytics = JSON.parse(fs.readFileSync("analytics.json"));
     analytics.day = day;
     analytics.hits++;
-    console.log(analytics.days[day]);
     if (analytics.days[day] == undefined){
         analytics.days[day] = 1;
     } else {
@@ -51,12 +47,10 @@ Router.post("/", (req, res) => {
         analytics.devices.unknown++;
     }
 
- 
+    console.log("platform: " + platform)
     fs.writeFileSync("analytics.json", JSON.stringify(analytics));
     res.send({"msg":"ok"})
-    } else {
-        res.send({"msg":"Analytics are disabled until the new privacy policy goes into effect"});
-    }
+
 });
 
 module.exports = Router;
