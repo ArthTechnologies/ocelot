@@ -9,8 +9,6 @@ Router.get("/:posttype/:filename", (req, res) => {
     "/" +
     req.params.filename.split("*").join("/");
   let text = "";
-  //log the current working directory
-  console.log("path: " + path);
   //log the path
 
   if (fs.existsSync(path)) {
