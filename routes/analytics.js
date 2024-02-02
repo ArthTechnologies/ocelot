@@ -14,6 +14,8 @@ Router.post("/", (req, res) => {
   day = parseInt(day.toString().split(".")[0]);
 
   let platform = req.body.platform;
+  console.log(req.body);
+  console.log(req.body.useragent);
   let analytics = JSON.parse(fs.readFileSync("analytics.json"));
   analytics.day = day;
   analytics.hits++;
