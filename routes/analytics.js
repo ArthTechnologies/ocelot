@@ -13,9 +13,7 @@ Router.post("/", (req, res) => {
   let day = new Date().getTime() / 1000 / 60 / 60 / 24;
   day = parseInt(day.toString().split(".")[0]);
 
-  let platform = req.body.platform;
-  console.log(req.body);
-  console.log(req.body.useragent);
+  let userAgent = req.body.userAgent;
   let analytics = JSON.parse(fs.readFileSync("analytics.json"));
   analytics.day = day;
   analytics.hits++;
@@ -28,21 +26,20 @@ Router.post("/", (req, res) => {
     }
   }
 
-  if (platform.includes("Linux")) {
+  if (userAgent.includes("Linux")) {
     analytics.devices.linux++;
-  } else if (platform.includes("Win")) {
+  } else if (userAgent.includes("Win")) {
     analytics.devices.windows++;
-  } else if (platform.includes("Mac")) {
+  } else if (userAgent.includes("Mac")) {
     analytics.devices.macintosh++;
-  } else if (platform.includes("Android")) {
+  } else if (userAgent.includes("Android")) {
     analytics.devices.android++;
-  } else if (platform.includes("iP")) {
+  } else if (userAgent.includes("iP")) {
     analytics.devices.iOS++;
   } else {
     analytics.devices.unknown++;
   }
 
-  console.log("platform: " + platform);
   console.log("userAgent: " + req.body.userAgent);
   fs.writeFileSync("analytics.json", JSON.stringify(analytics));
   res.send({ msg: "ok" });
