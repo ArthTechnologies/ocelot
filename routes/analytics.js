@@ -30,12 +30,12 @@ Router.post("/", (req, res) => {
     analytics.devices.linux++;
   } else if (userAgent.includes("Win")) {
     analytics.devices.windows++;
-  } else if (userAgent.includes("Mac")) {
-    analytics.devices.macintosh++;
   } else if (userAgent.includes("Android")) {
     analytics.devices.android++;
-  } else if (userAgent.includes("iP")) {
+  } else if (userAgent.includes("iPad") || userAgent.includes("iPhone")) {
     analytics.devices.iOS++;
+  } else if (userAgent.includes("Mac")) {
+    analytics.devices.macintosh++;
   } else {
     analytics.devices.unknown++;
   }
