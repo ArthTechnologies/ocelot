@@ -27,19 +27,19 @@ Router.post("/", (req, res) => {
   }
   //this makes sure google crawlers arent counted in analytics
   if (!userAgent.includes("google.com/")) {
-  if (userAgent.includes("Android")) {
-    analytics.devices.andriod++;
-  } else if (userAgent.includes("Win")) {
-    analytics.devices.windows++;
-  } else if (userAgent.includes("Linux")) {
-    analytics.devices.linux++;
-  } else if (userAgent.includes("iPad") || userAgent.includes("iPhone")) {
-    analytics.devices.iOS++;
-  } else if (userAgent.includes("Mac")) {
-    analytics.devices.macintosh++;
-  } else {
-    analytics.devices.unknown++;
-  }
+    if (userAgent.includes("Android")) {
+      analytics.devices.android++;
+    } else if (userAgent.includes("Win")) {
+      analytics.devices.windows++;
+    } else if (userAgent.includes("Linux")) {
+      analytics.devices.linux++;
+    } else if (userAgent.includes("iPad") || userAgent.includes("iPhone")) {
+      analytics.devices.iOS++;
+    } else if (userAgent.includes("Mac")) {
+      analytics.devices.macintosh++;
+    } else {
+      analytics.devices.unknown++;
+    }
   }
 
   console.log("userAgent: " + req.body.userAgent);
