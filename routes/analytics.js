@@ -16,7 +16,7 @@ Router.post("/", (req, res) => {
   let userAgent = req.body.userAgent;
   let analytics = JSON.parse(fs.readFileSync("analytics.json"));
   analytics.day = day;
-  analytics.hits++;
+
   if (analytics.days[day] == undefined) {
     analytics.days[day] = 1;
   } else {
@@ -27,6 +27,7 @@ Router.post("/", (req, res) => {
   }
   //this makes sure google crawlers arent counted in analytics
   if (!userAgent.includes("google.com/")) {
+    analytics.hits++;
     if (userAgent.includes("Android")) {
       analytics.devices.android++;
     } else if (userAgent.includes("Win")) {
