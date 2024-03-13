@@ -40,9 +40,16 @@ Router.post("/", (req, res) => {
     } else {
       analytics.devices.unknown++;
     }
+
+    if (req.body.locale.includes("en")) {
+      analytics.languages.english++;
+    } else if (req.body.locale.includes("es")) {
+      analytics.languages.spanish++;
+    }
   }
 
   console.log("userAgent: " + req.body.userAgent);
+  console.log("language: " + req.body.locale);
   fs.writeFileSync("analytics.json", JSON.stringify(analytics));
   res.send({ msg: "ok" });
 });

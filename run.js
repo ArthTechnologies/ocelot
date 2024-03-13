@@ -15,7 +15,15 @@ if (!fs.existsSync("analytics.json")) {
       day: 0,
       days: {},
       hits: 0,
-      devices: { linux: 0, windows: 0, macintosh: 0, android: 0, iOS: 0, unknown: 0 },
+      devices: {
+        linux: 0,
+        windows: 0,
+        macintosh: 0,
+        android: 0,
+        iOS: 0,
+        unknown: 0,
+      },
+      languages: { english: 0, spanish: 0 },
     })
   );
 }
