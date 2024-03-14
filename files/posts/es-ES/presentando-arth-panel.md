@@ -26,7 +26,7 @@ En el **1 de Diciembre**, Los repositorios de Arth Panel fue conmovido porque te
 En el **1 de enero**, Arth Panel entraba beta con su actualización más grande.
 
 ## ¿Y ahora qué?
-Nuestra prioridad es la estabilidad, seguridad y realizar la documentación. Eventualmente, queremos añadir caminos para federarse con otros panels, caminos para iniciar sesión con otras platformas como Discord o Google, combinar Pocketbase (un API para cuentas) con quartz (nuestro API principal) y eventualmente añadir codificación cuando es posíble.
+Nuestra prioridad es la estabilidad, seguridad y realizar la documentación. Eventualmente, queremos añadir caminos para federarse con otros panels, caminos para iniciar sesión con otras plataformas como Discord o Google, combinar Pocketbase (un API para cuentas) con quartz (nuestro API principal) y eventualmente añadir codificación cuando es posíble.
 
 Puedes probar o colaborar con la programación con nosotros en [codeberg](https://codeberg.org/arth).
 
