@@ -15,7 +15,7 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 ¡Hace mas que un año después de [Arth Panel]((https://arthmc.xyz/blog/introducing-arth-panel)) empiezó beta, y progreso no ha retrasa un poco, con compatibilidad con CurseForge, mejores con la interfaz, muchos mejores seguridades, y mucho más!
 
 
-## Security
+## Seguridad
 Seguridad ha mejoró mucho, con muchas características nuevas como el verificar que usted es humano botón con Cloudflare, copias de seguridad cada 12 horas, y buscar en virus usando `clamdscan` cuando un archivo de mundo está subiendo.
 ### Compatibilidad con CurseForge
 Añadimos compatibilidad con CurseForge además de Modrinth. CurseForge es la plataforma más grande para mods y tiene muchos mods y modpacks increíbles como RLCraft. Para permitirlo, necesitas obtener una clave de API de CurseForge.
