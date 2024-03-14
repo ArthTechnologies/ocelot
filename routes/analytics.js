@@ -42,13 +42,16 @@ Router.post("/", (req, res) => {
       analytics.devices.unknown++;
     }
 
-    if (req.body.locale.includes("en")) {
+    if (req.body.locale.includes("en") || req.body.locale.includes("EN")) {
       analytics.languages.english++;
-    } else if (req.body.locale.includes("es")) {
+    } else if (
+      req.body.locale.includes("es") ||
+      req.body.locale.includes("ES")
+    ) {
       analytics.languages.spanish++;
     }
   }
-
+  console.log("time: " + new Date().toString());
   console.log("userAgent: " + req.body.userAgent);
   console.log("language: " + req.body.locale);
   fs.writeFileSync("analytics.json", JSON.stringify(analytics));
