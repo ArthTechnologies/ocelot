@@ -49,6 +49,8 @@ Router.post("/", (req, res) => {
       req.body.locale.includes("ES")
     ) {
       analytics.languages.spanish++;
+    } else {
+      analytics.languages.unknown++;
     }
   }
   console.log("time: " + new Date().toString());
