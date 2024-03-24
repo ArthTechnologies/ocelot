@@ -1,4 +1,4 @@
-{"published":"11:00AM, 2023-01-29", "effective":"11:00AM, 2023-02-28", "version":2}
+{"published":"7:35PM, 2023-03-18", "effective":"11:00AM, 2023-04-17", "version":3}
 
 # Your data on Arth Hosting
 
@@ -27,7 +27,14 @@ Source code hosting is used by almost everyone who is developing software, inclu
 
 ### Analytics
 
-Many websites use analytics to gather data about how popular their services are, where their users are located, etc. We currently do not have analytics, but if we do in the future it will not be Google Analytics.
+Arth collects two pieces of information to better know how many people are using its services:
+
+1. Your Platform (Ex: iOS, Android, Linux, Windows, Mac)
+2. Your Language (Ex: En_Us, Es_Es)
+
+If your browser sends a do not track signal, your analytics will not be collected. Additionally, you can also opt-out of analytics by setting "allowAnalytics" in local storage to false using your browser's developer tools.
+
+Your analytics are only collected by Arth and do not go through a third party such as Google Analytics.
 
 ### Ads
 
@@ -37,4 +44,4 @@ Ads currently would serve no purpose on our websites and services, but if the ne
 
 
 Changes to these terms:
-- If changes to these terms are needed, we will put them into effect 30 days after the changes are made visible.
+- If changes to these terms are needed, we will put them into effect a month after the changes are made visible.
