@@ -25,6 +25,8 @@ if (!fs.existsSync("analytics.json")) {
       },
       languages: { english: 0, spanish: 0, unknown: 0 },
       getStartedButtonClicks: 0,
+      returning: 0,
+      initial: 0,
     })
   );
 }

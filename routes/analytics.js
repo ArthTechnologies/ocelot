@@ -28,6 +28,11 @@ Router.post("/", (req, res) => {
   //this makes sure google crawlers arent counted in analytics
   if (!userAgent.includes("google.com/")) {
     analytics.hits++;
+    if (req.body.returning) {
+      analytics.returning++;
+    } else {
+      analytics.initial++;
+    }
     if (userAgent.includes("Android")) {
       analytics.devices.android++;
     } else if (userAgent.includes("Win")) {
@@ -54,7 +59,12 @@ Router.post("/", (req, res) => {
     }
     console.log("userAgent: " + req.body.userAgent);
     console.log(
-      "language: " + req.body.locale + " & time: " + new Date().toString()
+      "language: " +
+        req.body.locale +
+        " & time: " +
+        new Date().toString() +
+        " returning " +
+        req.body.returning
     );
   }
 
