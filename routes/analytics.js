@@ -52,9 +52,10 @@ Router.post("/", (req, res) => {
     } else {
       analytics.languages.unknown++;
     }
-    console.log("time: " + new Date().toString());
     console.log("userAgent: " + req.body.userAgent);
-    console.log("language: " + req.body.locale);
+    console.log(
+      "language: " + req.body.locale + " & time: " + new Date().toString()
+    );
   }
 
   fs.writeFileSync("analytics.json", JSON.stringify(analytics));
