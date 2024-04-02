@@ -9,7 +9,10 @@ Router.get("/", (req, res) => {
 
 //disabled until new privacy policy goes into effect
 Router.post("/", (req, res) => {
-  //how many days since 1970
+
+  //this makes sure google crawlers arent counted in analytics
+  if (!userAgent.includes("google.com/")) {
+      //how many days since 1970
   let day = new Date().getTime() / 1000 / 60 / 60 / 24;
   day = parseInt(day.toString().split(".")[0]);
 
@@ -25,8 +28,6 @@ Router.post("/", (req, res) => {
       analytics.max = analytics.days[day];
     }
   }
-  //this makes sure google crawlers arent counted in analytics
-  if (!userAgent.includes("google.com/")) {
     analytics.hits++;
     if (req.body.returning) {
       analytics.returning++;
@@ -66,9 +67,10 @@ Router.post("/", (req, res) => {
         " returning " +
         req.body.returning
     );
+      fs.writeFileSync("analytics.json", JSON.stringify(analytics));
   }
 
-  fs.writeFileSync("analytics.json", JSON.stringify(analytics));
+
   res.send({ msg: "ok" });
 });
 
