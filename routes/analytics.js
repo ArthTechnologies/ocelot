@@ -9,14 +9,14 @@ Router.get("/", (req, res) => {
 
 //disabled until new privacy policy goes into effect
 Router.post("/", (req, res) => {
-
+  let userAgent = req.body.userAgent;
   //this makes sure google crawlers arent counted in analytics
   if (!userAgent.includes("google.com/")) {
       //how many days since 1970
   let day = new Date().getTime() / 1000 / 60 / 60 / 24;
   day = parseInt(day.toString().split(".")[0]);
 
-  let userAgent = req.body.userAgent;
+
   let analytics = JSON.parse(fs.readFileSync("analytics.json"));
   analytics.day = day;
 
