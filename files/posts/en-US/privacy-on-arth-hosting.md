@@ -19,7 +19,7 @@ While policy length is not as important as the policies themselves, it's still v
   We encourage you to look at the following policies as well as our [own privacy policy](https://arthmc.xyz/privacy) yourself.    
 
   One thing you'll find in almost every third-party section of privacy policies is exemptions for parties that assist in the operation of the service.
-> "We may share your personal information with companies or individuals that assist us in providing services to you."
+> We may share your personal information with companies or individuals that assist us in providing services to you.
 > <h6>Source: Apex Hosting Privacy Policy</h6>
 
 While there will always be some third parties necessary, like a payment processor, we keep this to an absolute minimum. While the majority of hosting services host your servers on a cloud computing service like Amazon Web Services, improving privacy as well as bringing down costs for our users were the main reasons for our decision to self-host the service.
@@ -27,7 +27,7 @@ While there will always be some third parties necessary, like a payment processo
 > Your personal information may be utilized by us or shared with partners, advertisers, advertising networks, social media platforms, analytics companies, and similar third parties to customize your advertising and marketing experiences.
 > <h6>Source: Apex Hosting Privacy Policy</h6>
 
-> "It's also important to note that we allow third-party behavioral tracking"
+> It's also important to note that we allow third-party behavioral tracking
 > <h6>Source: Bisect Hosting Privacy Policy</h6>  
 
 We also make sure all our software is [open-source](https://codeberg.org/arth), meaning the code behind our website, panel, etc is publicly viewable. Unlike closed-source panels like what most services have, you don't have to take our word that data isn't being sent to anyone not outlined on our policy, you can see for yourself!
