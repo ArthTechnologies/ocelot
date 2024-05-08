@@ -24,7 +24,7 @@ While policy length is not as important as the policies themselves, it's still v
 
 While there will always be some third parties necessary, like a payment processor, we keep this to an absolute minimum. While the majority of hosting services host your servers on a cloud computing service like Amazon Web Services, improving privacy as well as bringing down costs for our users were the main reasons for our decision to self-host the service.
   In addition to 'necessary' third parties, it's very common for services to supply information to all sorts of third parties.
-> "Your personal information may be utilized by us or shared with partners, advertisers, advertising networks, social media platforms, analytics companies, and similar third parties to customize your advertising and marketing experiences."
+> Your personal information may be utilized by us or shared with partners, advertisers, advertising networks, social media platforms, analytics companies, and similar third parties to customize your advertising and marketing experiences.
 > <h6>Source: Apex Hosting Privacy Policy</h6>
 
 > "It's also important to note that we allow third-party behavioral tracking"
