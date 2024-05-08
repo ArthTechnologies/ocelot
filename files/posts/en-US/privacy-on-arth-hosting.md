@@ -16,9 +16,9 @@ While policy length is not as important as the policies themselves, it's still i
 Apex Hosting, often considered the most popular hosting service has a policy over 20 pages long, which is **ten times** longer than our privacy policy at 2 pages (Since most privacy policies don't contain actual pages, they will be measured via pagelength on 11pt font). In addition, Arth Hosting's privacy policy at 2 pages is still shorter than Shockbyte's 3 pages and BisectHosting's 7 pages.
 
 ## Privacy far beyond the norm
-  We encourage you to look at the following policies as well as our [own privacy policy](https://arthmc.xyz/privacy) yourself.    
+We encourage you to look at the following policies as well as our [own privacy policy](https://arthmc.xyz/privacy) yourself.    
 
-  One thing you'll find in almost every third-party section of privacy policies is exemptions for parties that assist in the operation of the service.
+One thing you'll find in almost every third-party section of privacy policies is exemptions for parties that assist in the operation of the service.
 > We may share your personal information with companies or individuals that assist us in providing services to you.
 > <h6>Source: Apex Hosting Privacy Policy</h6>  
 
