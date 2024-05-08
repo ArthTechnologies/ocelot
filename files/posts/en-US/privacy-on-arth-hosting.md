@@ -9,10 +9,10 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 
 ![image-bordered](https://i.imgur.com/gzDCJU9.png)
 
-With 20+ page privacy policies common on Minecraft hosting services, it's often hard to tell how your data is really being handled. When designing our privacy practices, we wanted to make sure Arth Hosting's privacy practices were not just better than the leading competitors, but as good as possible.
+With 20+ page privacy policies common on Minecraft hosting services, it's often hard to tell how your data is really being handled. When designing our privacy practices, we wanted to make sure Arth Hosting's privacy practices were not just better than the leading competitors, but as good as they could possibly be.
 
 ## Privacy policy length
-While policy length is not as important as the policies themselves, it's still very important as a policy that's too long is often too much to read, resulting in missing a bunch of important clauses.
+While policy length is not as important as the policies themselves, it's still important because it's hard to read every clause in a policy that's too long.
   Apex Hosting, often considered the most popular hosting service has a policy over 20 pages long, which is **ten times** longer than our privacy policy at 2 pages (Since most privacy policies don't contain actual pages, they will be measured via pagelength on 11pt font). In addition, Arth Hosting's privacy policy at 2 pages is still shorter than Shockbyte's 3 pages and BisectHosting's 7 pages.
 
 ## Privacy far beyond the norm
