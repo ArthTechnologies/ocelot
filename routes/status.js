@@ -7,7 +7,7 @@ Router.get("/", (req, res) => {
 	let resp = {};
 	
 	let request = require("request");
-	request("https://api.arthmc.xyz", function(error, response, body){
+	request("https://us-dallas-1.arthmc.xyz", function(error, response, body){
 		if (error){
 			resp["quartz"] = "Offline";
 		} else {
