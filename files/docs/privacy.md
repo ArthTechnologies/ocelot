@@ -1,4 +1,4 @@
-{"published":"3:00PM, 2024-03-24", "effective":"3:00PM, 2024-03-24", "version":4}
+{"published":"3:00PM, 2024-05-21", "effective":"3:00PM, 2024-06-21", "version":5}
 
 
 ## Your data on Arth Hosting
@@ -28,10 +28,11 @@ We try to minimize third parties whenever possible for privacy and efficiency's 
 
 ### Analytics
 
-Arth collects two pieces of information from site visitors to better know how many people are using its services:
+Arth collects three pieces of information from site visitors to better know how many people are using its services:
 
 1. Your Platform (Ex: iOS, Android, Linux, Windows, Mac)
 2. Your Language (Ex: En_Us, Es_Es)
+3. The Referrer Site if applicable
 
 If your browser sends a do not track signal, your analytics will not be collected. Additionally, you can also opt-out of analytics by setting "allowAnalytics" in local storage to false using your browser's developer tools.
 
