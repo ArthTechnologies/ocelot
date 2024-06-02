@@ -47,7 +47,7 @@ Una cuestión mayor con la versión previa fue la experiencia en móvil. Aunque 
 
 algunos cambios menores incluyen: 
 -  añadir un menú para confirmar que quieres eliminar un servidor.
--  añadir un botón para descargar el archivo de mundo antes de eliminar un servidor.
+-  añadir un botón para descargar el archivo de mundo antes deliminar un servidor.
 -  añadir información como el numero de descargas en resultados de buscar de plugins.
 -  sustituir la mayoría de las alertas molestas con alertas que solo existen para unos segundos
 
@@ -56,10 +56,10 @@ algunos cambios menores incluyen:
 Accesibilidad está una prioridad importante, así que vamos a añadir documentación explanar todo una principiante necesita saber instalar el panel.
 
 
-Nuestro foco ahora está añadir compatibilidad con mods con forge y quilt, y compatibilidad con modpacks también. La mayoría de el tiempo de esa actualización fue pasaba trabajando en servidores con mods, pero hay muchos retos con implementando ellos y necesitamos demorar ese a la próxima actualización.
+Nuestro foco ahora está añadir compatibilidad con mods con forge y quilt, y compatibilidad con modpacks también. La mayoría del tiempo de esa actualización fue pasaba trabajando en servidores con mods, pero hay muchos retos con implementando ellos y necesitamos demorar ese a la próxima actualización.
 
 
-Aunque esta actualización tiene muchos cambios que rompen la compatibilidad, como necesitamos sustituir todo nuestro sistema de cuentas, esperamos iniciar trabaja para una actualización estable pronto. Las cosas principales trabajar en son lo hacer fácil para actualizar servidores y hacer las rutas de el API más constante.
+Aunque esta actualización tiene muchos cambios que rompen la compatibilidad, como necesitamos sustituir todo nuestro sistema de cuentas, esperamos iniciar trabaja para una actualización estable pronto. Las cosas principales trabajar en son lo hacer fácil para actualizar servidores y hacer las rutas del API más constante.
 
 
 

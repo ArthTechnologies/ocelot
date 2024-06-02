@@ -18,7 +18,7 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 ## Servidores con mods
 
 
-Aunque la mayoría de el trabajo era hecho en la actualización previa, la característica no fue lista. Ahora puedes ejecutar un servidor con quilt, forge o fabric, y puedes crearlo con un modpack y o añadir mods tú mismo. Aunque hay muchos mods en Modrinth, Arth Panel aún no suporta mods de CurseForge porque ellos no son abiertos con su API y probablemente require algún configuración de tu parte.
+Aunque la mayoría del trabajo era hecho en la actualización previa, la característica no fue lista. Ahora puedes ejecutar un servidor con quilt, forge o fabric, y puedes crearlo con un modpack y o añadir mods tú mismo. Aunque hay muchos mods en Modrinth, Arth Panel aún no suporta mods de CurseForge porque ellos no son abiertos con su API y probablemente require algún configuración de tu parte.
 
 
 ## Proxies
