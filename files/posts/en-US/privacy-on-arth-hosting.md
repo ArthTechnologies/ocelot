@@ -22,8 +22,8 @@ One thing you'll find in almost every third-party section of privacy policies is
 > We may share your personal information with companies or individuals that assist us in providing services to you.
 > <h6>Source: Apex Hosting Privacy Policy</h6>  
 
-While there will always be some third parties necessary, like a payment processor, we keep this to an absolute minimum. As of the time of writing, we don't use any cloud computing services, nor do we use tools like Google Analytics that would introduce trackers to our users.
-  In addition to 'necessary' third parties, it's very common for services to supply information to all sorts of third parties.
+While there will always be some third parties necessary, like a payment processor, we keep this to an absolute minimum. As of the time of writing, we don't use any cloud computing services, nor do we use tools like Google Analytics that would introduce trackers to our users.  
+In addition to 'necessary' third parties, it's very common for services to supply information to all sorts of third parties.
 > Your personal information may be utilized by us or shared with partners, advertisers, advertising networks, social media platforms, analytics companies, and similar third parties to customize your advertising and marketing experiences.
 > <h6>Source: Apex Hosting Privacy Policy</h6>
 
