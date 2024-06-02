@@ -1,6 +1,6 @@
 Privacy on Arth Hosting
 See how our privacy stacks up to competitors
-2024-14-05
+2024-1-06
 DiamonC 
 https://floss.social/@DiamonC 
 https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6516bdc6b0ff0203.jpeg
@@ -9,7 +9,7 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 
 ![image-bordered](https://i.imgur.com/gzDCJU9.png)
 
-With 20+ page privacy policies common on Minecraft hosting services, it's often hard to tell how your data is really being handled. When designing our privacy practices, we wanted to make sure Arth Hosting's privacy practices were not just better than the leading competitors, but as good as they could possibly be.
+With 20+ page privacy policies common on Minecraft hosting services, it's often hard to tell how your data is really being handled. When designing our privacy practices, we wanted to make sure that they were not just better than the leading competitors, but as good as they could possibly be.
 
 ## Privacy policy length
 While policy length is not as important as the policies themselves, it's still important because it's hard to read every clause in a policy that's too long.
@@ -22,7 +22,7 @@ One thing you'll find in almost every third-party section of privacy policies is
 > We may share your personal information with companies or individuals that assist us in providing services to you.
 > <h6>Source: Apex Hosting Privacy Policy</h6>  
 
-While there will always be some third parties necessary, like a payment processor, we keep this to an absolute minimum. While the majority of hosting services host your servers on a cloud computing service like Amazon Web Services, improving privacy as well as bringing down costs for our users were the main reasons for our decision to self-host the service.
+While there will always be some third parties necessary, like a payment processor, we keep this to an absolute minimum. As of the time of writing, we don't use any cloud computing services, nor do we use tools like Google Analytics that would introduce trackers to our users.
   In addition to 'necessary' third parties, it's very common for services to supply information to all sorts of third parties.
 > Your personal information may be utilized by us or shared with partners, advertisers, advertising networks, social media platforms, analytics companies, and similar third parties to customize your advertising and marketing experiences.
 > <h6>Source: Apex Hosting Privacy Policy</h6>

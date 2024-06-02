@@ -1,7 +1,7 @@
 <rss version="2.0">
 <channel>
 <title>Arth Blog</title>
-<description>Your gateway to running your own minecraft servers.</description>
+<description>See how our privacy stacks up to competitors</description>
 <link>https://arthmc.xyz/blog</link>
 
 <lastBuildDate>Sun, 8 Jan 2023 16:30:05 +0000</lastBuildDate>
@@ -23,7 +23,7 @@ https://arthmc.xyz/favicon.png
 <item>
 <title>Arth Panel Beta 1.4  </title>
 <description>
-CurseForge support, easy setup, security upgrades, discord accounts, and more are here in the beta 1.4 update.  
+CurseForge support, easy setup, security upgrades, discord accounts, and more is here in the beta 1.4 update.  
 </description>
 
 <link>https://backend.arthmc.xyz/view/post/arth-panel-beta-1.4</link>
@@ -69,5 +69,15 @@ Your gateway to running your own minecraft servers.
 <link>https://backend.arthmc.xyz/view/post/introducing-arth-panel</link>
 <guid isPermaLink="true">https://backend.arthmc.xyz/view/post/introducing-arth-panel</guid>
 <pubDate>2023-01-08</pubDate>
+
+</item><item>
+<title>Privacy on Arth Hosting</title>
+<description>
+See how our privacy stacks up to competitors
+</description>
+
+<link>https://backend.arthmc.xyz/view/post/privacy-on-arth-hosting</link>
+<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/privacy-on-arth-hosting</guid>
+<pubDate>2024-14-05</pubDate>
 
 </item>
