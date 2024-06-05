@@ -51,6 +51,7 @@ Router.post("/", (req, res) => {
       //add first half of locale to analytics
       let locale = req.body.locale.split("-")[0];
       //if locale is not in the array, add it
+      console.log("[!] Adding locale: " + locale);
       if (analytics.languages[locale] == undefined) {
         analytics.languages[locale] = 1;
       } else {

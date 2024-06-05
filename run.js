@@ -23,7 +23,7 @@ if (!fs.existsSync("analytics.json")) {
         iOS: 0,
         unknown: 0,
       },
-      languages: { english: 0, spanish: 0, unknown: 0 },
+      languages: { en: 0, es: 0 },
       getStartedButtonClicks: 0,
       returning: 0,
       initial: 0,
