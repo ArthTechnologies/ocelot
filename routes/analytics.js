@@ -12,22 +12,21 @@ Router.post("/", (req, res) => {
   let userAgent = req.body.userAgent;
   //this makes sure google crawlers arent counted in analytics
   if (!userAgent.includes("google.com/")) {
-      //how many days since 1970
-  let day = new Date().getTime() / 1000 / 60 / 60 / 24;
-  day = parseInt(day.toString().split(".")[0]);
+    //how many days since 1970
+    let day = new Date().getTime() / 1000 / 60 / 60 / 24;
+    day = parseInt(day.toString().split(".")[0]);
 
+    let analytics = JSON.parse(fs.readFileSync("analytics.json"));
+    analytics.day = day;
 
-  let analytics = JSON.parse(fs.readFileSync("analytics.json"));
-  analytics.day = day;
-
-  if (analytics.days[day] == undefined) {
-    analytics.days[day] = 1;
-  } else {
-    analytics.days[day]++;
-    if (analytics.days[day] > analytics.max) {
-      analytics.max = analytics.days[day];
+    if (analytics.days[day] == undefined) {
+      analytics.days[day] = 1;
+    } else {
+      analytics.days[day]++;
+      if (analytics.days[day] > analytics.max) {
+        analytics.max = analytics.days[day];
+      }
     }
-  }
     analytics.hits++;
     if (req.body.returning) {
       analytics.returning++;
@@ -48,15 +47,15 @@ Router.post("/", (req, res) => {
       analytics.devices.unknown++;
     }
 
-    if (req.body.locale.includes("en") || req.body.locale.includes("EN")) {
-      analytics.languages.english++;
-    } else if (
-      req.body.locale.includes("es") ||
-      req.body.locale.includes("ES")
-    ) {
-      analytics.languages.spanish++;
-    } else {
-      analytics.languages.unknown++;
+    if (!req.body.returning) {
+      //add first half of locale to analytics
+      let locale = req.body.locale.split("-")[0];
+      //if locale is not in the array, add it
+      if (analytics.languages[locale] == undefined) {
+        analytics.languages[locale] = 1;
+      } else {
+        analytics.languages[locale]++;
+      }
     }
     console.log("userAgent: " + req.body.userAgent);
     console.log(
@@ -67,9 +66,8 @@ Router.post("/", (req, res) => {
         " returning " +
         req.body.returning
     );
-      fs.writeFileSync("analytics.json", JSON.stringify(analytics));
+    fs.writeFileSync("analytics.json", JSON.stringify(analytics));
   }
-
 
   res.send({ msg: "ok" });
 });
