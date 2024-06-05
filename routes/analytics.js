@@ -66,7 +66,7 @@ Router.post("/", (req, res) => {
         " returning " +
         req.body.returning
     );
-    fs.writeFileSync("analytics.json", JSON.stringify(analytics));
+    fs.writeFileSync("analytics.json", JSON.stringify(analytics), "utf-8");
   }
 
   res.send({ msg: "ok" });
@@ -75,7 +75,7 @@ Router.post("/", (req, res) => {
 Router.post("/getStartedButtonClicked", (req, res) => {
   let analytics = JSON.parse(fs.readFileSync("analytics.json"));
   analytics.getStartedButtonClicks++;
-  fs.writeFileSync("analytics.json", JSON.stringify(analytics));
+  fs.writeFileSync("analytics.json", JSON.stringify(analytics), "utf-8");
   res.send({ msg: "ok" });
 });
 
