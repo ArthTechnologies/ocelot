@@ -11,7 +11,7 @@ Router.get("/", (req, res) => {
 Router.post("/", (req, res) => {
   let userAgent = req.body.userAgent;
   //this makes sure google crawlers arent counted in analytics
-  if (!userAgent.includes("google.com/")) {
+  if (!userAgent.includes("google.com/") && !userAgent.includes("bot")) {
     //how many days since 1970
     let day = new Date().getTime() / 1000 / 60 / 60 / 24;
     day = parseInt(day.toString().split(".")[0]);
@@ -58,13 +58,16 @@ Router.post("/", (req, res) => {
       }
 
       //Referrer
-      let referrer =
-        req.body.referrer.split(".")[req.body.referrer.split(".").length - 2];
-      if (analytics.referrers[referrer] == undefined) {
-        console.log("[!] Adding referrer: " + referrer);
-        analytics.referrers[referrer] = 1;
-      } else {
-        analytics.referrers[referrer]++;
+      if (req.body.referrer != "") {
+        let referrer =
+          req.body.referrer.split(".")[req.body.referrer.split(".").length - 2];
+
+        if (analytics.referrers[referrer] == undefined) {
+          console.log("[!] Adding referrer: " + referrer);
+          analytics.referrers[referrer] = 1;
+        } else {
+          analytics.referrers[referrer]++;
+        }
       }
 
       //Page
