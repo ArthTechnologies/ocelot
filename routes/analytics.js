@@ -61,6 +61,11 @@ Router.post("/", (req, res) => {
       if (req.body.referrer != "" && req.body.referrer.split(".").length > 1) {
         let referrer =
           req.body.referrer.split(".")[req.body.referrer.split(".").length - 2];
+        if (referrer.includes("https://")) {
+          referrer = referrer.split("https://")[1];
+        } else if (referrer.includes("http://")) {
+          referrer = referrer.split("http://")[1];
+        }
 
         if (analytics.referrers[referrer] == undefined) {
           console.log("[!] Adding referrer: " + referrer);
