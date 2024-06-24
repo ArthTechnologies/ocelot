@@ -58,7 +58,7 @@ Router.post("/", (req, res) => {
       }
 
       //Referrer
-      if (req.body.referrer != "") {
+      if (req.body.referrer != "" && req.body.referrer.split(".").length > 1) {
         let referrer =
           req.body.referrer.split(".")[req.body.referrer.split(".").length - 2];
 
