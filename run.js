@@ -35,10 +35,10 @@ if (!fs.existsSync("analytics.json")) {
 
 if (!fs.existsSync("files/backups")) {
   fs.mkdirSync("files/backups");
-  if (JSON.parse(fs.readFileSync("files/analytics.json"))) {
+  if (JSON.parse(fs.readFileSync("analytics.json"))) {
     fs.writeFileSync(
       "files/backups/analytics.json",
-      fs.readFileSync("files/analytics.json")
+      fs.readFileSync("analytics.json")
     );
   }
 }
