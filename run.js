@@ -24,12 +24,15 @@ if (!fs.existsSync("analytics.json")) {
         unknown: 0,
       },
       languages: { en: 0, es: 0 },
+      referrers: { google: 0 },
+      pages: { "/": 0 },
       getStartedButtonClicks: 0,
       returning: 0,
       initial: 0,
     })
   );
 }
+
 // middlewares
 app.use(express.json(), cors());
 

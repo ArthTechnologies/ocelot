@@ -48,16 +48,35 @@ Router.post("/", (req, res) => {
     }
 
     if (!req.body.returning) {
-      //add first half of locale to analytics
+      //Locale (Language + Dialect)
       let locale = req.body.locale.split("-")[0];
-      //if locale is not in the array, add it
-      console.log("[!] Adding locale: " + locale);
       if (analytics.languages[locale] == undefined) {
+        console.log("[!] Adding locale: " + locale);
         analytics.languages[locale] = 1;
       } else {
         analytics.languages[locale]++;
       }
+
+      //Referrer
+      let referrer =
+        req.body.referrer.split(".")[req.body.referrer.split(".").length - 2];
+      if (analytics.referrers[referrer] == undefined) {
+        console.log("[!] Adding referrer: " + referrer);
+        analytics.referrers[referrer] = 1;
+      } else {
+        analytics.referrers[referrer]++;
+      }
+
+      //Page
+      let page = req.body.url;
+      if (analytics.pages[page] == undefined) {
+        console.log("[!] Adding page: " + page);
+        analytics.pages[page] = 1;
+      } else {
+        analytics.pages[page]++;
+      }
     }
+
     console.log("userAgent: " + req.body.userAgent);
     console.log(
       "language: " +
