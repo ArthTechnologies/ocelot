@@ -1,11 +1,11 @@
-{"published":"3:00PM, 2024-05-21", "effective":"3:00PM, 2024-06-21", "version":5}
+{"published":"1:18PM, 2024-06-24", "effective":"1:18PM, 2024-07-24", "version":6}
 
+Arth Technologies has [open sourced](https://en.wikipedia.org/wiki/Open_source) all projects available for public use, so data handling is easily verifiable.
 
 ## Your data on Arth Hosting
-- Servers do not hold any information tied to you besides your account's id.
-- The only data in your account that is tied to you is your email and/or account name if you sign in with a service like discord. 
-- Passwords and IP addresses are hashed, meaning that no one can see them, not hackers or even us in the unlikely event of a data breach.
-- When you delete a server or account you've made, all data relating to it will be immediately deleted.  
+- The only data in your account that is tied to you is your email and account name if you sign in with a service like Discord. 
+- Passwords and IP addresses are hashed, meaning that we can't see them, nor can hackers in the unlikely event of a data breach. As with any Minecraft server, raw IP addresses may end up in logs, but those will not be accessed by our systems.
+- When you delete a server or account you've made, all its data will be immediately deleted.  
 
 ## Your data on this website
 
@@ -19,26 +19,23 @@ Like most other websites, our website stores certain data on your browser to pro
 
 ### Third Parties
 
-We try to minimize third parties whenever possible for privacy and efficiency's sake.
+We try to minimize third parties whenever possible for privacy and efficiency.
 
-- Web Hosting: Unlike most hosting services, we currently host all of our infrastructure ourselves, meaning cloud services like Amazon Web Services can't access your IP and other data from our sites.  
-- Source Code: Like almost all companies, we use a third-party service to host our underlying computer code / source code. On Dec 1 2022, we switched from Microsoft-Owned GitHub to Codeberg, an open-source website governed by Codeberg e.v, a democratic organization based in the European Union. Codeberg's privacy policy can be found [here](https://codeberg.org/Codeberg/org/src/branch/main/PrivacyPolicy.md).
-- Payment Processing: Our payment processing partner, Stripe, is required by some countries to comply with "Know Your Customer" laws, which may include addresses and legal names. Only Stripe can access this information. Arth can access the last four digits of your credit card and your email from stripe. You can read their privacy policy [here](https://stripe.com/privacy).
+- Source Code: Like almost all companies, we use a third-party service to host our underlying computer code / source code. On Dec 1, 2022, we switched from Microsoft-owned GitHub to Codeberg, an open-source website governed by Codeberg e.v, a democratic organization based in the European Union. Codeberg's privacy policy can be found [here](https://codeberg.org/Codeberg/org/src/branch/main/PrivacyPolicy.md).
+- Payment Processing: Our payment processing partner, Stripe, is required by some countries to comply with "Know Your Customer" laws, which may include addresses and legal names. Arth only accesses the last four digits of your credit card and your email from Stripe. You can read their privacy policy [here](https://stripe.com/privacy).
 
 
 ### Analytics
 
-Arth collects three pieces of information from site visitors to better know how many people are using its services:
+Arth collects the following information on the main website for analytics:
 
-1. Your Platform (Ex: iOS, Android, Linux, Windows, Mac)
-2. Your Language (Ex: En_Us, Es_Es)
+1. OS/Platform (Ex: Windows, Mac, iOS)
+2. Browser Language & Dialect (Ex: en_us)
 3. The Referrer Site if applicable
+4. The pages visited, and whether you're visiting the site for the first time or not
+5. Clicks on the "Get Started" button
 
-If your browser sends a do not track signal, your analytics will not be collected. Additionally, you can also opt-out of analytics by setting "allowAnalytics" in local storage to false using your browser's developer tools.
-
-In addition, we collect the number of clicks on the "get started" button.
-
-Your analytics are only collected by Arth and do not go through a third party such as Google Analytics.
+This data is not bundled into a profile of you specifically. You can opt-out by enabling do not track in your browser settings.
 
 Changes to these terms:  
 - If changes to these terms are needed, we will put them into effect a month after the changes are made visible.  
