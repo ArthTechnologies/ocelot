@@ -46,5 +46,3 @@ Nuestro principal objetivo ahora es añadir soporte para servidores modded, como
 Aunque esta actualización tiene un gran número de cambios de última hora, dado que hemos tenido que reemplazar todo nuestro sistema de cuentas entre otras cosas, esperamos empezar a poner las piezas en su lugar para una versión estable pronto. Las principales cosas en las que trabajar son facilitar la actualización de los servidores a nuevas versiones y hacer que las rutas API sean más consistentes.
 
  Mantente atento a nuestro Mastodon y a nuestro blog para nuevas actualizaciones, y como siempre, considera echar un vistazo/contribuir a Arth Panel en [codeberg](https://codeberg.org/arth/).
-
-Traducción realizada con la versión gratuita del traductor DeepL.com

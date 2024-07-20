@@ -36,4 +36,3 @@ También nos aseguramos de que todo nuestro software es [open-source](https://co
 ## Queremos tu opinión
 Realmente queremos asegurarnos de que estamos sobresaliendo en privacidad en todo lo que hacemos, y esperamos que los resultados hablen por sí mismos. Si crees que algo debería mejorarse en nuestra [política de privacidad](https://arthmc.xyz/privacy), nos encantaría escuchar tu idea en business@arthmc.xyz.
 
-Traducción realizada con la versión gratuita del traductor DeepL.com

@@ -45,5 +45,3 @@ La accesibilidad es una prioridad importante, y ahora mismo, para configurar el 
 Para salir de la beta, tenemos que hacer varias cosas. En primer lugar, tenemos que añadir más capas de seguridad. Aunque Arth Panel dispone de seguridad para cuentas y servidores, cualquiera que sepa algo sobre ciberseguridad sabe que nada es 100% seguro. Por lo tanto, necesitamos añadir capas adicionales de seguridad, así como copias de seguridad para asegurarnos de que no se pierden los datos de nadie (a menos que quieran borrarlos, claro). En el aspecto técnico, tenemos que reorganizar y cambiar el nombre de algunas rutas de la API para que tengan más sentido, porque cuando salgamos de la versión beta, este tipo de cambios requerirán una versión completamente nueva de la API. También hay muchas áreas en el código que podrían limpiarse, acortarse y tener más comentarios.
 
 Mantente atento a nuestro Mastodon y a nuestro blog para nuevas actualizaciones, y como siempre, considera echar un vistazo/contribuir a Arth Panel en [codeberg](https://codeberg.org/arth/).
-
-Traducción realizada con la versión gratuita del traductor DeepL.com
