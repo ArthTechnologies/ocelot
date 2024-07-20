@@ -7,7 +7,7 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 
 ---
 
-(https://i.imgur.com/7PD9CMz.png)
+![imagen-bordered](https://i.imgur.com/7PD9CMz.png)
 
 Después de 7 meses, por fin está aquí la actualización beta 1.3 de Arth Panel con una experiencia significativamente más estable, soporte para proxies, servidores modded, actualización de servidores, un explorador de archivos y mucho más. Si no está familiarizado con Arth Panel, puede consultar nuestro artículo [Presentación de Arth Panel](https://arthmc.xyz/blog/introducing-arth-panel).
 

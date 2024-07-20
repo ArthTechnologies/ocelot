@@ -7,7 +7,7 @@ https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6
 
 ---
 
-(https://i.imgur.com/WQy6vdr.png)
+![imagen-bordered](https://i.imgur.com/WQy6vdr.png)
 
 Ya está aquí la actualización beta 1.2 del Arth Panel con un nuevo sistema de cuentas, muchas correcciones de errores y mucho más. Si no está familiarizado con Arth Panel, consulte nuestro artículo [Introducing Arth Panel](https://arthmc.xyz/blog/introducing-arth-panel).
 
