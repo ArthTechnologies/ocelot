@@ -73,7 +73,8 @@ fs.readdirSync("./files/posts").forEach((item) => {
         let title = text.split("\n")[0];
         let desc = text.split("\n")[1];
         let date = text.split("\n")[2];
-
+        let author = text.split("\n")[3];
+        let authoricon = text.split("\n")[4];
         let image = null;
         for (let i = 0; i < text.split("\n").length; i++) {
           if (text.split("\n")[i].includes("https://i.imgur.com")) {
@@ -87,6 +88,8 @@ fs.readdirSync("./files/posts").forEach((item) => {
           date: date,
           slug: item2.split(".md")[0],
           image: image,
+          author: author,
+          authoricon: authoricon,
         });
       }
     });
