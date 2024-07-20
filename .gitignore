@@ -1,3 +1,4 @@
 /node_modules
 analytics.json
-arthblog.rss
+*_arthblog.rss
+/files/posts/index.json
