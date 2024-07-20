@@ -74,11 +74,19 @@ fs.readdirSync("./files/posts").forEach((item) => {
         let desc = text.split("\n")[1];
         let date = text.split("\n")[2];
 
+        let image = null;
+        for (let i = 0; i < text.split("\n").length; i++) {
+          if (text.split("\n")[i].includes("https://i.imgur.com")) {
+            image = text.split("\n")[i].split("](")[1].split(")")[0];
+          }
+        }
+
         postsIndex[item].push({
           title: title,
           desc: desc,
           date: date,
           slug: item2.split(".md")[0],
+          image: image,
         });
       }
     });
