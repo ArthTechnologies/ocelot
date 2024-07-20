@@ -1,6 +1,6 @@
 Privacy on Arth Hosting
 See how our privacy stacks up to competitors
-2024-1-06
+2024-06-01
 DiamonC 
 https://floss.social/@DiamonC 
 https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6516bdc6b0ff0203.jpeg

@@ -1,64 +1,49 @@
-Arth Panel Actualización Beta 1.3
-¡7 meses de mejoras llegan en la actualización Beta 1.3!
+Arth Panel Beta 1.3 
+7 meses de mejoras culminan en la actualización Beta 1.3. 
 2023-11-02
-DiamonC
-https://floss.social/@DiamonC
+DiamonC 
+https://floss.social/@DiamonC 
 https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6516bdc6b0ff0203.jpeg
-
 
 ---
 
+(https://i.imgur.com/7PD9CMz.png)
 
-![image-bordered](https://i.imgur.com/7PD9CMz.png)
-
-
-¡Después de 7 meses, la actualización beta 1.3 de Arth Panel está finalmente aquí con una experiencia más estable, compatibilidad con proxies, servidores con mods, actualizar servidores, un explorador de archivos, y mucho más! Si no estás familiarizado con Arth Panel, considere consultar nuestro artículo [Presentando Arth Panel](https://arthmc.xyz/blog/es-ES*presentando-arth-panel).
-
+Después de 7 meses, por fin está aquí la actualización beta 1.3 de Arth Panel con una experiencia significativamente más estable, soporte para proxies, servidores modded, actualización de servidores, un explorador de archivos y mucho más. Si no está familiarizado con Arth Panel, puede consultar nuestro artículo [Presentación de Arth Panel](https://arthmc.xyz/blog/introducing-arth-panel).
 
 ## Servidores con mods
 
-
-Aunque la mayoría del trabajo era hecho en la actualización previa, la característica no fue lista. Ahora puedes ejecutar un servidor con quilt, forge o fabric, y puedes crearlo con un modpack y o añadir mods tú mismo. Aunque hay muchos mods en Modrinth, Arth Panel aún no suporta mods de CurseForge porque ellos no son abiertos con su API y probablemente require algún configuración de tu parte.
-
+Aunque la mayor parte del trabajo se realizó en la última actualización, la función aún no estaba lista. Ahora, puedes ejecutar un servidor modded con quilt, forge, o fabric, y puedes crearlo con un modpack, y/o añadir mods manualmente. Aunque el catálogo de mods es bastante amplio en modrinth, el Panel Arth aún no es compatible con los mods de CurseForge, ya que son mucho menos abiertos con sus APIs y es probable que requiera alguna configuración por parte del propietario del panel.
 
 ## Proxies
 
+Los proxies son un tipo especial de servidores que conectan múltiples servidores, haciéndolos aparecer como uno solo. La mayoría de los servidores utilizan esto para tener una sección de minijuegos, una sección de supervivencia, etc. en un solo servidor. El Panel Arth ahora los soporta, con algunas características de conveniencia que no se ven en la mayoría de los otros paneles. Configurará automáticamente cualquier sub-servidor que añadas con el proxy si está en el mismo panel, y como los proxies se cargan tan rápido, lo reiniciará automáticamente si añades un sub-servidor para aplicar el cambio.
 
-Proxies son un tipo de servidor especial que conectan servidores múltiples, hacer ellos verse como uno. La mayoría de los servidores usan ese para tener secciones como minigames, supervivencia y más en un servidor singular. Arth Panel ahora soporta con algún características de conveniencia no son visto en la mayoría de los otros panels. Va a automáticamente configurar alguno sub-server que añades al proxy, y porqué proxies ejecutar tan rápidamente va a automáticamente reiniciar cuando añades un sub-server.
+## Actualización de servidores
 
+Por fin puedes actualizar tus servidores, que era la última característica básica que faltaba. También puedes cambiar tu servidor a cualquier versión disponible. Arth Panel te dirá cuando tus mods worldgen no funcionen con una versión determinada, para que puedas borrarlos o no actualizarlos en consecuencia.
 
-## Server Updates
+## Sistema de tarros
 
+Al probar la función de actualización, descubrimos que, por alguna razón, no se podía actualizar a la versión 1.20 o superior en los servidores de papel. La causa resultó ser serverjars.com, que no ha subido un jar 1.20+ para paper **hasta el día de hoy**. Así pues, hemos creado un software llamado jarsmc que arth panel utiliza como copia de seguridad siempre que no haya un jar en serverjars.com. De forma predeterminada, Arth Panel ya está configurado con nuestra instancia de jarsmc, pero usted puede ejecutar la suya propia si desea disponer de un catálogo de tarros diferente o de mayor velocidad.
 
-¡Finalmente puedes actualizar tus servidores, lo cual estaba la última característica principal ausente! También puedes cambiar tu servidor a todas las versiones. Arth Panel notificara cuando tus worldgen mods no pueden funcionar con una versión cierta.
+## Menú Mundo
 
+Mientras que antes podías descargar tu mundo, ahora puedes subir un mundo, o regenerar un mundo. Puedes elegir qué mods worldgen tendrá, su tipo de mundo y su semilla.
 
-## El sistema de Jars
+## Explorador de archivos
 
+Ahora puedes editar ciertos archivos de texto desde el panel, lo que te permite configurar la mayoría de los plugins. Por seguridad, no puedes editar archivos como server.properties, o borrar/editar archivos ejecutables.
 
-Al probar la característica actualizar, notamos que por alguna razón no podías actualizar a 1.20 o superior en servidores paper. La causa fue serverjars.com, que por aquel entonces no había actualizado un jar 1.20+. Así que creamos un software llamado JarsMC que Arth Panel usa de respaldo cuando un jar no está en serverjars.com. Por defecto Arth Panel es configurado con nuestra instancia de jarsmc pero puedes ejecutar tu instancia propia si quieres tener un catálogo de jars diferente, o velocidades más rápidas.
+## El Futuro
+CurseForge es de lejos la mayor plataforma para mods de Minecraft, y será soportada en la próxima actualización. Mientras Modrinth es a menudo más rápido, y es mejor para los mods del lado del cliente (mods que sólo cambian las cosas en su extremo, por lo que todavía se puede jugar en los servidores no modded), hay muchos grandes mods y Modpacks que simplemente no están en Modrinth. Junto con el soporte de CurseForge, el Historial de Archivos también debería llegar en la próxima actualización, permitiéndote editar archivos sin preocupaciones.
 
+Hemos estado trabajando en ocelot, un backend maestro que conecta instancias de quartz, el backend de Arth Panel. Esto permite añadir capacidad para más servidores añadiendo más instancias de quartz en distintos ordenadores. Aunque aún no estaba listo para esta actualización, pronto estará disponible.
 
-## El Menú Mundo
+La accesibilidad es una prioridad importante, y ahora mismo, para configurar el panel tiene que ir a la carpeta de almacenes, y editar valores en varios archivos. Queremos poner todos los ajustes que necesita en un archivo unificado. En el frontend, también hay que rebuscar en algunas carpetas para conectarlo a tu propia instancia de quartz.
 
+Para salir de la beta, tenemos que hacer varias cosas. En primer lugar, tenemos que añadir más capas de seguridad. Aunque Arth Panel dispone de seguridad para cuentas y servidores, cualquiera que sepa algo sobre ciberseguridad sabe que nada es 100% seguro. Por lo tanto, necesitamos añadir capas adicionales de seguridad, así como copias de seguridad para asegurarnos de que no se pierden los datos de nadie (a menos que quieran borrarlos, claro). En el aspecto técnico, tenemos que reorganizar y cambiar el nombre de algunas rutas de la API para que tengan más sentido, porque cuando salgamos de la versión beta, este tipo de cambios requerirán una versión completamente nueva de la API. También hay muchas áreas en el código que podrían limpiarse, acortarse y tener más comentarios.
 
-Aunque podías ya descargar tu mundo, ahora puedes subir un mundo o regenerarlo. Puedes elegir qué worldgen mods, tipo de mundo y semilla tendrá.
-Explorador de Archivos
-Ahora puedes editar ciertos archivos textos en el panel, pudiendo configurar la mayoría de plugins. Por seguridad, no puedes editar archivos como server.properties o eliminar/editar archivos ejecutables.
+Mantente atento a nuestro Mastodon y a nuestro blog para nuevas actualizaciones, y como siempre, considera echar un vistazo/contribuir a Arth Panel en [codeberg](https://codeberg.org/arth/).
 
-
-## El futuro
-
-
-CurseForge es por mucho la plataforma más popular para mods de Minecraft y va a ser compatible con la próxima actualización. Aunque usualmente Modrinth es más rápido y mejor para mods de cliente (Mods que solo cambian cosas en tu parte así que puedes jugar en servidores sin mods), hay muchos mods grandes que no son en Modrinth. Junto con el soporte para CurseForge, el historial de archivos debería llegar en la próxima actualización, permitiéndote editar archivos sin preocupaciones.
-Hemos sido trabajando en ocelot, un "backend principal" que conecta instancias de Quartz (El software de API de Arth Panel). Este te permite añadir más capacidad para más servidores añadiendo más instancias de quartz en computadoras diferentes. Aunque no está listo, deberá ser compatible pronto.
-
-
-La accesibilidad es una prioridad mayor, y actualmente para instalar el panel necesitas editar archivos múltiples en la carpeta "stores". Queremos hacer un archivo unificado para todos los ajustes que necesitas. En la interfaz, también necesitas buscar muchas carpetas para conectarlo a tu propia instancia de Quartz.
-
-
-Para salir de la beta, necesitamos hacer muchas cosas. Primero, necesitamos añadir más capas de seguridad. Aunque Arth Panel tiene seguridad para cuentas y servidores, cualquiera que sepa un poco sobre seguridad sabe que nada está 100% seguro. Por lo tanto, necesitamos añadir capas de seguridad adicionales y copias de seguridad para asegurar que no se pierden los datos de nadie (a menos que quieran eliminarlos, claro). En la parte técnica de cosas, necesitamos reorganizar y renombrar algunas de las rutas de API porque, después de salir de la beta, cambios como esos requerirán hacer una versión de API nueva. Hay también muchas áreas en el código que podrían limpiarse, acortarse, y tener más comentarios.
-Mantente atento a nuestro Mastodon y blog para actualizaciones nuevas y como siempre, considera consultar o colaborar con nosotros en codeberg.
-
-
-
+Traducción realizada con la versión gratuita del traductor DeepL.com

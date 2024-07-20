@@ -78,7 +78,7 @@ fs.readdirSync("./files/posts").forEach((item) => {
         let image = null;
         for (let i = 0; i < text.split("\n").length; i++) {
           if (text.split("\n")[i].includes("https://i.imgur.com")) {
-            image = text.split("\n")[i].split("](")[1].split(")")[0];
+            image = text.split("\n")[i].split("(")[1].split(")")[0];
           }
         }
 

@@ -1,65 +1,50 @@
-Arth Panel Actulización Beta 1.2
-¡Un sistema de cuentas, nuevas opciones y mucho más!
+Arth Panel Beta 1.2 
+Un sistema de cuentas, nuevas opciones de plugins y mucho más llega en la actualización Beta 1.2. 
 2023-04-02
-DiamonC
-https://floss.social/@DiamonC
+DiamonC 
+https://floss.social/@DiamonC 
 https://cdn.masto.host/floss/accounts/avatars/109/207/881/612/624/574/original/6516bdc6b0ff0203.jpeg
-
 
 ---
 
+(https://i.imgur.com/WQy6vdr.png)
 
-![image-bordered](https://i.imgur.com/WQy6vdr.png)
+Ya está aquí la actualización beta 1.2 del Arth Panel con un nuevo sistema de cuentas, muchas correcciones de errores y mucho más. Si no está familiarizado con Arth Panel, consulte nuestro artículo [Introducing Arth Panel](https://arthmc.xyz/blog/introducing-arth-panel).
 
+## Abandono de Pocketbase
 
-¡La actualización beta 1.2 de Arth Panel está aquí con una sistema de cuentas nueva, muchas correcciones de errores y más! Si no estás familiarizado con Arth Panel, consideras consultar nuestro artículo [Presentando Arth Panel](https://arthmc.xyz/blog/es-ES*presentando-arth-panel/).
+Originalmente, Arth Panel se basaba en una aplicación llamada Pocketbase para gestionar las cuentas. La razón principal por la que estamos eliminando esto es que tener una tercera aplicación (Quartz y Observer son las dos primeras) hecha con un lenguaje diferente, diferentes desarrolladores, su propio panel web y base de datos añade mucha complejidad a Arth Panel.  
+	Además de la seguridad, hace que el panel sea menos accesible para el usuario medio. Arth Panel se creó para ser lo más accesible posible porque las alternativas eran difíciles de configurar para los principiantes. Nuestro objetivo es que cualquier persona que sepa ejecutar un comando de Linux y cambiar directorios pueda ejecutar Arth Panel.
 
+## El nuevo sistema de cuentas
+El nuevo sistema de cuentas almacena las cuentas en el archivo accounts.json. Todo lo que necesita para registrarse o iniciar sesión es una dirección de correo electrónico y una contraseña. Como en la mayoría de los sitios web, las contraseñas se almacenan como hashes (cadenas que no pueden ser rastreadas hasta su contraseña) de forma que si alguien hackeara los ordenadores de su servidor, no podría acceder a las contraseñas de sus usuarios. También se emplean sales (valores aleatorios añadidos al hash) para que los piratas informáticos no puedan buscar contraseñas comunes como «password123».
 
-## Abandonar Pocketbase
+Puedes restablecer tu contraseña y eliminar tu cuenta a través de la página de gestión de cuentas. Si ha olvidado su contraseña, tendrá que introducir los 4 últimos dígitos de su tarjeta de crédito y su nueva contraseña. Por razones de seguridad, sólo dispone de 5 intentos. 
 
+## Cambios en los pagos
+Además de comprobar en Stripe si está suscrito o no, Arth Panel también comprueba cuántas suscripciones tiene. Ahora los usuarios deben pagar por cada servidor.
 
-Originalmente, Arth Panel usaba una aplicación llamada Pocketbase para administrar cuentas. El razón principal de abandonarlo es para tener una tercera aplicación (El API Quartz y la interfaz Observer siendo el primero dos) con una idioma de programación diferente, programadores diferentes, y su propia interfaz en línea y base de datos añada muchas complejidades a Arth Panel.
-   Además de seguridad, hace el panel menos accesible a tu usuario medio. Arth Panel fue creado para ser lo más accesible posible porque las alternativas fueron muy difícil para principiantes instalar.
+Si no desea monetizar su panel, puede ir a stores/settings.json y establecer `enablePay` a false. También puede añadir una excepción para usuarios individuales añadiendo `bypassStripe:true` a una cuenta en accounts.json. Deshabilitar la autenticación es todavía experimental por ahora.
 
+## Experiencia de usuario
 
-## El sistema de cuentas nueva
-El sistema de cuentas nueva reserva cuentas en el archivo accounts.json. Todo lo que necesitas es un correo electrónico y contraseña para iniciar sesión o registrar. Como la mayoría de los sitos web, contraseñas son se reservan como hashes (texto que no puede ser rastrear a tu contraseña) así que si alguien hackeado en tu computadora servidor, no puede ver los contraseñas de tus usurarios. Sales (números o textos aleatorios que son añadido a cada hash) son también usados prevenir hackers buscando de contraseñas comunes como "contraseña123".
+El objetivo de este panel es ser fácil de usar para todos, incluidos los jugadores principiantes de Minecraft. El botón de cómo unirse a los servidores ahora enlaces a nuestra propia guía sobre cómo unirse a los servidores de Minecraft de Java Edition, móvil, e incluso en las consolas donde los servidores personalizados no son compatibles por defecto. También hemos añadido un botón de «ayuda» en la esquina inferior derecha con un enlace a una nueva discordia que hemos creado para ofrecer apoyo con cualquier problema que los usuarios puedan estar experimentando.
 
+Un problema importante de la versión anterior era la experiencia en móviles. Mientras que la mayoría de las páginas se veían bien, la página /newserver era demasiado pequeña y la página del servidor estaba por todas partes, con botones fuera de sus contenedores y contenedores no centrados. He revisado cada página en modo de simulación móvil y he solucionado estos problemas.
 
-Puedes restablecer tu contraseña y eliminar tu cuenta desde la pagina de administrar cuenta. Si olvidado tu contraseña, necesitarías ingresar los últimos 4 dígitos de tu tarjeta y tu contraseña nuevo. Para mantener seguridad, solo tienes 5 intentos.
+Algunos cambios menores incluyen:  
+- la adición de un menú para confirmar que desea eliminar un servidor
+- añadir un botón para descargar el archivo del mundo antes de borrar un servidor  
+- añadir metadatos como el número de descargas en los resultados de búsqueda de plugins  
+- reemplazar la mayoría de las molestas alertas que te impiden hacer clic en cualquier cosa con alertas que aparecen en la parte superior derecha durante unos segundos  
 
+## El futuro
+La accesibilidad es una prioridad importante, por lo que vamos a añadir documentación para explicar todo lo que un principiante necesita saber para configurar el panel.
 
-## Cambios de Pagos
-Además de verificar Stripe para una suscripción, Arth Panel también verifica cuantos suscripciones tienes. Ahora usuarios necesitan pagar para cada servidor.
+Nuestro principal objetivo ahora es añadir soporte para servidores modded, como forge y quilt, así como soporte para modpacks. La mayor parte del tiempo de desarrollo de esta actualización se dedicó a los servidores modded, sin embargo hay muchos retos a la hora de implementarlos y tenemos que retrasar esto a una futura actualización.
 
+Aunque esta actualización tiene un gran número de cambios de última hora, dado que hemos tenido que reemplazar todo nuestro sistema de cuentas entre otras cosas, esperamos empezar a poner las piezas en su lugar para una versión estable pronto. Las principales cosas en las que trabajar son facilitar la actualización de los servidores a nuevas versiones y hacer que las rutas API sean más consistentes.
 
-Si no quieres monetizar tu panel puedes configurarlo para entrar en `stores/settings.json` y poner `enablePay` a `false`. También puedes añadir una excepción para usuarios individuales para añadir `bypassStripe:true` a una cuenta en `accounts.json`. Desactivar autenticación es experimental por ahora.
+ Mantente atento a nuestro Mastodon y a nuestro blog para nuevas actualizaciones, y como siempre, considera echar un vistazo/contribuir a Arth Panel en [codeberg](https://codeberg.org/arth/).
 
-
-## Experiencia de usuarios
-
-
-El objetivo de este panel es ser fácil usar para alguien, incluyendo jugadores de Minecraft principiantes. El botón de cómo unirse a servidores ahora incluye nuestro propio guía de unirse a servidores de Minecraft desde la edición de Java, móvil e incluso videoconsola, donde servidores a la media no son compatibles de forma predeterminada. Además añadimos un botón de ayuda en la esquina inferior derecha con un enlace a nuestro servidor de Discord que configuramos ayudar con cualquier problema que podrías estar experimentando.
-
-
-Una cuestión mayor con la versión previa fue la experiencia en móvil. Aunque la mayoría de las páginas no fueron de mal ver, la página `/newserver` fue demasiada pequeña y la página servidor fue dispersa, con botones que fuera de sus envases y envases no siendo centrado, pero ahora cada página ha sido corregió.
-
-
-algunos cambios menores incluyen: 
--  añadir un menú para confirmar que quieres eliminar un servidor.
--  añadir un botón para descargar el archivo de mundo antes deliminar un servidor.
--  añadir información como el numero de descargas en resultados de buscar de plugins.
--  sustituir la mayoría de las alertas molestas con alertas que solo existen para unos segundos
-
-
-## El Futuro
-Accesibilidad está una prioridad importante, así que vamos a añadir documentación explanar todo una principiante necesita saber instalar el panel.
-
-
-Nuestro foco ahora está añadir compatibilidad con mods con forge y quilt, y compatibilidad con modpacks también. La mayoría del tiempo de esa actualización fue pasaba trabajando en servidores con mods, pero hay muchos retos con implementando ellos y necesitamos demorar ese a la próxima actualización.
-
-
-Aunque esta actualización tiene muchos cambios que rompen la compatibilidad, como necesitamos sustituir todo nuestro sistema de cuentas, esperamos iniciar trabaja para una actualización estable pronto. Las cosas principales trabajar en son lo hacer fácil para actualizar servidores y hacer las rutas del API más constante.
-
-
-
+Traducción realizada con la versión gratuita del traductor DeepL.com
