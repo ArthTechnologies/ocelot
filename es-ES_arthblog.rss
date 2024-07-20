@@ -21,9 +21,19 @@ https://arthmc.xyz/favicon.png
 <language>es-ES</language>
 <!-- Posts -->
 <item>
-<title>Arth Panel Beta 1.4 </title>
+<title>Privacidad en Arth Hosting</title>
 <description>
-Compatibilidad con CurseForge, cuentas de discord, actualizaciones seguridades, configuración fácil, y mucho más están aquí en beta 1.4.
+Vea cómo nuestra privacidad se compara con la competencia
+</description>
+
+<link>https://backend.arthmc.xyz/view/post/privacidad-de-arth-hosting</link>
+<guid isPermaLink="true">https://backend.arthmc.xyz/view/post/privacidad-de-arth-hosting</guid>
+<pubDate>2024-06-01</pubDate>
+
+</item><item>
+<title>Arth Panel Beta 1.4  </title>
+<description>
+Compatibilidad con CurseForge, configuración sencilla, mejoras de seguridad, cuentas de discordia y mucho más en la actualización beta 1.4.  
 </description>
 
 <link>https://backend.arthmc.xyz/view/post/arth-panel-beta-1.4</link>
@@ -31,9 +41,9 @@ Compatibilidad con CurseForge, cuentas de discord, actualizaciones seguridades, 
 <pubDate>2024-01-01</pubDate>
 
 </item><item>
-<title>Arth Panel Actualización Beta 1.3</title>
+<title>Arth Panel Beta 1.3 </title>
 <description>
-¡7 meses de mejoras llegan en la actualización Beta 1.3!
+7 meses de mejoras culminan en la actualización Beta 1.3. 
 </description>
 
 <link>https://backend.arthmc.xyz/view/post/arth-panel-beta-1.3</link>
@@ -41,9 +51,9 @@ Compatibilidad con CurseForge, cuentas de discord, actualizaciones seguridades, 
 <pubDate>2023-11-02</pubDate>
 
 </item><item>
-<title>Arth Panel Actulización Beta 1.2</title>
+<title>Arth Panel Beta 1.2 </title>
 <description>
-¡Un sistema de cuentas, nuevas opciones y mucho más!
+Un sistema de cuentas, nuevas opciones de plugins y mucho más llega en la actualización Beta 1.2. 
 </description>
 
 <link>https://backend.arthmc.xyz/view/post/arth-panel-beta-1.2</link>
