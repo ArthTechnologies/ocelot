@@ -1,4 +1,4 @@
-Unirse a servidores de Minecraft en consola
+Unirse a servidores en consola
 Cómo puedes unirte a servidores personalizados desde Xbox, PlayStation o Switch.
 2024-07-28
 DiamonC 
