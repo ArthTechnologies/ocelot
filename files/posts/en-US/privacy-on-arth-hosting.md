@@ -1,5 +1,5 @@
 Privacy on Arth Hosting
-See how our privacy stacks up to competitors
+See how our privacy stacks up to competitors.
 2024-06-01
 DiamonC 
 https://floss.social/@DiamonC 
