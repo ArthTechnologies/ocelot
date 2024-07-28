@@ -151,6 +151,10 @@ for (i in langs) {
     "<description></description>",
     "<description>" + posts[posts.length - 1].desc + "</description>"
   );
+
+  //replace instances of the year '1970' with the current year
+  content = content.replace(/1970/g, new Date().getFullYear());
+
   fs.writeFileSync(i + "_arthblog.rss", content);
 }
 
