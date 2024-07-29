@@ -54,6 +54,7 @@ Router.get("/", (req, res) => {
       res.send(resp);
     }
     inter++;
+    console.log(resp);
     if (inter > 50) {
       inter = 50;
     }
