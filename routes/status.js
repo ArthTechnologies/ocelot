@@ -41,24 +41,14 @@ Router.get("/", (req, res) => {
     }
   });
 
-  let net = require("net");
-  let client = new net.Socket();
-  client.connect(25565, "arthmc.xyz", function () {
-    resp["arthnetwork"] = "Online";
-    client.destroy();
-  });
-  client.on("error", function (err) {
-    console.log(err);
-    resp["arthnetwork"] = "Offline";
-  });
-
   let inter = 10;
   //check every 50 ms
   let interval = setInterval(function () {
     if (
       resp["arthnetwork"] != undefined &&
       resp["observer"] != undefined &&
-      resp["quartz"] != undefined
+      resp["quartz"] != undefined &&
+      resp["frontend"] != undefined
     ) {
       clearInterval(interval);
       res.send(resp);
