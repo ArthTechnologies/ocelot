@@ -45,7 +45,6 @@ Router.get("/", (req, res) => {
   //check every 50 ms
   let interval = setInterval(function () {
     if (
-      resp["arthnetwork"] != undefined &&
       resp["observer"] != undefined &&
       resp["quartz"] != undefined &&
       resp["frontend"] != undefined
@@ -54,7 +53,7 @@ Router.get("/", (req, res) => {
       res.send(resp);
     }
     inter++;
-    console.log(resp);
+
     if (inter > 50) {
       inter = 50;
     }
