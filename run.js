@@ -7,7 +7,7 @@ const rsa = require("node-rsa");
 const fs = require("fs");
 const crypto = require("crypto");
 const { jar } = require("request");
-const { readJSON } = require("./scripts/utils");
+const { readJSON, writeJSON } = require("./scripts/utils");
 if (!fs.existsSync("analytics.json")) {
   writeJSON(
     "analytics.json",

@@ -1,6 +1,7 @@
 const express = require("express");
 const Router = express.Router();
 const fs = require("fs");
+const { readJSON, writeJSON } = require("../scripts/utils");
 
 Router.get("/", (req, res) => {
   let analytics = readJSON("analytics.json");
