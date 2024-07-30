@@ -7,8 +7,9 @@ const rsa = require("node-rsa");
 const fs = require("fs");
 const crypto = require("crypto");
 const { jar } = require("request");
+const { readJSON } = require("./scripts/utils");
 if (!fs.existsSync("analytics.json")) {
-  fs.writeFileSync(
+  writeJSON(
     "analytics.json",
     JSON.stringify({
       max: 0,
@@ -36,11 +37,14 @@ if (!fs.existsSync("analytics.json")) {
 if (!fs.existsSync("files/backups")) {
   fs.mkdirSync("files/backups");
 }
-if (JSON.parse(fs.readFileSync("analytics.json"))) {
-  fs.writeFileSync(
-    "files/backups/analytics.json",
-    fs.readFileSync("analytics.json")
-  );
+if (readJSON("analytics.json")) {
+  //the if clause is to prevent corrupted backups from overwriting the good one
+  if (
+    readJSON("analytics.json").iOS > 16 &&
+    readJSON("analytics.json").devices.windows > 64
+  ) {
+    writeJSON("files/backups/analytics.json", readJSON("analytics.json"));
+  }
 }
 // middlewares
 app.use(express.json(), cors());

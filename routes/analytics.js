@@ -3,7 +3,7 @@ const Router = express.Router();
 const fs = require("fs");
 
 Router.get("/", (req, res) => {
-  let analytics = JSON.parse(fs.readFileSync("analytics.json"));
+  let analytics = readJSON("analytics.json");
   res.send(analytics);
 });
 
@@ -16,7 +16,7 @@ Router.post("/", (req, res) => {
     let day = new Date().getTime() / 1000 / 60 / 60 / 24;
     day = parseInt(day.toString().split(".")[0]);
 
-    let analytics = JSON.parse(fs.readFileSync("analytics.json"));
+    let analytics = readJSON("analytics.json");
     analytics.day = day;
 
     if (analytics.days[day] == undefined) {
@@ -94,16 +94,16 @@ Router.post("/", (req, res) => {
         " returning " +
         req.body.returning
     );
-    fs.writeFileSync("analytics.json", JSON.stringify(analytics), "utf-8");
+    writeJSON("analytics.json", JSON.stringify(analytics));
   }
 
   res.send({ msg: "ok" });
 });
 
 Router.post("/getStartedButtonClicked", (req, res) => {
-  let analytics = JSON.parse(fs.readFileSync("analytics.json"));
+  let analytics = readJSON("analytics.json");
   analytics.getStartedButtonClicks++;
-  fs.writeFileSync("analytics.json", JSON.stringify(analytics), "utf-8");
+  writeJSON("analytics.json", JSON.stringify(analytics));
   res.send({ msg: "ok" });
 });
 
