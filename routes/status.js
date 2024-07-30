@@ -41,13 +41,39 @@ Router.get("/", (req, res) => {
     }
   });
 
+  request("https://api.jarsmc.xyz", function (error, response, body) {
+    if (error) {
+      resp["jarsmcb"] = "Offline";
+    } else {
+      if (response.statusCode != 502) {
+        resp["jarsmcb"] = "Online";
+      } else {
+        resp["jarsmcb"] = "Offline";
+      }
+    }
+  });
+
+  request("https://jarsmc.xyz", function (error, response, body) {
+    if (error) {
+      resp["jarsmcf"] = "Offline";
+    } else {
+      if (response.statusCode != 502) {
+        resp["jarsmcf"] = "Online";
+      } else {
+        resp["jarsmcf"] = "Offline";
+      }
+    }
+  });
+
   let inter = 10;
   //check every 50 ms
   let interval = setInterval(function () {
     if (
       resp["observer"] != undefined &&
       resp["quartz"] != undefined &&
-      resp["frontend"] != undefined
+      resp["frontend"] != undefined &&
+      resp["jarsmcb"] != undefined &&
+      resp["jarsmcf"] != undefined
     ) {
       clearInterval(interval);
       res.send(resp);
