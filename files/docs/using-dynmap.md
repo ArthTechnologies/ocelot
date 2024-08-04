@@ -6,7 +6,7 @@ Dynmap is a plugin that shows a detailed map of your overworld, nether and end o
 When adding official support for Dynmap, we designed the setup process to be as automatic and seamless as possible. After adding the plugin, all you need to do is restart and you'll soon see a dynmap bar pop up on the right of the server page, which has a button to copy the dynmap's link.
 
 ### Troubleshooting
-**If your dynmap starts on port 8123** instead of your servers's port + 200, all you should need to do is **restart the server again.**  
+**If your map isn't working and the console says dynmap started on port 8123** instead of your servers's port + 200, all you should need to do is **restart the server again.**  
 
 If that fails or if you have any other issues regarding ports, simply open the file explorer on the server page and edit `plugins/ dynmap/configuration.txt`. Look for this section:
 ```
