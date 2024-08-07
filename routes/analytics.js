@@ -10,6 +10,7 @@ Router.get("/", (req, res) => {
 
 //disabled until new privacy policy goes into effect
 Router.post("/", (req, res) => {
+  console.log(req.body);
   let userAgent = req.body.userAgent;
   //this makes sure google crawlers arent counted in analytics
   if (!userAgent.includes("google.com/") && !userAgent.includes("bot")) {
