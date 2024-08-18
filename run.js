@@ -35,7 +35,7 @@ if (!fs.existsSync("analytics.json")) {
 } else {
   json = readJSON("analytics.json");
   for (i in json.days) {
-    if (json.days[i].hits == undefined) {
+    if (typeof json.days[i].hits == "number") {
       json.days[i].hits = json.days[i];
       json.days[i].redirects = 0;
     }
