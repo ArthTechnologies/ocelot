@@ -35,7 +35,7 @@ if (!fs.existsSync("analytics.json")) {
 } else {
   json = readJSON("analytics.json");
   for (i in json.days) {
-    console.log(json.days[i]);
+    console.log(typeof json.days[i]);
     if (typeof json.days[i] == "number") {
       json.days[i].hits = json.days[i];
       json.days[i].redirects = 0;
