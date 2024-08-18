@@ -37,7 +37,9 @@ if (!fs.existsSync("analytics.json")) {
   for (i in json.days) {
     console.log(typeof json.days[i]);
     if (typeof json.days[i] == "number") {
-      json.days[i].hits = json.days[i];
+      let number = json.days[i];
+      json.days[i] = {};
+      json.days[i].hits = number;
       json.days[i].redirects = 0;
     }
   }
