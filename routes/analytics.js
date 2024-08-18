@@ -10,7 +10,6 @@ Router.get("/", (req, res) => {
 
 //disabled until new privacy policy goes into effect
 Router.post("/", (req, res) => {
-
   let userAgent = req.body.userAgent;
   //this makes sure google crawlers arent counted in analytics
   if (!userAgent.includes("google.com/") && !userAgent.includes("bot")) {
@@ -22,11 +21,12 @@ Router.post("/", (req, res) => {
     analytics.day = day;
 
     if (analytics.days[day] == undefined) {
-      analytics.days[day] = 1;
+      analytics.days[day].hits = 1;
+      analytics.days[day].redirects = 0;
     } else {
-      analytics.days[day] = parseInt(analytics.days[day])+1;
-      if (analytics.days[day] > analytics.max) {
-        analytics.max = analytics.days[day];
+      analytics.days[day].hits = parseInt(analytics.days[day].hits) + 1;
+      if (analytics.days[day].hits > analytics.max) {
+        analytics.max = analytics.days[day].hits;
       }
     }
     analytics.hits++;
@@ -104,7 +104,9 @@ Router.post("/", (req, res) => {
 
 Router.post("/getStartedButtonClicked", (req, res) => {
   let analytics = readJSON("analytics.json");
-  analytics.getStartedButtonClicks++;
+  let day = new Date().getTime() / 1000 / 60 / 60 / 24;
+  day = parseInt(day.toString().split(".")[0]);
+  analytics.days[day].redirects++;
   writeJSON("analytics.json", JSON.stringify(analytics));
   res.send({ msg: "ok" });
 });

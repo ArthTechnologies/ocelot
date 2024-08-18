@@ -32,6 +32,15 @@ if (!fs.existsSync("analytics.json")) {
       initial: 0,
     })
   );
+} else {
+  json = readJSON("analytics.json");
+  for (i in json.days) {
+    if (json.days[i].hits == undefined) {
+      json.days[i].hits = json.days[i];
+      json.days[i].redirects = 0;
+    }
+  }
+  writeJSON("analytics.json", json);
 }
 
 if (!fs.existsSync("files/backups")) {
