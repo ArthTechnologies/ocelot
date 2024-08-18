@@ -40,7 +40,7 @@ if (!fs.existsSync("analytics.json")) {
       json.days[i].redirects = 0;
     }
   }
-  writeJSON("analytics.json", json);
+  writeJSON("analytics.json", JSON.stringify(json));
 }
 
 if (!fs.existsSync("files/backups")) {
