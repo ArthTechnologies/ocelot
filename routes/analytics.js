@@ -18,7 +18,7 @@ Router.post("/", (req, res) => {
     day = parseInt(day.toString().split(".")[0]);
 
     let analytics = readJSON("analytics.json");
-
+    analytics.day = day;
     if (analytics.days[day] == undefined) {
       analytics.days[day] = {};
       analytics.days[day].hits = 1;
