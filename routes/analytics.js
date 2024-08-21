@@ -19,7 +19,7 @@ Router.post("/", (req, res) => {
 
     let analytics = readJSON("analytics.json");
     analytics.day = day;
-
+    console.log("test");
     if (analytics.days[day] == undefined) {
       analytics.days[day].hits = 1;
       analytics.days[day].redirects = 0;
@@ -30,7 +30,7 @@ Router.post("/", (req, res) => {
       }
     }
     analytics.hits++;
-    console.log("test");
+
     if (req.body.returning) {
       analytics.returning++;
     } else {
