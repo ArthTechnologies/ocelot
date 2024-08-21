@@ -96,6 +96,7 @@ Router.post("/", (req, res) => {
         " returning " +
         req.body.returning
     );
+    console.log(analytics);
     writeJSON("analytics.json", JSON.stringify(analytics));
   }
 
