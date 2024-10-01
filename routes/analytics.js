@@ -8,7 +8,6 @@ Router.get("/", (req, res) => {
   res.send(analytics);
 });
 
-//disabled until new privacy policy goes into effect
 Router.post("/", (req, res) => {
   let userAgent = req.body.userAgent;
   //this makes sure google crawlers arent counted in analytics
@@ -108,6 +107,11 @@ Router.post("/getStartedButtonClicked", (req, res) => {
   let analytics = readJSON("analytics.json");
   let day = new Date().getTime() / 1000 / 60 / 60 / 24;
   day = parseInt(day.toString().split(".")[0]);
+  if (req.query.bpage != true) {
+    analytics.days[day].getStartedButtonClicked++;
+  } else {
+    analytics.days[day].getStartedButtonClickedB++;
+  }
   analytics.days[day].redirects++;
   writeJSON("analytics.json", JSON.stringify(analytics));
   res.send({ msg: "ok" });
