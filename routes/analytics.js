@@ -108,11 +108,11 @@ Router.post("/getStartedButtonClicked", (req, res) => {
   let day = new Date().getTime() / 1000 / 60 / 60 / 24;
   day = parseInt(day.toString().split(".")[0]);
   if (req.query.bpage != true) {
-    analytics.days[day].getStartedButtonClicked++;
+    analytics.days[day].redirects++;
   } else {
-    analytics.days[day].getStartedButtonClickedB++;
+    analytics.days[day].redirectsB++;
   }
-  analytics.days[day].redirects++;
+
   writeJSON("analytics.json", JSON.stringify(analytics));
   res.send({ msg: "ok" });
 });
