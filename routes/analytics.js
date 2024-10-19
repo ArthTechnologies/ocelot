@@ -110,7 +110,11 @@ Router.post("/getStartedButtonClicked", (req, res) => {
   if (req.query.bpage != true && req.query.bpage != "true") {
     analytics.days[day].redirects++;
   } else {
-    analytics.days[day].redirectsB++;
+    if (analytics.days[day].redirectsB == undefined) {
+      analytics.days[day].redirectsB = 1;
+    } else {
+      analytics.days[day].redirectsB++;
+    }
   }
 
   writeJSON("analytics.json", JSON.stringify(analytics));
