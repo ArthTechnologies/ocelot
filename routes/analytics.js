@@ -107,7 +107,7 @@ Router.post("/getStartedButtonClicked", (req, res) => {
   let analytics = readJSON("analytics.json");
   let day = new Date().getTime() / 1000 / 60 / 60 / 24;
   day = parseInt(day.toString().split(".")[0]);
-  if (req.query.bpage != true) {
+  if (req.query.bpage != true && req.query.bpage != "true") {
     analytics.days[day].redirects++;
   } else {
     analytics.days[day].redirectsB++;
