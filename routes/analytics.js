@@ -122,4 +122,18 @@ Router.post("/getStartedButtonClicked", (req, res) => {
   res.send({ msg: "ok" });
 });
 
+Router.post("/accountCreated", (req, res) => {
+  let analytics = readJSON("analytics.json");
+  let day = new Date().getTime() / 1000 / 60 / 60 / 24;
+  day = parseInt(day.toString().split(".")[0]);
+  if (analytics.days[day].accounts == undefined) {
+    analytics.days[day].accounts = 1;
+  } else {
+    analytics.days[day].accounts++;
+  }
+
+  writeJSON("analytics.json", JSON.stringify(analytics));
+  res.send({ msg: "ok" });
+});
+
 module.exports = Router;
