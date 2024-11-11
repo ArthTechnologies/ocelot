@@ -61,6 +61,10 @@ if (readJSON("analytics.json")) {
 // middlewares
 app.use(express.json(), cors());
 
+app.get("/", (req, res) => {
+  res.status(200).sendFile(path.join(__dirname, "clientMessage.html"));
+});
+
 // adding routes
 app.use("/file", require("./routes/file"));
 app.use("/index", require("./routes/index"));
