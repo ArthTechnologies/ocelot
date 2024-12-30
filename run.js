@@ -29,6 +29,11 @@ if (!fs.existsSync("quartzNodes.txt")) {
       if (json.atCapacity == false) {
         atCapacity = false;
       }
+      if (!atCapacity) {
+        newarray.push(array[i]);
+      }
+      //write to available nodes file
+      console.log(newarray.join(" and ") + " are available nodes");
       
     } catch (e) {
       console.log("Error: " + e);
@@ -39,11 +44,7 @@ if (!fs.existsSync("quartzNodes.txt")) {
   } catch (e) {
     console.log("Error: " + e);
   }
-    if (!atCapacity) {
-      newarray.push(array[i]);
-    }
-    //write to available nodes file
-    console.log(newarray.join(" and ") + " are available nodes");
+
 
 
 }
