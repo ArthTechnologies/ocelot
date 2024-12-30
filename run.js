@@ -19,9 +19,11 @@ if (!fs.existsSync("quartzNodes.txt")) {
     console.log("Fetching " + array[i] + "/info/capacity");	
     try {
 
-    fetch(array[i] + "/info/capacity").then((res) => {
-      atCapacity = res.json().atCapacity;
-    });
+    //fetch the node's capacity via the /info/capacity route
+    let response = require("sync-request")("GET", array[i] + "/info/capacity");
+    let body = response.getBody("utf-8");
+    let json = JSON.parse(body);
+    atCapacity = json.atCapacity;
   } catch (e) {
     console.log("Error: " + e);
   }
