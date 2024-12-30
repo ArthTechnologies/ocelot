@@ -16,9 +16,13 @@ if (!fs.existsSync("quartzNodes.txt")) {
   for (i in array) {
     //make a request to the node's capacity route
     let atCapacity = true;
+    try {
     fetch(array[i] + "/info/capacity").then((res) => {
       atCapacity = res.json().atCapacity;
     });
+  } catch (e) {
+    console.log("Error: " + e);
+  }
     if (atCapacity) {
       newarray.push(array[i]);
     }
