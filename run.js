@@ -105,6 +105,7 @@ app.use("/status", require("./routes/status"));
 app.use("/analytics", require("./routes/analytics"));
 app.use("/rss", require("./routes/rss"));
 app.use("/view", require("./routes/view"));
+app.use("/availableNode", require("./routes/availableNode")); 
 
 // port
 const port = process.env.PORT || 5000;
