@@ -4,12 +4,12 @@ const fs = require("fs");
 
 Router.get("/", (req, res) => {
   let node = "null";
-  try {
+  /*try {
   let availableNodesArray = fs.readFileSync("files/availableNodes.txt", "utf8").split(",");
   node = availableNodesArray[0];
   } catch (e) {
     console.log(e);
-  }
+  }*/
 
     res.send(node);
 });
