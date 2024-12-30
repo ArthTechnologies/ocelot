@@ -8,6 +8,27 @@ const fs = require("fs");
 const crypto = require("crypto");
 const { jar } = require("request");
 const { readJSON, writeJSON } = require("./scripts/utils");
+if (!fs.existsSync("quartzNodes.txt")) {
+  fs.writeFileSync("quartzNodes.txt", "");
+} else {
+  let array = fs.readFileSync("quartzNodes.txt").toString().split(",");
+  let newarray = [];
+  for (i in array) {
+    //make a request to the node's capacity route
+    let atCapacity = true;
+    fetch(array[i] + "/info/capacity").then((res) => {
+      atCapacity = res.json().atCapacity;
+    });
+    if (atCapacity) {
+      newarray.push(array[i]);
+    }
+    //write to available nodes file
+    console.log(newarray.join(" and ") + " are available nodes");
+    fs.writeFileSync("files/availableNodes.txt", newarray.join(","));
+
+}
+}
+
 if (!fs.existsSync("analytics.json")) {
   writeJSON(
     "analytics.json",
