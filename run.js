@@ -11,7 +11,7 @@ const { readJSON, writeJSON } = require("./scripts/utils");
 if (!fs.existsSync("quartzNodes.txt")) {
   fs.writeFileSync("quartzNodes.txt", "");
 } else {
-  let array = fs.readFileSync("quartzNodes.txt").toString().split(",");
+  let array = fs.readFileSync("quartzNodes.txt").toString().split("\n")[0].split(",");
   let newarray = [];
   for (i in array) {
     //make a request to the node's capacity route
