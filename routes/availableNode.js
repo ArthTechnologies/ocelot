@@ -6,3 +6,5 @@ Router.get("/", (req, res) => {
   let availableNodesArray = fs.readFileSync("files/availableNodes.txt", "utf8").split(",");
     res.send(availableNodesArray[0]);
 });
+
+module.exports = Router;  
