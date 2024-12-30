@@ -7,9 +7,9 @@ Router.get("/", (req, res) => {
   try {
   let availableNodesArray = fs.readFileSync("files/availableNodes.txt", "utf8").split(",");
 
-  node = availableNodesArray[0];
-  if (availableNodesArray.length == 0) {
-    node = "null";
+
+  if (availableNodesArray[0].includes("http")) {
+    node = availableNodesArray[0];
   }
   } catch (e) {
     console.log(e);
