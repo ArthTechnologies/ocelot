@@ -3,8 +3,15 @@ const Router = express.Router();
 const fs = require("fs");
 
 Router.get("/", (req, res) => {
+  let node = "null";
+  try {
   let availableNodesArray = fs.readFileSync("files/availableNodes.txt", "utf8").split(",");
-    res.send(availableNodesArray[0]);
+  node = availableNodesArray[0];
+  } catch (e) {
+    console.log(e);
+  }
+
+    res.send(node);
 });
 
 module.exports = Router;  
