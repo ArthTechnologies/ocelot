@@ -74,7 +74,7 @@ if (!fs.existsSync("analytics.json")) {
 } else {
   json = readJSON("analytics.json");
   for (i in json.days) {
-    console.log(typeof json.days[i]);
+
     if (typeof json.days[i] == "number") {
       let number = json.days[i];
       json.days[i] = {};
