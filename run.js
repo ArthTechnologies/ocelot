@@ -44,9 +44,10 @@ if (!fs.existsSync("quartzNodes.txt")) {
     }
     //write to available nodes file
     console.log(newarray.join(" and ") + " are available nodes");
-    fs.writeFileSync("files/availableNodes.txt", newarray.join(","));
+
 
 }
+fs.writeFileSync("files/availableNodes.txt", newarray.join(","));
 }
 
 if (!fs.existsSync("analytics.json")) {
