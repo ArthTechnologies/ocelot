@@ -25,7 +25,7 @@ if (!fs.existsSync("quartzNodes.txt")) {
   } catch (e) {
     console.log("Error: " + e);
   }
-    if (atCapacity) {
+    if (!atCapacity) {
       newarray.push(array[i]);
     }
     //write to available nodes file
