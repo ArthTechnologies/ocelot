@@ -24,11 +24,12 @@ if (!fs.existsSync("quartzNodes.txt")) {
     let url = array[i] + "/info/capacity";
     console.log("1"+url);
     exec("curl -s " + url, (error, stdout, stderr) => {
-      console.log("2"+url);
+
       
       try {
         let json = JSON.parse(stdout);
-        console.log(json);
+        console.log("2"+url);
+        console.log(json.atCapacity);
       if (json.atCapacity == false) {
         atCapacity = false;
       }
