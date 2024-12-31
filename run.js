@@ -28,11 +28,12 @@ if (!fs.existsSync("quartzNodes.txt")) {
       
       try {
         let json = JSON.parse(stdout);
-        console.log("2"+url);
-        console.log(json.atCapacity);
+
       if (json.atCapacity == false) {
         atCapacity = false;
       }
+      console.log("2"+url);
+      console.log(atCapacity);
       if (!atCapacity) {
         newarray.push(url);
              
@@ -53,7 +54,9 @@ if (!fs.existsSync("quartzNodes.txt")) {
 
 
 }
-fs.writeFileSync("files/availableNodes.txt", newarray.join(","));
+setTimeout(() => {
+  fs.writeFileSync("files/availableNodes.txt", newarray.join(","));
+}, 1000);
 }
 
 if (!fs.existsSync("analytics.json")) {
