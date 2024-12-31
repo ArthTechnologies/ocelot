@@ -33,7 +33,7 @@ if (!fs.existsSync("quartzNodes.txt")) {
       }
       console.log(atCapacity);
       if (!atCapacity) {
-        newarray.push(url.split("/info/capacity")[0]);
+        newarray.push(url.split("info/capacity")[0]);
              
 
       }
