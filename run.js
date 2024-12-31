@@ -22,8 +22,9 @@ if (!fs.existsSync("quartzNodes.txt")) {
     //fetch the node's capacity via the /info/capacity route
     const {exec} = require("child_process");
     let url = array[i] + "/info/capacity";
-    console.log(url);
+    console.log("1"+url);
     exec("curl -s " + url, (error, stdout, stderr) => {
+      console.log("2"+url);
       
       try {
         let json = JSON.parse(stdout);
