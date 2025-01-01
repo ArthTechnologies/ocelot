@@ -11,6 +11,14 @@ const { readJSON, writeJSON } = require("./scripts/utils");
 if (!fs.existsSync("quartzNodes.txt")) {
   fs.writeFileSync("quartzNodes.txt", "");
 } else {
+ refreshNodes();
+}
+
+setInterval(() => {
+  refreshNodes();
+}, 1000 * 60 * 60 * 5);
+
+function refreshNodes() {
   let array = fs.readFileSync("quartzNodes.txt").toString().split("\n")[0].split(",");
   let newarray = [];
   for (i in array) {
