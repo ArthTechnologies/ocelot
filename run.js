@@ -10,6 +10,7 @@ const { jar } = require("request");
 const { readJSON, writeJSON } = require("./scripts/utils");
 if (!fs.existsSync("quartzNodes.txt")) {
   fs.writeFileSync("quartzNodes.txt", "");
+  console.log("Use quartzNodes.txt to comma-separated add urls of quartz nodes.");
 } else {
  refreshNodes();
 }
@@ -19,7 +20,6 @@ setInterval(() => {
 }, 1000 * 60 * 60 * 5);
 
 function refreshNodes() {
-  console.log("Refreshing nodes...");
   let array = fs.readFileSync("quartzNodes.txt").toString().split("\n")[0].split(",");
   let newarray = [];
   for (i in array) {
