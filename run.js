@@ -19,6 +19,7 @@ setInterval(() => {
 }, 1000 * 60 * 60 * 5);
 
 function refreshNodes() {
+  console.log("Refreshing nodes...");
   let array = fs.readFileSync("quartzNodes.txt").toString().split("\n")[0].split(",");
   let newarray = [];
   for (i in array) {
