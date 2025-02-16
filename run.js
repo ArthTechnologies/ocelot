@@ -15,6 +15,15 @@ if (!fs.existsSync("quartzNodes.txt")) {
  refreshNodes();
 }
 
+if (!fs.existsSync("forwardingSecret.txt")) {
+  fs.writeFileSync("forwardingSecret.txt", crypto.randomBytes(16).toString("hex"));
+  console.log("Use forwardingSecret.txt to set a forwarding secret.");
+  if (!fs.existsSync("backups")) {
+    fs.mkdirSync("backups");
+  }
+
+}
+
 setInterval(() => {
   refreshNodes();
 }, 1000 * 60 * 60 * 5);
@@ -131,6 +140,7 @@ app.use("/analytics", require("./routes/analytics"));
 app.use("/rss", require("./routes/rss"));
 app.use("/view", require("./routes/view"));
 app.use("/availableNode", require("./routes/availableNode")); 
+app.use("/backups", require("./routes/backups"));
 
 // port
 const port = process.env.PORT || 5000;
