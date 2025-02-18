@@ -72,6 +72,7 @@ function refreshNodes() {
 
 }
 setTimeout(() => {
+  console.log("New nodes: " + newarray.join(","));
   fs.writeFileSync("files/availableNodes.txt", newarray.join(","));
 }, 1000);
 }
