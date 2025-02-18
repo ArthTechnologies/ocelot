@@ -4,3 +4,4 @@ analytics.json
 /files/posts/index.json
 quartzNodes.txt
 forwardingSecret.txt
+nodeInfo.json

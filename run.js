@@ -34,28 +34,25 @@ function refreshNodes() {
   let newarray = [];
   for (i in array) {
     //make a request to the node's capacity route
-    let atCapacity = true;
+ 
 
     try {
 
     //fetch the node's capacity via the /info/capacity route
     const {exec} = require("child_process");
     let url = array[i] + "/info/capacity";
+    let nodeurl = array[i];
     exec("curl -s " + url, (error, stdout, stderr) => {
 
       
       try {
         let json = JSON.parse(stdout);
 
-      if (json.atCapacity == false) {
-        atCapacity = false;
-      }
-      console.log(atCapacity);
-      if (!atCapacity) {
-        newarray.push(url.split("info/capacity")[0]);
+
+        newarray.push([nodeurl, json.numServers, json.maxServers]);
              
 
-      }
+      
 
       
     } catch (e) {
@@ -72,8 +69,9 @@ function refreshNodes() {
 
 }
 setTimeout(() => {
-  console.log("New nodes: " + newarray.join(","));
-  fs.writeFileSync("files/availableNodes.txt", newarray.join(","));
+
+  console.log("New nodes: " + JSON.stringify(newarray));
+  fs.writeFileSync("files/nodeInfo.json", JSON.stringify(newarray));
 }, 1000);
 }
 
@@ -141,7 +139,7 @@ app.use("/status", require("./routes/status"));
 app.use("/analytics", require("./routes/analytics"));
 app.use("/rss", require("./routes/rss"));
 app.use("/view", require("./routes/view"));
-app.use("/availableNode", require("./routes/availableNode")); 
+app.use("/nodeInfo", require("./routes/nodeInfo")); 
 app.use("/backups", require("./routes/backups"));
 
 // port
