@@ -17,4 +17,16 @@ Router.get("/", (req, res) => {
     
 });
 
+Router.get("/list", (req, res) => {
+  try {
+    let availableNodes = fs.readFileSync("quartzNodes.txt", "utf8");
+    availableNodes = availableNodes.split(",");
+    res.send(availableNodes);
+  } catch (e) { 
+    console.log(e);
+    res.send({error: "Error reading file"});
+  }
+}
+); 
+
 module.exports = Router;  
