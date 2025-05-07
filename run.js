@@ -46,7 +46,9 @@ function refreshNodes() {
 
       
       try {
+
         let json = JSON.parse(stdout);
+        console.log(json);
 
 
         newarray.push([nodeurl, json.numServers, json.maxServers]);
