@@ -74,6 +74,18 @@ function refreshNodes() {
 setTimeout(() => {
 
   console.log("New nodes: " + JSON.stringify(newarray));
+  //if a node from the quartzNodes.txt file is not in the new array, just add it as 100,100
+  for (i in array) {
+    let found = false;
+    for (j in newarray) {
+      if (newarray[j][0] == array[i]) {
+        found = true;
+      }
+    }
+    if (!found) {
+      newarray.push([array[i], 100, 100]);
+    }
+  }
   fs.writeFileSync("files/nodeInfo.json", JSON.stringify(newarray));
 }, 5000);
 }
