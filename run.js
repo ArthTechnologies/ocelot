@@ -73,7 +73,7 @@ setTimeout(() => {
 
   console.log("New nodes: " + JSON.stringify(newarray));
   fs.writeFileSync("files/nodeInfo.json", JSON.stringify(newarray));
-}, 1000);
+}, 5000);
 }
 
 if (!fs.existsSync("analytics.json")) {
