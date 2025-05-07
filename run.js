@@ -57,6 +57,7 @@ function refreshNodes() {
       
     } catch (e) {
       console.log("Error: " + e);
+      newarray.push([nodeurl, 100, 100]); 
     
     }
     }
