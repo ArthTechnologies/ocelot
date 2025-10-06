@@ -12,6 +12,7 @@ Router.post("/", (req, res) => {
   let userAgent = req.body.userAgent;
   //this makes sure google crawlers arent counted in analytics
   if (!userAgent.includes("google.com/") && !userAgent.includes("bot")) {
+        console.log("userAgent: " + req.body.userAgent);
     //how many days since 1970
     let day = new Date().getTime() / 1000 / 60 / 60 / 24;
     day = parseInt(day.toString().split(".")[0]);
@@ -87,7 +88,7 @@ Router.post("/", (req, res) => {
       }
     }
 
-    console.log("userAgent: " + req.body.userAgent);
+
     console.log(
       "language: " +
         req.body.locale +
