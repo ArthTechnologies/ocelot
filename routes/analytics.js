@@ -116,7 +116,10 @@ Router.post("/", (req, res) => {
 Router.post("/getStartedButtonClicked", (req, res) => {
   console.log("bpage: " + req.query.bpage);
   let analytics = readJSON("analytics.json");
-  console.log(analytics);
+    //if analytics are stringified, parse them
+    if (typeof analytics == "string") {
+      analytics = JSON.parse(analytics);
+    }
   let day = new Date().getTime() / 1000 / 60 / 60 / 24;
   day = parseInt(day.toString().split(".")[0]);
   if (req.query.bpage != true && req.query.bpage != "true") {
