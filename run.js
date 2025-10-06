@@ -91,7 +91,7 @@ setTimeout(() => {
 }
 
 if (!fs.existsSync("analytics.json")) {
-  writeJSON(
+  writeJSON({
     "analytics.json",
       max: 0,
       day: 0,
@@ -111,7 +111,7 @@ if (!fs.existsSync("analytics.json")) {
       getStartedButtonClicks: 0,
       returning: 0,
       initial: 0,
-  );
+  } );
 } else {
   json = readJSON("analytics.json");
   for (i in json.days) {
