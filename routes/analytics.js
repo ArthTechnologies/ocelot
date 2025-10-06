@@ -18,15 +18,14 @@ Router.post("/", (req, res) => {
     day = parseInt(day.toString().split(".")[0]);
 
     let analytics = readJSON("analytics.json");
-        console.log(typeof analytics);
-        console.log(analytics);
+
     //if analytics are stringified, parse them
     if (typeof analytics == "string") {
       analytics = JSON.parse(analytics);
     }
-        console.log(analytics);
+
     analytics.day = day;
-            console.log("userAgent1: " + req.body.userAgent);
+            
 
     if (analytics.days[day] == undefined) {
       analytics.days[day] = {};
