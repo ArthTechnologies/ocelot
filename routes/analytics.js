@@ -18,7 +18,10 @@ Router.post("/", (req, res) => {
     day = parseInt(day.toString().split(".")[0]);
 
     let analytics = readJSON("analytics.json");
-
+    //if analytics are stringified, parse them
+    if (typeof analytics == "string") {
+      analytics = JSON.parse(analytics);
+    }
     analytics.day = day;
             console.log("userAgent1: " + req.body.userAgent);
     console.log(analytics);
