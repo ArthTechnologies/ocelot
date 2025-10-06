@@ -16,8 +16,9 @@ Router.post("/", (req, res) => {
     //how many days since 1970
     let day = new Date().getTime() / 1000 / 60 / 60 / 24;
     day = parseInt(day.toString().split(".")[0]);
-
+        console.log("userAgent1: " + req.body.userAgent);
     let analytics = readJSON("analytics.json");
+            console.log("userAgent2: " + req.body.userAgent);
     analytics.day = day;
     if (analytics.days[day] == undefined) {
       analytics.days[day] = {};
@@ -30,7 +31,7 @@ Router.post("/", (req, res) => {
       }
     }
     analytics.hits++;
-        console.log("userAgent: " + req.body.userAgent);
+
     if (req.body.returning) {
       analytics.returning++;
     } else {
