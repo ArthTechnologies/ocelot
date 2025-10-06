@@ -91,8 +91,9 @@ setTimeout(() => {
 }
 
 if (!fs.existsSync("analytics.json")) {
-  writeJSON({
+  writeJSON(
     "analytics.json",
+    {
       max: 0,
       day: 0,
       days: {},
