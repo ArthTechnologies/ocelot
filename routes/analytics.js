@@ -30,7 +30,7 @@ Router.post("/", (req, res) => {
       }
     }
     analytics.hits++;
-
+        console.log("userAgent: " + req.body.userAgent);
     if (req.body.returning) {
       analytics.returning++;
     } else {
@@ -49,7 +49,7 @@ Router.post("/", (req, res) => {
     } else {
       analytics.devices.unknown++;
     }
-        console.log("userAgent: " + req.body.userAgent);
+
     if (!req.body.returning) {
       //Locale (Language + Dialect)
       let locale = req.body.locale.split("-")[0];
