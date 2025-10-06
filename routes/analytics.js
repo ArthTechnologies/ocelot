@@ -21,7 +21,7 @@ Router.post("/", (req, res) => {
 
     analytics.day = day;
             console.log("userAgent1: " + req.body.userAgent);
-    console.log(analytics.days[day] == undefined);
+    console.log(analytics.days);
     if (analytics.days[day] == undefined) {
       analytics.days[day] = {};
       analytics.days[day].hits = 1;
