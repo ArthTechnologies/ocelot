@@ -132,12 +132,17 @@ Router.post("/getStartedButtonClicked", (req, res) => {
     }
   }
 
-  writeJSON("analytics.json", JSON.stringify(analytics));
+  // writeJSON expects an object; keep the file consistent by writing the object
+  writeJSON("analytics.json", analytics);
   res.send({ msg: "ok" });
 });
 
 Router.post("/accountCreated", (req, res) => {
   let analytics = readJSON("analytics.json");
+  // if analytics are stringified, parse them
+  if (typeof analytics == "string") {
+    analytics = JSON.parse(analytics);
+  }
   let day = new Date().getTime() / 1000 / 60 / 60 / 24;
   day = parseInt(day.toString().split(".")[0]);
   if (analytics.days[day].accounts == undefined) {
@@ -145,8 +150,8 @@ Router.post("/accountCreated", (req, res) => {
   } else {
     analytics.days[day].accounts++;
   }
-
-  writeJSON("analytics.json", JSON.stringify(analytics));
+  // write the object (don't double-stringify)
+  writeJSON("analytics.json", analytics);
   res.send({ msg: "ok" });
 });
 
