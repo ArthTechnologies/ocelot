@@ -155,4 +155,32 @@ Router.post("/accountCreated", (req, res) => {
   res.send({ msg: "ok" });
 });
 
+// Record a sale entry in analytics.sales
+Router.post("/sale", (req, res) => {
+  let analytics = readJSON("analytics.json");
+  // if analytics are stringified, parse them
+  if (typeof analytics == "string") {
+    analytics = JSON.parse(analytics);
+  }
+
+  // Read from query params (normalize values)
+  const q = req.query || {};
+  const btest = ["true", "1", "yes"].includes(String(q.btest || "").toLowerCase());
+  const source = q.source ? String(q.source).slice(0, 200) : "unknown";
+
+  if (!analytics.sales || !Array.isArray(analytics.sales)) {
+    analytics.sales = [];
+  }
+
+  analytics.sales.push({
+    unixtimestamp: Date.now(),
+    source: source,
+    btest: btest,
+  });
+
+  // persist
+  writeJSON("analytics.json", analytics);
+  res.send({ msg: "ok" });
+});
+
 module.exports = Router;
