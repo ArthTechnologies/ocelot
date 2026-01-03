@@ -1,0 +1,49 @@
+{
+  "name": "quartz",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "server": "nodemon index.js",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "@mysql/xdevapi": "^8.0.35",
+    "base62": "^2.0.2",
+    "btoa": "^1.2.1",
+    "cron-parser": "^4.0.1",
+    "cors": "^2.8.5",
+    "decompress": "^4.2.1",
+    "diff": "^5.1.0",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.1",
+    "express-rate-limit": "^6.7.0",
+    "extract-zip": "^2.0.1",
+    "extract-zip-relative-path": "^2.0.4",
+    "ftpd": "^0.2.16",
+    "http-proxy": "^1.18.1",
+    "image-size": "^1.0.2",
+    "jquery": "^3.7.1",
+    "jsdom": "^25.0.1",
+    "multer": "^1.4.5-lts.1",
+    "mysql": "^2.18.1",
+    "mysql2": "^3.11.5",
+    "node-fetch": "^2.6.7",
+    "node-rsa": "^1.1.1",
+    "path": "^0.12.7",
+    "socket.io": "^4.5.2",
+    "stripe": "^11.4.0",
+    "uuid": "^9.0.0",
+    "whatwg-fetch": "^3.6.2",
+    "yauzl": "^2.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "vitest": "^1.0.0"
+  }
+}

@@ -1,0 +1,60 @@
+# Node name (Useful for multiple locations)
+nodeName=quartz
+# The address that servers will be ran under:
+address=arthmc.xyz
+# ID Offset (Recommended to be in increments of 100)
+idOffset=0
+# Mode: solo (no accounts/payments), user (accounts, no payments), or provider (accounts + payments)
+mode=provider
+# We highly reccomend using docker in provider mode for security. Also, it is necescary for FTP in any mode.
+dockerMode=true
+# The maximum amount of servers that this panel is allowed to create:
+maxServers=8
+# The maximum amount of storage that each server can use (in gigaBytes):
+serverStorageLimit=10
+
+# The CurseForge API Key to use for downloading mods (You can apply for one at docs.curseforge.com):
+curseforgeKey=
+# The Stripe API Key to use for charging users (You can apply for one at stripe.com):
+stripeKey=
+# The URL that users get sent to after checking out (should probably be yourobserverinstance/subscription-success):
+stripeReturnUrl=
+# The stripe productId of each plan:
+basic=
+plus=
+premium=
+max=
+
+# Advanced Settings:
+
+# Enable testing mode: caps all Docker containers at 1GB RAM (useful for testing on limited resources)
+testingMode=false
+# The DeepL API Key to use for translating mod descriptions and such (You can apply for one at deepl.com):
+deeplKey=
+# Arth Hosting Only: PIN so that backend can get account data
+forwardingPin=
+# The 'pepper', used to obfuscate things such as IP addresses:
+pepper=
+# The info for cloudflare that enables the claiming of subdomains
+cloudflareKey=
+cloudflareEmail=
+cloudflareZone=
+
+# Security Settings:
+
+# Virus scans run whenever someone uploads a world file. Read clamav.net's documentation for setup 
+# instructions and make sure clamdscan in specific is set up:
+enableVirusScan=false
+# Enable cloudflare turnstile, which verifies that users are human:
+enableCloudflareVerify=false
+# The "sitekey" for cloudflare turnstile, found in the cloudflare dashboard:
+cloudflareVerifySiteKey=
+# The secret key for cloudflare turnstile, found in the cloudflare dashboard:
+cloudflareVerifySecretKey=
+
+# The list of places (can also be on other computers via ssh) to backup to [Seperate with commas]:
+backupsList=
+enableBackups=
+
+# Do not modify
+setup=false
