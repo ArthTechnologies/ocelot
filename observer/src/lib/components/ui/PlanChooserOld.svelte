@@ -1,0 +1,405 @@
+<script lang="ts">
+  import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
+  import Footer from "$lib/components/layout/SignedOutNav.svelte";
+
+  import { t } from "$lib/scripts/i18n";
+  import { apiurl } from "$lib/scripts/req";
+  import {
+    AlertTriangleIcon,
+    BadgeDollarSign,
+    Check,
+    ChevronDown,
+    Cross,
+    MemoryStick,
+    XIcon,
+  } from "lucide-svelte";
+  import { onMount } from "svelte";
+
+  let atCapacity = false;
+  let billingCycle = $t("perMonth");
+  onMount(() => {
+    if (browser && window.innerWidth > 768) {
+      if (window.location.pathname == "/signup/subscribe/basic") {
+        selectBasic();
+      } else if (window.location.pathname == "/signup/subscribe/modded") {
+        selectModded();
+      } else if (window.location.pathname == "/signup/subscribe/premium") {
+        selectPremium();
+      }
+    }
+
+    if (browser) {
+      const usd = document.getElementById("usd");
+      const mxn = document.getElementById("mxn");
+      if (localStorage.getItem("currency") == "mxn") {
+        usd?.classList.add("btn-neutral");
+        usd?.classList.add("hover:bg-base-100");
+        usd?.classList.remove("pointer-events-none");
+        mxn?.classList.remove("btn-neutral");
+        mxn?.classList.remove("hover:bg-base-100");
+        mxn?.classList.add("pointer-events-none");
+      }
+    }
+
+    fetch(apiurl + "info/capacity")
+      .then((x) => x.json())
+      .then((x) => {
+        atCapacity = x.atCapacity;
+      });
+  });
+
+  function selectBasic() {
+    document.getElementById("basicSelect").classList.remove("btn-neutral");
+    document.getElementById("basicSelect").classList.add("bg-base-300");
+    document.getElementById("basicSelect").classList.add("pointer-events-none");
+    document.getElementById("basicSelect").innerHTML = "Selected";
+
+    document.getElementById("moddedSelect").classList.add("btn-neutral");
+    document
+      .getElementById("moddedSelect")
+      .classList.remove("pointer-events-none");
+    document.getElementById("moddedSelect").innerHTML = "Select";
+    document.getElementById("premiumSelect").classList.add("btn-neutral");
+    document
+      .getElementById("premiumSelect")
+      .classList.remove("pointer-events-none");
+    document.getElementById("premiumSelect").innerHTML = "Select";
+  }
+  function selectModded() {
+    document.getElementById("moddedSelect").classList.remove("btn-neutral");
+    document.getElementById("moddedSelect").classList.add("bg-base-300");
+    document
+      .getElementById("moddedSelect")
+      .classList.add("pointer-events-none");
+    document.getElementById("moddedSelect").innerHTML = "Selected";
+
+    document.getElementById("basicSelect").classList.add("btn-neutral");
+    document
+      .getElementById("basicSelect")
+      .classList.remove("pointer-events-none");
+    document.getElementById("basicSelect").innerHTML = "Select";
+
+    document.getElementById("premiumSelect").classList.add("btn-neutral");
+    document
+      .getElementById("premiumSelect")
+      .classList.remove("pointer-events-none");
+    document.getElementById("premiumSelect").innerHTML = "Select";
+  }
+  function selectPremium() {
+    document.getElementById("premiumSelect").classList.remove("btn-neutral");
+    document.getElementById("premiumSelect").classList.add("bg-base-300");
+    document
+      .getElementById("premiumSelect")
+      .classList.add("pointer-events-none");
+    document.getElementById("premiumSelect").innerHTML = "Selected";
+
+    document.getElementById("basicSelect").classList.add("btn-neutral");
+    document
+      .getElementById("basicSelect")
+      .classList.remove("pointer-events-none");
+    document.getElementById("basicSelect").innerHTML = "Select";
+
+    document.getElementById("moddedSelect").classList.add("btn-neutral");
+    document
+      .getElementById("moddedSelect")
+      .classList.remove("pointer-events-none");
+    document.getElementById("moddedSelect").innerHTML = "Select";
+  }
+  let basicPlanPrice = 3.49;
+  let moddedPlanPrice = 4.99;
+  let premiumPlanPrice = 7.99;
+
+  if (browser) {
+    onMount(() => {
+      if (localStorage.getItem("address") == "arthmc.xyz") {
+        if (localStorage.getItem("billQuarterly") == "true") {
+          document.getElementById("billPeriod").selectedIndex = 1;
+
+          basicPlanPrice = 9.99;
+          moddedPlanPrice = 13.99;
+          premiumPlanPrice = 23.49;
+          billingCycle = $t("perQuarter");
+        }
+
+        let currency = localStorage.getItem("currency");
+        if (currency == "mxn") {
+          basicPlanPrice = (basicPlanPrice * 18).toFixed(0);
+          moddedPlanPrice = (moddedPlanPrice * 18).toFixed(0);
+          premiumPlanPrice = (premiumPlanPrice * 18).toFixed(0);
+          //round up to nearest 5
+          basicPlanPrice = Math.ceil(basicPlanPrice / 5) * 5;
+          moddedPlanPrice = Math.ceil(moddedPlanPrice / 5) * 5;
+          premiumPlanPrice = Math.ceil(premiumPlanPrice / 5) * 5;
+        }
+      } else {
+        const currencyChooser = document.getElementById("currencyChooser");
+        currencyChooser?.classList.add("hidden");
+
+        const addonChooser = document.getElementById("addonChooser");
+        addonChooser?.classList.add("hidden");
+      }
+    });
+  }
+
+  function updateBillPeriod() {
+    let dropdown = document.getElementById("billPeriod")?.value;
+    if (dropdown == $t("billMonthly")) {
+      localStorage.setItem("billQuarterly", "false");
+    } else if (dropdown == $t("billQuarterly")) {
+      localStorage.setItem("billQuarterly", "true");
+    }
+    location.reload();
+  }
+</script>
+
+<Navbar navType="welcome" />
+
+<div class="min-[1080px]:flex relative bg-base-200 h-full w-full">
+  {#if atCapacity}
+    <div
+      class="absolute w-screen h-screen bg-black bg-opacity-70 z-[999] flex place-items-center justify-center"
+    >
+      <div role="alert" class="alert alert-error w-96">
+        <AlertTriangleIcon />
+        <span>{$t("atCapacity")}</span>
+      </div>
+    </div>
+  {/if}
+  <div
+    class="absolute top-3 right-3 max-[1080px]:right-16 z-50 flex flex-col gap-1.5 items-end"
+  >
+    <div id="currencyChooser" class="flex space-x-1 flex hidden">
+      <button
+        id="usd"
+        class="btn btn-sm pointer-events-none"
+        on:click={() => {
+          if (browser) {
+            const usd = document.getElementById("usd");
+            const mxn = document.getElementById("mxn");
+            usd?.classList.remove("btn-neutral");
+            usd?.classList.remove("hover:bg-base-100");
+            usd?.classList.add("pointer-events-none");
+            mxn?.classList.add("btn-neutral");
+            mxn?.classList.add("hover:bg-base-100");
+            mxn?.classList.remove("pointer-events-none");
+
+            localStorage.setItem("currency", "usd");
+            location.reload();
+          }
+        }}>$</button
+      >
+
+      <button
+        id="mxn"
+        class="btn btn-neutral btn-sm hover:bg-base-100"
+        on:click={() => {
+          if (browser) {
+            const usd = document.getElementById("usd");
+            const mxn = document.getElementById("mxn");
+            usd?.classList.add("btn-neutral");
+            usd?.classList.add("hover:bg-base-100");
+            usd?.classList.remove("pointer-events-none");
+            mxn?.classList.remove("btn-neutral");
+            mxn?.classList.remove("hover:bg-base-100");
+            mxn?.classList.add("pointer-events-none");
+
+            localStorage.setItem("currency", "mxn");
+            location.reload();
+          }
+        }}>MX$</button
+      >
+    </div>
+    <select
+      id="billPeriod"
+      on:change={updateBillPeriod}
+      class="select select-sm select-ghost"
+    >
+      <option selected>{$t("billMonthly")}</option>
+      <option>{$t("billQuarterly")}</option>
+    </select>
+  </div>
+
+  <div
+    class="px-[2.5rem] min-[1080px]:px-4 min-[1200px]:px-[2.5rem] 2xl:px-[7rem] py-[4.5rem] flex flex-col max-md:place-items-center relative"
+  >
+    <p class="text-xl mb-4 font-bold">{$t("subscribe.pickAPlan")}</p>
+
+    <div class="sm:flex mb-2">
+      <div class="flex flex-col gap-2">
+        {$t("basic")}
+        <div class="flex gap-2">
+          <p class="text-accent-content text-4xl font-bold">
+            ${basicPlanPrice}
+          </p>
+
+          <p class="w-5 text-sm">{billingCycle}</p>
+        </div>
+        <img
+          src="/images/basicPlan.webp"
+          class="rounded-xl h-[5.75rem] w-[9.5rem]"
+        />
+
+        <a
+          on:click={() => {
+            setTimeout(() => {
+              location.reload();
+            }, 100);
+          }}
+          id="basicSelect"
+          class="btn btn-neutral btn-sm my-0.5 w-full"
+          href="/signup/subscribe/basic">{$t("select")}</a
+        >
+        <p
+          class="hidden sm:flex items-center gap-2 text-sm xl:text-[.95rem] w-[9.5rem]"
+        >
+          <Check size="16" class="shrink-0" />
+          {$t("subscribe.list.crossplay")}
+        </p>
+        <p
+          class="hidden sm:flex items-center gap-2 text-sm xl:text-[.95rem] w-[9.5rem]"
+        >
+          <Check size="16" class="shrink-0" />
+          {$t("subscribe.list.worldgen")}
+        </p>
+        <p
+          class="hidden sm:flex items-center gap-2 text-sm xl:text-[.95rem] w-[9.5rem]"
+        >
+          <Check size="16" class="shrink-0" />
+          {$t("subscribe.list.plugins")}
+        </p>
+      </div>
+      <div
+        class="max-[1200px]:invisible max-[1200px]:m-0 divider divider-horizontal m-0 ml-2 mr-5 h-12 mt-7"
+      ></div>
+      <div class="flex flex-col gap-2">
+        {$t("plus")}
+        <div class="flex gap-2">
+          <p class="text-accent-content text-4xl font-bold">
+            ${moddedPlanPrice}
+          </p>
+
+          <p class="w-5 text-sm">{billingCycle}</p>
+        </div>
+
+        <img
+          src="/images/moddedPlan.webp"
+          class="rounded-xl h-[5.75rem] w-[9.5rem]"
+        />
+
+        <a
+          on:click={() => {
+            setTimeout(() => {
+              location.reload();
+            }, 100);
+          }}
+          id="moddedSelect"
+          class="btn btn-neutral btn-sm my-0.5 w-full"
+          href="/signup/subscribe/modded">{$t("select")}</a
+        >
+        <p
+          class="hidden sm:flex items-center gap-2 text-sm xl:text-[.95rem] w-[9.5rem]"
+        >
+          <Check size="16" class="shrink-0" />
+          {$t("subscribe.list.mods1")}
+        </p>
+        <p
+          class="hidden sm:flex items-center gap-2 text-sm xl:text-[.95rem] w-[9.5rem]"
+        >
+          <Check size="16" class="shrink-0" />
+          {$t("subscribe.list.modpacks")}
+        </p>
+        <p
+          class="hidden sm:flex items-center gap-2 text-sm xl:text-[.95rem] w-[9.5rem]"
+        >
+          <Check size="16" class="shrink-0" />
+          {$t("subscribe.list.mods2")}
+        </p>
+      </div>
+
+      <div
+        class="max-[1200px]:invisible max-[1200px]:m-0 divider divider-horizontal m-0 ml-2 mr-5 h-12 mt-7"
+      ></div>
+      <div class="flex flex-col gap-2">
+        Premium
+        <div class="flex gap-2">
+          <p class="text-accent-content text-4xl font-bold">
+            ${premiumPlanPrice}
+          </p>
+
+          <p class="w-5 text-sm">{billingCycle}</p>
+        </div>
+
+        <img
+          src="/images/premiumPlan.webp"
+          class="rounded-xl h-[5.75rem] w-[9.5rem]"
+        />
+
+        <a
+          on:click={() => {
+            setTimeout(() => {
+              location.reload();
+            }, 100);
+          }}
+          id="premiumSelect"
+          class="btn btn-neutral btn-sm my-0.5 w-full"
+          href="/signup/subscribe/premium">{$t("select")}</a
+        >
+        <p
+          class="hidden sm:flex items-center gap-2 text-sm xl:text-[.95rem] w-[9.5rem]"
+        >
+          <Check size="16" class="shrink-0" />
+          Unmatched price for performance at only $1/GB of RAM
+        </p>
+        <p
+          class="hidden sm:flex items-center gap-2 text-sm xl:text-[.95rem] w-[9.5rem]"
+        >
+          <Check size="16" class="shrink-0" />
+          {$t("subscribe.list.mods2")}
+        </p>
+        <p
+          class="hidden sm:flex items-center gap-2 text-sm xl:text-[.95rem] w-[9.5rem]"
+        >
+          <Check size="16" class="shrink-0" />
+          {$t("subscribe.list.crossplay")}
+        </p>
+      </div>
+    </div>
+    <ul class="list-disc mb-8 mt-24">
+      <p class="text-lg mb-4 font-bold">{$t("subscribe.didYouKnow")}</p>
+      <li>
+        {$t("subscribe.didYouKnow.geyser")}
+      </li>
+      <li>
+        {$t("subscribe.didYouKnow.price")}
+      </li>
+      <li>
+        {$t("subscribe.didYouKnow.interface")}
+      </li>
+    </ul>
+    <div>
+      <!--
+              <img src="/images/sitelogo.svg" width="100px" />-->
+      <p>
+        <!--Arth Technologies<br />-->© 2022-{new Date().getFullYear()}
+        <br />
+        <!---->
+        <a
+          href="https://arthmc.xyz/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:link text-[.825rem]">Arth Technologies</a
+        >
+        <span class="text-[.825rem]">|</span>
+        <a
+          href="https://arthmc.xyz/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:link text-[.825rem]">{$t("privacyPolicy")}</a
+        >
+      </p>
+    </div>
+  </div>
+</div>
+
+<Footer navType="welcone" />

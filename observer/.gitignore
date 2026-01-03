@@ -1,0 +1,16 @@
+.DS_Store
+node_modules
+/.svelte-kit
+/build
+/package
+.env
+.env.*
+!.env.example
+/target
+/node_modules
+/servers/java/17
+/pocketbase/pb_data
+.breakpoints
+.replit
+replit.nix
+yarn.lock
