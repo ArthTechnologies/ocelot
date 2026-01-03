@@ -1,0 +1,365 @@
+<script>
+  import { browser } from "$app/environment";
+  import File from "$lib/components/ui/files/File.svelte";
+  import Folder from "$lib/components/ui/files/Folder.svelte";
+  import TextEditor from "$lib/components/ui/files/TextEditor.svelte";
+  import { apiurl, usingOcelot, getServerNode } from "$lib/scripts/req";
+  import { ArrowLeft, ArrowLeftIcon, FlaskConical, HardDriveDownload, Hash, KeyIcon, LinkIcon, UserIcon, Search, X, FileText, Folder as FolderIcon, FolderClosed } from "lucide-svelte";
+  import { t } from "$lib/scripts/i18n";
+  import HistoryButton from "$lib/components/buttons/HistoryButton.svelte";
+  import MainFolder from "$lib/components/ui/files/MainFolder.svelte";
+  import { alert } from "$lib/scripts/utils";
+
+  let files = [];
+  let filteredFiles = [];
+  let searchQuery = "";
+  let id;
+  let backurl = "server";
+  let tab = "list";
+  let filepath = "file.txt";
+  let ftpPassword = "loading...";
+  let showFtpPassword = false;
+  let username;
+  let isLoading = true; // Add loading state
+
+  if (browser) {
+    let accountId = localStorage.getItem("accountId");
+    if (accountId?.includes("acc_")) accountId = accountId.split("acc_")[1];  
+    username = accountId.slice(-6)+"."+localStorage.getItem("serverID")
+    if (window.location.href.includes("proxy")) {
+      backurl = "proxy";
+    }
+    if (localStorage.getItem("serverSoftware") == "Velocity") {
+      backurl = "proxy";
+    }
+    id = localStorage.getItem("serverID");
+    getFiles();
+
+    document.addEventListener("refresh", function () {
+      console.log("refreshing");
+      getFiles();
+    });
+
+    fetch(
+      apiurl + "server/" + id + "/getFtpToken",
+      {
+        method: "GET",
+        headers: {
+          token: localStorage.getItem("token"),
+          username: localStorage.getItem("accountEmail"),
+        },
+      }
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        ftpPassword = data.token;
+      });
+
+    document.addEventListener("keydown", function (event) {
+      if (
+        (event.key === "s" || event.key === "S") &&
+        (event.ctrlKey || event.metaKey)
+      ) {
+        event.preventDefault();
+        save();
+      }
+    });
+  }
+
+  function getFiles() {
+    isLoading = true; // Set loading to true when fetching
+    let baseurl = apiurl;
+    if (usingOcelot) baseurl = getServerNode(id);
+    const url = baseurl + "server/" + id + "/files";
+    fetch(url, {
+      method: "GET",
+      headers: {
+        token: localStorage.getItem("token"),
+        username: localStorage.getItem("accountEmail"),
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        files = data;
+        filteredFiles = data;
+        isLoading = false; // Set loading to false when done
+        console.log(data);
+      })
+      .catch((error) => {
+        console.error("Error fetching files:", error);
+        isLoading = false; // Also set to false on error
+      });
+  }
+
+  function filterFiles(query) {
+    if (!query.trim()) {
+      filteredFiles = files;
+      return;
+    }
+
+    const searchLower = query.toLowerCase();
+    
+    function searchInFiles(fileList) {
+      const results = [];
+      
+      for (const file of fileList) {
+        if (typeof file === "string") {
+          const filename = file.split(":")[0].toLowerCase();
+          if (filename.includes(searchLower)) {
+            results.push(file);
+          }
+        } else {
+          const foldername = file[0].split(":")[0].toLowerCase();
+          const folderContents = searchInFiles(file[1]);
+          
+          if (foldername.includes(searchLower) || folderContents.length > 0) {
+            if (folderContents.length > 0) {
+              results.push([file[0], folderContents]);
+            } else {
+              results.push([file[0], []]);
+            }
+          }
+        }
+      }
+      
+      return results;
+    }
+    
+    filteredFiles = searchInFiles(files);
+  }
+
+  function handleSearchInput(event) {
+    searchQuery = event.target.value;
+    filterFiles(searchQuery);
+  }
+
+  function clearSearch() {
+    searchQuery = "";
+    filteredFiles = files;
+  }
+
+  function save() {
+    document.dispatchEvent(new Event("updatedTextEditor"));
+    document.getElementById("filepath").innerHTML = document
+      .getElementById("filepath")
+      .innerHTML.replace("*", "");
+    fetch(
+      apiurl +
+        "server/" +
+        id +
+        "/files/write/" +
+        filepath.split("/").join("*"),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          token: localStorage.getItem("token"),
+          username: localStorage.getItem("accountEmail"),
+        },
+        body: JSON.stringify({
+          content: document.getElementById("textEditor").value,
+        }),
+      }
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        console.log(data);
+        document.getElementById("saveButton").classList.add("btn-disabled");
+      });
+  }
+
+  function toggleFtpPassword() {
+    showFtpPassword = !showFtpPassword;
+  }
+
+  if (browser) {
+    document.addEventListener("openTextEditor", function (event) {
+      tab = "editor";
+      setTimeout(function () {
+        filepath = event.detail.path;
+        document.getElementById("textEditor").value = event.detail.content;
+      }, 100);
+    });
+  }
+
+  function copyPassword() {
+    const textarea = document.createElement("textarea");
+    textarea.value = ftpPassword.trim();
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, 99999);
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+    alert("Password copied to clipboard", "success");
+  }
+
+  $: filteredFiles = files;
+</script>
+
+<div class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradientStroke">
+  <p class="font-ubuntu text-gray-200 text-lg ml-1 mb-2">Server Files</p>
+  
+  {#if tab == "list"}
+    <div class="flex flex-col items-start gap-3 w-full">
+      <!-- Search Bar -->
+      <div class="w-full">
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search class="h-4 w-4 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search files and folders..."
+            class="input input-bordered w-full pl-10 pr-10 bg-base-100 h-10 text-[.9rem]"
+            bind:value={searchQuery}
+            on:input={handleSearchInput}
+            disabled={isLoading}
+          />
+          {#if searchQuery}
+            <button
+              class="absolute inset-y-0 right-0 pr-3 flex items-center"
+              on:click={clearSearch}
+            >
+              <X class="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer" />
+            </button>
+          {/if}
+        </div>
+        {#if searchQuery && filteredFiles.length === 0 && !isLoading}
+          <p class="text-sm text-gray-500 mt-2 pl-1">No files or folders found matching "{searchQuery}"</p>
+        {/if}
+      </div>
+
+      <div class="bg-base-100 rounded-xl md:p-2 w-full" id="filetree">
+        {#if isLoading}
+          <!-- Skeleton Loader -->
+          <div class="space-y-1">
+            
+            
+            <!-- File/folder skeletons -->
+            {#each Array(8) as _, i}
+              <div class="flex items-center gap-1.5 p-2 rounded-lg">
+               
+                
+                <!-- File/folder icon -->
+                {#if i % 3 === 0}
+    <FolderClosed
+      class="shrink-0 w-[.9rem] h-[.9rem] md:w-[1rem] md:h-[1rem] text-gray-600 animate-pulse"
+    />
+                {:else}
+                  <FileText
+                    class="shrink-0 w-[.9rem] h-[.9rem] md:w-[1rem] md:h-[1rem] text-gray-600 animate-pulse"
+                  />  
+                {/if}
+                
+                <!-- Filename with varying widths -->
+                <div class="w-{20 + (i * 8) % 40} h-3 bg-gray-600 rounded animate-pulse"></div>
+                
+                <!-- Spacer -->
+                <div class="flex-1"></div>
+                
+                <!-- File size placeholder -->
+                {#if i % 3 !== 0 || i == 0}
+                  <div class="w-12 h-3 bg-gray-600 rounded animate-pulse"></div>
+                {/if}
+              </div>
+              
+     
+            {/each}
+          </div>
+        {:else}
+          <!-- Actual content -->
+          <MainFolder />
+          {#each filteredFiles as file}
+            {#if typeof file == "string"}
+              <File filename={file.split(":")[0]} url={file.split(":")[1]} size={file.split(":")[2]}/>
+            {:else}
+              <Folder
+                foldername={file[0].split(":")[0]}
+                files={file[1]}
+                path={file[0].split(":")[1]}
+                size={file[0].split(":")[2]}
+              />
+            {/if}
+          {/each}
+        {/if}
+      </div>
+    </div>
+  {:else if tab == "editor"}
+    <div class="bg-base-100 rounded-xl p-3 h-[30rem] w-full lg:h-[35rem] xl:h-[45rem]">
+      <div class="flex justify-between">
+        <div class="flex mb-2 justify-between w-full">
+          <button
+            class="btn btn-sm btn-neutral btn-circle"
+            on:click={() => { tab = "list"; }}>
+            <ArrowLeftIcon class="w-5 h-5" />
+          </button>
+          <h1 class="text-xl font-bold" id="filepath">{filepath}</h1>
+          <button
+            class="btn btn-sm btn-neutral btn-disabled"
+            id="saveButton"
+            on:click={save}>
+            {$t("save")}
+          </button>
+        </div>
+      </div>
+      <TextEditor />
+    </div>
+  {/if}
+
+  <!-- FTP info -->
+  <div class="flex flex-col items-start gap-5 w-full mt-5 ">
+    <div class="bg-base-100 rounded-xl px-5 py-3 w-full relative">
+      <div class="badge badge-outline absolute top-2 right-2 badge-lg text-sm flex gap-1 items-center">
+        <FlaskConical size="14" class="mt-0.5"/>Beta
+      </div>
+      <h1 class="text-xl font-poppins-bold mb-1">SFTP Info</h1>
+      <div class="flex flex-col gap-2">
+        <div class="flex gap-2 items-center">
+          <div class="flex bg-neutral p-1.5 rounded-lg items-center text-sm font-bold gap-1">
+            <LinkIcon size="16" />
+            Host
+          </div>
+          sftp://{localStorage.getItem("userNode")?.includes("https://")
+            ? localStorage.getItem("userNode").split("https://")[1].split("/")[0]
+            : ''}
+        </div>
+        
+        <div class="flex gap-2 items-center">
+          <div class="flex bg-neutral p-1.5 rounded-lg items-center text-sm font-bold gap-1">
+            <Hash size="16" />
+            Port
+          </div>
+          {10000+(Math.floor(parseInt(localStorage.getItem("serverID")) / 100) * 100)+99}
+        </div>
+        
+        <div class="flex gap-2 items-center">
+          <div class="flex bg-neutral p-1.5 rounded-lg items-center text-sm font-bold gap-1">
+            <UserIcon size="16" />
+            Username
+          </div>
+          {username}
+        </div>
+
+        <div class="flex gap-2 items-center">
+          <div class="flex bg-neutral p-1.5 rounded-lg items-center text-sm font-bold gap-1">
+            <KeyIcon size="16" />
+            Password
+          </div>
+          <p id="ftpToken">
+            {#if showFtpPassword}
+              {ftpPassword}
+            {:else}
+              ********
+            {/if}
+          </p>
+          <button class="btn btn-xs" on:click={toggleFtpPassword}>
+            {#if showFtpPassword}Hide{:else}Show{/if}
+          </button>
+          <button class="btn btn-xs btn-neutral" on:click={copyPassword}>
+            Copy
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
