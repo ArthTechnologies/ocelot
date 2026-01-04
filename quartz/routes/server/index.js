@@ -1351,7 +1351,7 @@ router.post("/:id/claimSubdomain", function (req, res) {
     -H "X-Auth-Email: ${config.cloudflareEmail}" \
     -H "X-Auth-Key: ${config.cloudflareKey}" \
     -d '{
-    "name": "_minecraft._tcp.${subdomain}}",
+    "name": "_minecraft._tcp.${subdomain}.${config.address}",
           "type": "SRV",
       "data": {
          "port": ${portOffset + parseInt(req.params.id)},
@@ -1369,7 +1369,7 @@ router.post("/:id/claimSubdomain", function (req, res) {
     -H "X-Auth-Email: ${config.cloudflareEmail}" \
     -H "X-Auth-Key: ${config.cloudflareKey}" \
     -d '{
-    "name": "_minecraft._tcp.${subdomain}",
+    "name": "_minecraft._tcp.${subdomain}.${config.address}",
           "type": "SRV",
       "data": {
          "port": ${portOffset + parseInt(req.params.id)},
@@ -1392,7 +1392,7 @@ router.post("/:id/claimSubdomain", function (req, res) {
         -H "X-Auth-Email: ${config.cloudflareEmail}" \
         -H "X-Auth-Key: ${config.cloudflareKey}" \
         -d '{
-        "name": "_minecraft._udp.${subdomain}",
+        "name": "_minecraft._udp.${subdomain}.${config.address}",
               "type": "SRV",
           "data": {
              "port": ${portOffset + parseInt(req.params.id)},
@@ -1400,7 +1400,7 @@ router.post("/:id/claimSubdomain", function (req, res) {
              "target": "${baseUrl}",
              "weight": 5
           }
-    
+
         }'`,
               (err, stdout, stderr) => {
                 if (err) {
@@ -1450,13 +1450,13 @@ router.post("/:id/deleteSubdomain", function (req, res) {
     if (server.subdomain === undefined) {
       res.status(400).json({ msg: "Server doesn't have a subdomain." });
     } else {
-      console.log(`curl https://api.cloudflare.com/client/v4/zones/${config.cloudflareZone}/dns_records?name=_minecraft._tcp.${subdomain} \
+      console.log(`curl https://api.cloudflare.com/client/v4/zones/${config.cloudflareZone}/dns_records?name=_minecraft._tcp.${subdomain}.${config.address} \
     -X DELETE \
     -H 'Content-Type: application/json' \
     -H "X-Auth-Email: ${config.cloudflareEmail}" \
     -H "X-Auth-Key: ${config.cloudflareKey}"`);
       exec(
-        `curl https://api.cloudflare.com/client/v4/zones/${config.cloudflareZone}/dns_records?name=_minecraft._tcp.${subdomain} \
+        `curl https://api.cloudflare.com/client/v4/zones/${config.cloudflareZone}/dns_records?name=_minecraft._tcp.${subdomain}.${config.address} \
     -X DELETE \
     -H 'Content-Type: application/json' \
     -H "X-Auth-Email: ${config.cloudflareEmail}" \
