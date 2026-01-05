@@ -16,6 +16,7 @@ private.pem
 /assets/data.json
 /assets/scraper.json
 /assets/schedules.json
+/assets/migrations.json
 /assets/uploads
 /backups
 config.json
