@@ -1322,7 +1322,7 @@ router.get("/:id/getFtpToken", function (req, res) {
       account.accountId = account.accountId.replace("acc_", "");
     res.status(200).json({
       token: ftp.getTempToken(
-        account.accountId.slice(0, 6) + "." + req.params.id
+        account.accountId.slice(-6) + "." + req.params.id
       ),
     });
   } else {
