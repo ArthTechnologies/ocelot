@@ -163,6 +163,14 @@ if (!fs.existsSync("accounts.tsv")) {
 if (!fs.existsSync("servers.tsv")) {
   migrations.serversToTSV();
 }
+
+// Check and run migrations
+const migrationsStatus = migrations.getMigrationsStatus();
+if (!migrationsStatus.stringServerList) {
+  console.log("[Migration] Running stringServerList migration...");
+  migrations.stringServerList();
+}
+
 exec = require("child_process").exec;
 
 

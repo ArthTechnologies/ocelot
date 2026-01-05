@@ -74,4 +74,93 @@ function specialPlugins() {
 function migration1() {
     specialPlugins();
 }
-module.exports = {accountsToTSV, serversToTSV, migration1};
+
+/**
+ * Get or create migrations.json tracking file
+ */
+function getMigrationsStatus() {
+    const migrationsPath = "assets/migrations.json";
+    if (!fs.existsSync(migrationsPath)) {
+        const defaultMigrations = {
+            stringServerList: false
+        };
+        fs.writeFileSync(migrationsPath, JSON.stringify(defaultMigrations, null, 2));
+        return defaultMigrations;
+    }
+    return readJSON(migrationsPath);
+}
+
+/**
+ * Mark a migration as completed
+ */
+function markMigrationComplete(migrationName) {
+    const migrationsPath = "assets/migrations.json";
+    const migrations = getMigrationsStatus();
+    migrations[migrationName] = true;
+    writeJSON(migrationsPath, migrations);
+    console.log(`[Migration] Marked ${migrationName} as complete`);
+}
+
+/**
+ * Migration: Convert integer server IDs to strings in all account files
+ * This fixes compatibility with code that expects server IDs to be strings
+ */
+function stringServerList() {
+    console.log("[Migration] Starting stringServerList migration...");
+    let accountsUpdated = 0;
+    let totalServersConverted = 0;
+
+    try {
+        const accounts = fs.readdirSync("accounts");
+
+        for (let accountFile of accounts) {
+            if (!accountFile.endsWith(".json")) continue;
+
+            try {
+                const accountPath = `accounts/${accountFile}`;
+                const account = readJSON(accountPath);
+
+                // Check if servers array exists and needs conversion
+                if (account.servers && Array.isArray(account.servers)) {
+                    let hasChanges = false;
+                    let accountServersConverted = 0;
+
+                    const convertedServers = account.servers.map(server => {
+                        if (typeof server !== 'string') {
+                            hasChanges = true;
+                            accountServersConverted++;
+                            return String(server);
+                        }
+                        return server;
+                    });
+
+                    if (hasChanges) {
+                        account.servers = convertedServers;
+                        writeJSON(accountPath, account);
+                        accountsUpdated++;
+                        totalServersConverted += accountServersConverted;
+                        console.log(`[Migration] Updated ${accountFile}: converted ${accountServersConverted} server ID(s) to strings`);
+                    }
+                }
+            } catch (e) {
+                console.error(`[Migration] Error processing ${accountFile}:`, e.message);
+            }
+        }
+
+        console.log(`[Migration] stringServerList complete: ${accountsUpdated} account(s) updated, ${totalServersConverted} server ID(s) converted`);
+        markMigrationComplete("stringServerList");
+        return true;
+    } catch (e) {
+        console.error("[Migration] stringServerList failed:", e);
+        return false;
+    }
+}
+
+module.exports = {
+    accountsToTSV,
+    serversToTSV,
+    migration1,
+    getMigrationsStatus,
+    markMigrationComplete,
+    stringServerList
+};
