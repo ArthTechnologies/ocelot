@@ -372,6 +372,209 @@ Router.delete("/discord", (req, res) => {
   }
 });
 
+// Combined signin and signup for Google
+Router.post("/google/", (req, res) => {
+  res.header("Access-Control-Allow-Origin", "*");
+
+  let account = {};
+  let emailTaken = false;
+  let code = req.query.code;
+  let redirectUri = req.query.redirectUri;
+
+  if (!code || !redirectUri) {
+    return res.status(400).send({ token: -1, reason: "Missing code or redirectUri" });
+  }
+
+  // Check if Google OAuth is configured
+  if (!config.googleOAuthId || !config.googleOAuthSecret) {
+    console.error("Google OAuth not configured. googleOAuthId:", config.googleOAuthId, "googleOAuthSecret:", config.googleOAuthSecret ? "***" : "undefined");
+    return res.status(500).send({ token: -1, reason: "Google OAuth not configured in config.txt. Please add googleOAuthId and googleOAuthSecret." });
+  }
+
+  const { exec } = require("child_process");
+
+  console.log("Google OAuth: Using client_id:", config.googleOAuthId);
+
+  // Step 1: Exchange authorization code for access token
+  const tokenParams = new URLSearchParams({
+    code: code,
+    client_id: config.googleOAuthId,
+    client_secret: config.googleOAuthSecret,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code'
+  });
+
+  exec(
+    `curl -X POST https://oauth2.googleapis.com/token -H 'Content-Type: application/x-www-form-urlencoded' -d '${tokenParams.toString()}'`,
+    (err1, tokenResponse) => {
+      if (err1) {
+        console.error("Error exchanging code for token:", err1);
+        return res.status(500).send({ token: -1, reason: "Failed to exchange authorization code" });
+      }
+
+      let tokenData;
+      try {
+        tokenData = JSON.parse(tokenResponse);
+      } catch (parseErr) {
+        console.error("Error parsing token response:", tokenResponse);
+        return res.status(500).send({ token: -1, reason: "Invalid token response" });
+      }
+
+      if (tokenData.error) {
+        console.error("Google OAuth error:", tokenData.error_description);
+        return res.status(400).send({ token: -1, reason: tokenData.error_description || "OAuth error" });
+      }
+
+      const accessToken = tokenData.access_token;
+
+      // Step 2: Fetch user profile using access token
+      exec(
+        `curl -X GET https://www.googleapis.com/oauth2/v2/userinfo -H 'Authorization: Bearer ${accessToken}'`,
+        (err2, userResponse) => {
+          if (err2) {
+            console.error("Error fetching user info:", err2);
+            return res.status(500).send({ token: -1, reason: "Failed to fetch user info" });
+          }
+
+          let userData;
+          try {
+            userData = JSON.parse(userResponse);
+          } catch (parseErr) {
+            console.error("Error parsing user response:", userResponse);
+            return res.status(500).send({ token: -1, reason: "Invalid user response" });
+          }
+
+          if (userData.error) {
+            console.error("Google user info error:", userData.error.message);
+            return res.status(400).send({ token: -1, reason: userData.error.message || "Failed to fetch user info" });
+          }
+
+          console.log("Google user data:", userData);
+
+          let email = userData.email.toLowerCase();
+          if (email.includes("email:")) email = email.replace("email:", "");
+
+          // Check if account exists (sign-in)
+          if (fs.existsSync("accounts/google:" + email + ".json")) {
+            emailTaken = true;
+          }
+
+          if (emailTaken) {
+            // Sign-in: Load existing account
+            let account = readJSON("accounts/google:" + email + ".json");
+            let response = {};
+
+            if (account.ips.indexOf(files.getIPID(req.ip)) == -1) {
+              account.ips.push(files.getIPID(req.ip));
+            }
+
+            response = {
+              email: account.email,
+              token: account.token,
+              accountId: account.accountId,
+              username: email,
+              firstTime: false,
+              picture: userData.picture,
+              name: userData.name,
+            };
+
+            account.lastSignin = new Date().getTime();
+            writeJSON("accounts/google:" + email + ".json", account);
+            writeAccount(
+              account.accountId,
+              "google:" + email,
+              account.email,
+              account.servers,
+              0,
+              account.freeServers,
+              account.lastSignin,
+              account.token,
+              account.salt,
+              account.password,
+              account.resetAttempts
+            );
+
+            res.status(200).send(response);
+          } else {
+            // Sign-up: Create new account
+            let accountId = "acc_" + Buffer.from(
+              nodeName + (nodeName.includes("*email:") ? "" : "*google:") + email.substring(0, 7)
+            ).toString('base64url');
+
+            account.accountId = accountId;
+            account.token = uuidv4();
+            account.resetAttempts = 0;
+            account.ips = [];
+            if (account.ips.indexOf(files.getIPID(req.ip)) == -1) {
+              account.ips.push(files.getIPID(req.ip));
+            }
+
+            account.type = "google";
+            account.email = email;
+            account.servers = [];
+            account.freeServers = 0;
+            account.lastSignin = new Date().getTime();
+
+            writeJSON("accounts/google:" + email + ".json", account);
+            writeAccount(
+              account.accountId,
+              "google:" + email,
+              account.email,
+              account.servers,
+              0,
+              account.freeServers,
+              account.lastSignin,
+              account.token,
+              "",
+              "",
+              account.resetAttempts
+            );
+
+            console.log("Google account created:", userData);
+            res.status(200).send({
+              token: account.token,
+              accountId: accountId,
+              username: email,
+              firstTime: true,
+              picture: userData.picture,
+              name: userData.name,
+              email: email,
+            });
+          }
+        }
+      );
+    }
+  );
+});
+
+// Delete Google account
+Router.delete("/google", (req, res) => {
+  let email = req.headers.username;
+  if (email.includes("google:")) email = email.replace("google:", "");
+  let token = req.headers.token;
+
+  try {
+    let account = readJSON("accounts/google:" + email + ".json");
+
+    if (token == account.token) {
+      // Delete all user's servers
+      for (let i in account.servers) {
+        files.removeDirectoryRecursiveAsync("servers/" + account.servers[i]);
+      }
+
+      // Delete account file
+      fs.unlinkSync("accounts/google:" + email + ".json");
+
+      res.status(200).send({ success: true });
+    } else {
+      res.status(400).send({ success: false, reason: "Invalid token" });
+    }
+  } catch (error) {
+    console.error("Error deleting Google account:", error);
+    res.status(500).send({ success: false, reason: "An error occurred" });
+  }
+});
+
 Router.post("/email", (req, res) => {
   let email = req.query.email;
   let accountname = req.headers.accountname;

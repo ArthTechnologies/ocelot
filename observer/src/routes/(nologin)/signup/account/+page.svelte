@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import EmailSignin from "$lib/components/ui/EmailSignin.svelte";
   import EmailSigninNew from "$lib/components/ui/EmailSigninNew.svelte";
+  import { env } from '$env/dynamic/public';
 
   import { t, locale, locales } from "$lib/scripts/i18n";
   import { getSettings } from "$lib/scripts/req";
@@ -13,7 +14,7 @@
   getSettings();
 
   if (browser) {
-   
+
 
     plan = document.location.search.split("plan=")[1];
     address = window.location.host;
@@ -28,13 +29,26 @@
 
 
 
-  
+
   function discord() {
 
           setTimeout(() => {
             goto("https://discord.com/api/oauth2/authorize?client_id=1025856388297150475&redirect_uri="+address+"/auth/discord&response_type=token&scope=email+identify");
           }, 100);
         }
+
+  function googleSignup() {
+    setTimeout(() => {
+      const clientId = env.PUBLIC_GOOGLE_OAUTH_ID;
+      const redirectUri = address + "/auth/google";
+      const scope = "email profile";
+      const responseType = "code";
+
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${responseType}&scope=${encodeURIComponent(scope)}&access_type=online`;
+
+      goto(googleAuthUrl);
+    }, 100);
+  }
 </script>
 
 <div
@@ -75,17 +89,14 @@
               src="/discord.svg"
             />Discord</button
           >
-          <a
-            class="max-sm:hidden w-40 btn btn-neutral rounded-xl mb-2 btn-icon-text btn-disabled"
-            href="https://discord.com/api/oauth2/authorize?client_id=1025856388297150475&redirect_uri={address}/auth/discord&response_type=token&scope=email+identify"
-            ><span class="flex flex-shrink-0 items-center scale-95">
-              <img
-                alt="microsoft logo"
-                style="width:2.5ch"
-                src="/google.png"
-                class="opacity-25"
-              />Coming Soon
-            </span></a
+          <button
+            class="max-sm:hidden w-40 btn btn-neutral rounded-xl mb-2 btn-icon-text text-2xs"
+            on:click={googleSignup}
+            ><img
+              alt="google logo"
+              style="width:2.5ch"
+              src="/google.png"
+            />Google</button
           >
         </div>
       </div>

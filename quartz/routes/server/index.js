@@ -139,6 +139,44 @@ router.get(`/claim/:id`, function (req, res) {
               console.log(
                 "hasPayedForServer1: " + email + req.headers.username
               );
+
+              // Check if customer exists before trying to get subscriptions
+              if (!customers.data || customers.data.length === 0) {
+                console.log("No Stripe customer found for email: " + account.email);
+                // No Stripe customer, so no paid subscriptions - only check free servers
+                let freeServers = 0;
+                if (account.freeServers != undefined) {
+                  freeServers = parseInt(account.freeServers);
+                }
+                hasPayedForServer = freeServers > account.servers.length;
+                console.log(
+                  "hasPayedForServer (no customer): " +
+                    freeServers +
+                    " > " +
+                    account.servers.length
+                );
+
+                if (hasPayedForServer) {
+                  if (
+                    !account.servers.includes(id) &&
+                    !fs.existsSync("servers/" + id)
+                  ) {
+                    account.servers.push(id);
+                    writeJSON("accounts/" + email + ".json", account);
+                    //to-do: make a way to write the account tsv file
+                    fs.mkdirSync("servers/" + id);
+                    res.status(200).json({ msg: `Success. Server claimed.` });
+                  } else {
+                    res.status(400).json({ msg: `Server already claimed.` });
+                  }
+                } else {
+                  res
+                    .status(400)
+                    .json({ msg: `You have not paid for this server.` });
+                }
+                return;
+              }
+
               stripe.subscriptions.list(
                 {
                   customer: customers.data[0].id,

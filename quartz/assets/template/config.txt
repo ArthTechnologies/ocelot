@@ -17,6 +17,10 @@ serverStorageLimit=10
 curseforgeKey=
 # The Stripe API Key to use for charging users (You can apply for one at stripe.com):
 stripeKey=
+# The Google OAuth Client ID to use for authentication (You can get one from console.cloud.google.com):
+googleOAuthId=
+# The Google OAuth Client Secret to use for authentication (You can get one from console.cloud.google.com):
+googleOAuthSecret=
 # The URL that users get sent to after checking out (should probably be yourobserverinstance/subscription-success):
 stripeReturnUrl=
 # The stripe productId of each plan:
