@@ -18,7 +18,7 @@
         btest = true;
       }
       localStorage.setItem("btest", btest.toString());
-        fetch('https://ocelot.arthmc.xyz/nodeInfo')
+        fetch('/api/nodeInfo')
             .then(response => response.json())
             .then(data => {
                 nodeInfo = data;

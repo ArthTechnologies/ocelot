@@ -14,7 +14,7 @@
       mode = localStorage.getItem("mode");
     }
 
-    fetch("https://ocelot.arthmc.xyz/nodeInfo")
+    fetch("/api/nodeInfo")
       .then((res) => res.json())
       .then((data) => {
         for (let i = 0; i < data.length; i++) {
