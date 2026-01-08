@@ -1,10 +1,7 @@
 // SvelteKit server hooks - runs on server startup
 import { startNodeMonitoring } from '$lib/server/nodeMonitor';
+import { env } from '$env/dynamic/public';
 import type { Handle } from '@sveltejs/kit';
-import dotenv from 'dotenv';
-
-// Load .env file in production (dev mode loads it automatically)
-dotenv.config();
 
 // Initialize node monitoring once on first request
 // This replaces ocelot_old's run.js startup behavior
@@ -16,9 +13,8 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (!initialized) {
     initialized = true; // Set immediately to prevent race conditions
 
-    // Use process.env directly for server-side access to PUBLIC_ variables
-    const usingOcelot = process.env.PUBLIC_USING_OCELOT;
-    const allNodes = process.env.PUBLIC_ALL_NODES;
+    const usingOcelot = env.PUBLIC_USING_OCELOT;
+    const allNodes = env.PUBLIC_ALL_NODES;
 
     // Check if Ocelot is enabled
     if (usingOcelot === 'true') {
