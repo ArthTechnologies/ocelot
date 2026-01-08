@@ -13,11 +13,11 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (!initialized) {
     initialized = true; // Set immediately to prevent race conditions
 
-    const usingOcelot = env.PUBLIC_USING_OCELOT;
+    const multinode = env.PUBLIC_MULTINODE;
     const allNodes = env.PUBLIC_ALL_NODES;
 
     // Check if Ocelot is enabled
-    if (usingOcelot === 'true') {
+    if (multinode === 'true') {
       if (allNodes) {
         const nodes = allNodes.split(',').map(n => n.trim()).filter(n => n.length > 0);
 

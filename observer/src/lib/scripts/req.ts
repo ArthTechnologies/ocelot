@@ -14,6 +14,7 @@ export let stripeKey = "";
 export let usingCurseForge = false;
 export let customerPortalLink = "";
 export let mode = "solo";
+export let multinode = false;
 
 
 //set apiurl & usingOcelot to the enviroment variable if it exists
@@ -34,7 +35,10 @@ if (browser) {
     apiurl = localStorage.getItem("userNode");
   }
   if (env.PUBLIC_USING_OCELOT) {
-    usingOcelot = JSON.parse(env.PUBLIC_USING_OCELOT);
+    usingOcelot = false;
+  }
+  if (env.PUBLIC_MULTINODE) {
+    multinode = env.PUBLIC_MULTINODE;
   }
   if (env.PUBLIC_LR_URL) {
     lrurl = env.PUBLIC_LR_URL;
@@ -462,7 +466,7 @@ export function getServers(em: string) {
         localStorage.setItem("amountOfServers", JSON.parse(input).length);
         localStorage.setItem("servers", input);
 
-        if (usingOcelot) getServerNodes();
+        //if (usingOcelot) getServerNodes();
       }
 
       console.log("Response Recieved: " + input);
