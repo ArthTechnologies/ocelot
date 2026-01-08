@@ -54,9 +54,9 @@ async function refreshNodes(nodes: string[]) {
   // Fetch capacity from each node in parallel
   const promises = nodes.map(async (nodeUrl) => {
     try {
-      // 5 second timeout per request (matching ocelot_old's setTimeout buffer)
+      // 15 second timeout per request (increased from 5s to handle slower nodes)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const response = await fetch(`${nodeUrl}info/capacity`, {
         signal: controller.signal,
@@ -69,6 +69,7 @@ async function refreshNodes(nodes: string[]) {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        console.error(`[NodeMonitor] ${nodeUrl} returned HTTP ${response.status}`);
         throw new Error(`HTTP ${response.status}`);
       }
 
@@ -82,7 +83,10 @@ async function refreshNodes(nodes: string[]) {
         maxServers: data.maxServers
       };
     } catch (error) {
-      console.error(`[NodeMonitor] Failed to fetch ${nodeUrl}:`, error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+      console.error(`[NodeMonitor] Failed to fetch ${nodeUrl}: ${errorName} - ${errorMsg}`);
+
       // Mark unreachable nodes as full (100/100) - matches ocelot_old behavior
       return {
         url: nodeUrl,
@@ -95,27 +99,23 @@ async function refreshNodes(nodes: string[]) {
   const results = await Promise.allSettled(promises);
 
   // Collect all results (even failed ones with 100/100)
-  results.forEach((result) => {
+  results.forEach((result, index) => {
     if (result.status === 'fulfilled') {
       newArray.push(result.value);
-    }
-  });
-
-  // Ensure all nodes are present (matching ocelot_old's logic at run.js:77-87)
-  for (const nodeUrl of nodes) {
-    const found = newArray.some(n => n.url === nodeUrl);
-    if (!found) {
+    } else {
+      // This should never happen since we have try/catch, but log it just in case
+      console.error(`[NodeMonitor] Promise rejected for ${nodes[index]}: ${result.reason}`);
       newArray.push({
-        url: nodeUrl,
+        url: nodes[index],
         numServers: 100,
         maxServers: 100
       });
     }
-  }
+  });
 
   // Update cache
   nodeInfoCache = newArray;
-  console.log('[NodeMonitor] New nodes:', JSON.stringify(newArray));
+  console.log('[NodeMonitor] Updated cache with', newArray.length, 'nodes');
 }
 
 /**
