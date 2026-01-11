@@ -155,11 +155,12 @@ router.get(`/billing`, function (req, res) {
           }
           cid = customers.data[0].id;
 
-          //check the customer's subscriptions and return it
+          //check the customer's subscriptions and return it (including expired/canceled ones)
           stripe.subscriptions.list(
             {
               customer: cid,
               limit: 100,
+              status: 'all',
             },
             function (err, subscriptions2) {
           
