@@ -31,7 +31,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         console.log('[Observer] PUBLIC_ALL_NODES not set, skipping node monitoring');
       }
     } else {
-      console.log('[Observer] Ocelot disabled (PUBLIC_USING_OCELOT=' + usingOcelot + ')');
+      console.log('[Observer] Multinode disabled (PUBLIC_MULTINODE=' + multinode + ')');
     }
   }
 
