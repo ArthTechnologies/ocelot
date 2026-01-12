@@ -65,8 +65,18 @@
       });
 
       // Track actual upload progress (cap at 99% until backend responds)
+      let lastLoaded = 0;
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
+          // Detect if reverse proxy reset the connection (loaded decreased significantly)
+          if (event.loaded < lastLoaded - 1000) {
+            xhr.abort();
+            alert("Reverse proxy blocked file upload. Check your proxy's max body size settings.", "error");
+            resetButton();
+            return;
+          }
+          lastLoaded = event.loaded;
+
           const actualPercent = (event.loaded / event.total) * 100;
           visualPercent = Math.min(actualPercent, 99);
           updateProgressUI();
