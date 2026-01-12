@@ -33,31 +33,14 @@
 
       // Update progress UI
       function updateProgressUI() {
-        if (visualPercent < 100) {
-          uploadBtn.innerHTML = $t("uploading") + ` (${Math.round(visualPercent)}%)`;
-          uploadBtn.style.background = `linear-gradient(
-            to right,
-            #13171e 0%,
-            #13171e ${visualPercent}%,
-            #2b364f ${visualPercent}%,
-            #2b364f 100%
-          )`;
-        } else if (!requestFinished) {
-          // Upload complete, waiting for server response
-          uploadBtn.classList.remove("text-accent-content");
-          uploadBtn.classList.remove("text-gray-200");
-          if (virusScanningEnabled == "true") {
-            uploadBtn.innerHTML = $t("scanningForViruses");
-            uploadBtn.classList.add("text-lime-500");
-            uploadBtn.style.background = ``;
-            if (theme == "dark") uploadBtn.classList.add("bg-[#112100]");
-            if (theme == "light") uploadBtn.classList.add("bg-[#143f04]");
-            uploadBtn.classList.add("skeleton");
-          } else {
-            uploadBtn.innerHTML = $t("uploading") + " (100%)";
-            uploadBtn.classList.add("skeleton");
-          }
-        }
+        uploadBtn.innerHTML = $t("uploading") + ` (${Math.round(visualPercent)}%)`;
+        uploadBtn.style.background = `linear-gradient(
+          to right,
+          #13171e 0%,
+          #13171e ${visualPercent}%,
+          #2b364f ${visualPercent}%,
+          #2b364f 100%
+        )`;
       }
 
       // Reset button to original state
@@ -81,11 +64,32 @@
         }, 100);
       });
 
-      // Track actual upload progress
+      // Track actual upload progress (cap at 99% until backend responds)
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
-          visualPercent = (event.loaded / event.total) * 100;
+          const actualPercent = (event.loaded / event.total) * 100;
+          visualPercent = Math.min(actualPercent, 99);
           updateProgressUI();
+        }
+      });
+
+      // Upload stream complete, waiting for backend response
+      xhr.upload.addEventListener("loadend", () => {
+        if (!requestFinished) {
+          uploadBtn.classList.remove("text-accent-content");
+          uploadBtn.classList.remove("text-gray-200");
+          if (virusScanningEnabled == "true") {
+            uploadBtn.innerHTML = $t("scanningForViruses");
+            uploadBtn.classList.add("text-lime-500");
+            uploadBtn.style.background = ``;
+            if (theme == "dark") uploadBtn.classList.add("bg-[#112100]");
+            if (theme == "light") uploadBtn.classList.add("bg-[#143f04]");
+            uploadBtn.classList.add("skeleton");
+          } else {
+            uploadBtn.innerHTML = $t("uploading") + " (99%)";
+            uploadBtn.style.background = ``;
+            uploadBtn.classList.add("skeleton");
+          }
         }
       });
 
