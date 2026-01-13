@@ -3,6 +3,7 @@
   import File from "$lib/components/ui/files/File.svelte";
   import Folder from "$lib/components/ui/files/Folder.svelte";
   import TextEditor from "$lib/components/ui/files/TextEditor.svelte";
+  import ConfigEditor from "$lib/components/ui/files/ConfigEditor.svelte";
   import { apiurl, usingOcelot, getServerNode } from "$lib/scripts/req";
   import { ArrowLeft, ArrowLeftIcon, FlaskConical, HardDriveDownload, Hash, KeyIcon, LinkIcon, UserIcon, Search, X, FileText, Folder as FolderIcon, FolderClosed } from "lucide-svelte";
   import { t } from "$lib/scripts/i18n";
@@ -17,6 +18,9 @@
   let backurl = "server";
   let tab = "list";
   let filepath = "file.txt";
+  let isConfigFile = false;
+  let configContent = "";
+  let configFileType = "yaml";
   let ftpPassword = "loading...";
   let showFtpPassword = false;
   let username;
@@ -175,8 +179,22 @@
   if (browser) {
     document.addEventListener("openTextEditor", function (event) {
       tab = "editor";
+      filepath = event.detail.path;
+
+      // Check if it's a config file (YAML or properties)
+      const ext = filepath.split(".").pop().toLowerCase();
+      const isYaml = ext === "yml" || ext === "yaml";
+      const isProperties = ext === "properties";
+      isConfigFile = isYaml || isProperties;
+      configFileType = isProperties ? "properties" : "yaml";
+
       setTimeout(function () {
-        filepath = event.detail.path;
+        if (isConfigFile) {
+          configContent = event.detail.content;
+          document.dispatchEvent(new CustomEvent("configContentUpdate", {
+            detail: { content: event.detail.content, fileType: configFileType }
+          }));
+        }
         document.getElementById("textEditor").value = event.detail.content;
       }, 100);
     });
@@ -285,8 +303,8 @@
       </div>
     </div>
   {:else if tab == "editor"}
-    <div class="bg-base-100 rounded-xl p-3 h-[30rem] w-full lg:h-[35rem] xl:h-[45rem]">
-      <div class="flex justify-between">
+    <div class="bg-base-100 rounded-xl p-3 h-[30rem] w-full lg:h-[35rem] xl:h-[45rem] flex flex-col">
+      <div class="flex justify-between shrink-0">
         <div class="flex mb-2 justify-between w-full">
           <button
             class="btn btn-sm btn-neutral btn-circle"
@@ -302,7 +320,13 @@
           </button>
         </div>
       </div>
-      <TextEditor />
+      <div class="flex-1 min-h-0">
+        {#if isConfigFile}
+          <ConfigEditor initialContent={configContent} fileType={configFileType} />
+        {:else}
+          <TextEditor />
+        {/if}
+      </div>
     </div>
   {/if}
 
