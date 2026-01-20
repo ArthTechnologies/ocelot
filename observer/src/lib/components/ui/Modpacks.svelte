@@ -18,7 +18,7 @@
   let skeletonsLength = 15;
   let allowLoadMore = true;
   let offset = 0;
-  let sortBy = "relevance";
+  let sortBy = "downloads";
   let modpackImageUrl = "/images/placeholder.webp";
   let modpackName = "";
   let modpackVersion = "";
@@ -293,8 +293,8 @@
           class="select select-sm ml-2 bg-base-300"
           on:change={() => search(tab)}
         >
-          <option>{$t("dropdown.sortBy.relevance")}</option>
           <option>{$t("dropdown.sortBy.downloads")}</option>
+          <option>{$t("dropdown.sortBy.relevance")}</option>
           <option>{$t("dropdown.sortBy.lastUpdated")}</option></select
         >
       </div>
