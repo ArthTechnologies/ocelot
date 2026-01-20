@@ -288,7 +288,7 @@ export function searchPlugins(
   if (version == "Latest") {
     version = "1.19.3";
   }
-  query = query.replace(" ", "-");
+  query = query.replaceAll(" ", "-");
   let versionString = '["versions:' +
   version +
   '"],';
@@ -348,7 +348,7 @@ export function searchMods(
       }
 
   }
-  query = query.replace(" ", "-");
+  query = query.replaceAll(" ", "-");
   let url;
 
   if (platform == "mr")  {
