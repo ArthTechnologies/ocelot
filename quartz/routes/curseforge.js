@@ -20,7 +20,7 @@ Router.get("/search", (req, res) => {
         modLoaderType = 6;
       } 
     }
-    let filterText = req.query.query;
+    let filterText = encodeURIComponent(req.query.query || "");
     let classId = req.query.classId;
     let index = req.query.index || 0;
     let sortField = req.query.sortField || 1;

@@ -175,11 +175,9 @@
               !duplicates &&
               !includesAny(item.summary.toLowerCase(), [
                 "optimization",
-                "performance",
                 "client-side",
                 "clientside",
                 "graphics",
-                "fps",
                 "shader",
               ])
             ) {

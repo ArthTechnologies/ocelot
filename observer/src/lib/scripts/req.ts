@@ -288,7 +288,6 @@ export function searchPlugins(
   if (version == "Latest") {
     version = "1.19.3";
   }
-  query = query.replaceAll(" ", "-");
   let versionString = '["versions:' +
   version +
   '"],';
@@ -303,7 +302,7 @@ export function searchPlugins(
     lrurl +
     "search" +
     "?query=" +
-    query +
+    encodeURIComponent(query) +
     '&facets=[["categories:' +
     software + 
     '"],'+ versionString +
@@ -348,7 +347,6 @@ export function searchMods(
       }
 
   }
-  query = query.replaceAll(" ", "-");
   let url;
 
   if (platform == "mr")  {
@@ -361,7 +359,7 @@ export function searchMods(
     lrurl +
     "search" +
     "?query=" +
-    query +
+    encodeURIComponent(query) +
     '&facets=[["categories:' +
     software +
     '"],'+categoriesString+'["project_type:' +
@@ -394,7 +392,7 @@ export function searchMods(
     apiurl +
     "curseforge/search" +
     "?query=" +
-    query +
+    encodeURIComponent(query) +
     '&version=' +
     version +
     '&loader=' +
