@@ -11,6 +11,27 @@
   let originalContent = "";
   let collapsedSections = {};
 
+  // Enable/disable save button based on changes
+  function saveIndicator() {
+    if (browser) {
+      const editor = document.getElementById("textEditor");
+      const filepath = document.getElementById("filepath");
+      const saveButton = document.getElementById("saveButton");
+
+      if (editor && filepath && saveButton) {
+        if (editor.value === originalContent) {
+          filepath.innerHTML = filepath.innerHTML.replace("*", "");
+          saveButton.classList.add("btn-disabled");
+        } else {
+          if (!filepath.innerHTML.endsWith("*")) {
+            filepath.innerHTML += "*";
+          }
+          saveButton.classList.remove("btn-disabled");
+        }
+      }
+    }
+  }
+
   // Parse content based on file type
   function parseContent(content) {
     if (fileType === "properties") {
@@ -275,7 +296,7 @@
       if (editor) {
         const newContent = generateContent();
         editor.value = newContent;
-        editor.dispatchEvent(new Event("input", { bubbles: true }));
+        saveIndicator();
       }
     }
   }
@@ -375,6 +396,7 @@
       class="textarea w-full bg-base-200 bg-opacity-25 flex-1 font-mono text-sm"
       id="textEditor"
       style="resize: none;"
+      on:input={saveIndicator}
     >{rawContent}</textarea>
   {:else}
     <div class="flex-1 min-h-0 overflow-y-auto space-y-1 pr-2 pb-4">
