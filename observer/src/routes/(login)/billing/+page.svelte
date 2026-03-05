@@ -2,7 +2,8 @@
   import { apiurl, customerPortalLink } from "$lib/scripts/req";
   import { t, locale, locales } from "$lib/scripts/i18n";
   import { browser } from "$app/environment";
-  import { ClipboardList, MessagesSquare, CreditCard, Server, CheckCircle, XCircle, AlertCircle, Clock, ExternalLink } from "lucide-svelte";
+  import { ClipboardList, MessagesSquare, CreditCard, Server, CheckCircle, XCircle, AlertCircle, Clock, ExternalLink, RefreshCw } from "lucide-svelte";
+  import { alert } from "$lib/scripts/utils";
 
   let servers = [];
   var email: string = "";
@@ -40,6 +41,32 @@
     if (browser) {
       localStorage.setItem("subscribed", "true");
     }
+  }
+
+  let syncing = false;
+
+  async function syncPlan() {
+    syncing = true;
+    try {
+      const res = await fetch(apiurl + "info/syncplan", {
+        method: "POST",
+        headers: {
+          username: localStorage.getItem("accountEmail"),
+          token: localStorage.getItem("token"),
+        },
+      });
+      const json = await res.json();
+      if (json.changed) {
+        alert("Plan updated — restart your server to apply the new RAM and storage allocation.", "success");
+      } else if (json.reason === "no_active_subscription") {
+        alert("No active subscription found. If you just subscribed, it may take a moment to activate.", "info");
+      } else {
+        alert("Your plan is already up to date.", "success");
+      }
+    } catch (e) {
+      alert("Failed to sync plan. Please try again.", "error");
+    }
+    syncing = false;
   }
 
   function getStatusColor(status: string) {
@@ -133,6 +160,14 @@
           {$t("button.newsubscribe")}
         {/if}
       </a>
+      <button
+        class="btn btn-outline gap-2"
+        on:click={syncPlan}
+        disabled={syncing}
+      >
+        <RefreshCw size="18" class="mr-1.5 {syncing ? 'animate-spin' : ''}" />
+        {syncing ? "Refreshing..." : "Refresh Plans"}
+      </button>
     </div>
 
     <!-- Two Column Layout: Subscriptions (Left) | Servers (Right) -->

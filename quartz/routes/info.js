@@ -533,4 +533,43 @@ router.get("/snapshot", (req, res) => {
     res.json(snapshotHistory);
 });
 
+router.post(`/syncplan`, function (req, res) {
+  if (mode !== "provider") return res.status(400).json({ msg: "Not in provider mode." });
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON(`accounts/${email}.json`);
+  if (!account || token !== account.token) return res.status(401).json({ msg: "Invalid credentials." });
+
+  stripe.customers.list({ limit: 100, email: account.email }, function (err, customers) {
+    if (err || customers.data.length === 0) return res.status(200).json({ changed: false });
+    let cid = customers.data[0].id;
+
+    stripe.subscriptions.list({ customer: cid, limit: 10, status: "active" }, function (err, subs) {
+      if (err) return res.status(200).json({ changed: false, reason: "error" });
+      if (subs.data.length === 0) return res.status(200).json({ changed: false, reason: "no_active_subscription" });
+
+      // Use the most recent active subscription's product ID
+      let currentProductId = subs.data[0].items.data[0].plan.product;
+
+      let changed = [];
+      for (let serverId of account.servers) {
+        let serverPath = `servers/${serverId}/server.json`;
+        if (!fs.existsSync(serverPath)) continue;
+        let server = readJSON(serverPath);
+        if (server.productID !== currentProductId) {
+          server.productID = currentProductId;
+          writeJSON(serverPath, server);
+          changed.push(serverId);
+        }
+      }
+
+      if (changed.length > 0) {
+        res.status(200).json({ changed: true, servers: changed });
+      } else {
+        res.status(200).json({ changed: false });
+      }
+    });
+  });
+});
+
 module.exports = router;
