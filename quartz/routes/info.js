@@ -56,6 +56,7 @@ router.get(`/servers`, function (req, res) {
 
 
     for (let i in account.servers) {
+                const serverId = account.servers[i];
 
 
   
@@ -118,7 +119,8 @@ try {
           account.servers[i] = account.servers[i].replace(":freed", "") + ":no valid subscription:" + -1;
         } else if (!hasValidSubscription && parsedSuccesfully) {
           account.servers[i] = account.servers[i] + ":no valid subscription:" + resetDate + ":" + subscriptionCause;
-        } else if (fs.existsSync(`servers/${account.servers[i]}/server.json`)) {
+        } else if (fs.existsSync(`servers/${serverId}/server.json`)) {
+                  let serverData = readJSON(`servers/${serverId}/server.json`);
         account.servers[i] = readJSON(
           `servers/${account.servers[i]}/server.json`
         );
@@ -197,13 +199,25 @@ router.get(`/billing`, function (req, res) {
               }
               let serversArray = [];
               for (let i in account.servers) {
-                if (fs.existsSync(`servers/${account.servers[i]}/server.json`)) {
+                const serverId = account.servers[i];
+                if (fs.existsSync(`servers/${serverId}/server.json`)) {
+                  let serverData = readJSON(`servers/${serverId}/server.json`);
                   let planName = "basic";
-                  if (account.servers[i].productID == config.plus) planName = "plus"; 
-                  if (account.servers[i].productID == config.premium) planName = "premium";
-                  serversArray.push(account.servers[i].id + ":" + planName);
+                  if (serverData.productID == config.plus) planName = "plus";
+                  if (serverData.productID == config.premium) planName = "premium";
+                  serversArray.push({
+                    id: serverId,
+                    software: serverData.software || "Unknown",
+                    version: serverData.version || "Unknown",
+                    plan: planName
+                  });
                 } else {
-                  serversArray.push(account.servers[i] + ":undefined");
+                  serversArray.push({
+                    id: serverId,
+                    software: "Unknown",
+                    version: "Unknown",
+                    plan: "not created yet"
+                  });
                 }
               }
               res.status(200).json({
@@ -533,42 +547,45 @@ router.get("/snapshot", (req, res) => {
     res.json(snapshotHistory);
 });
 
-router.post(`/syncplan`, function (req, res) {
+router.post(`/updatePlans`, function (req, res) {
   if (mode !== "provider") return res.status(400).json({ msg: "Not in provider mode." });
   let email = req.headers.username;
   let token = req.headers.token;
   let account = readJSON(`accounts/${email}.json`);
   if (!account || token !== account.token) return res.status(401).json({ msg: "Invalid credentials." });
 
-  stripe.customers.list({ limit: 100, email: account.email }, function (err, customers) {
-    if (err || customers.data.length === 0) return res.status(200).json({ changed: false });
-    let cid = customers.data[0].id;
+  // req.body should contain { planAssignments: { serverId: planName, serverId: planName, ... } }
+  let planAssignments = req.body.planAssignments || {};
+  let updated = [];
+  let errors = [];
 
-    stripe.subscriptions.list({ customer: cid, limit: 10, status: "active" }, function (err, subs) {
-      if (err) return res.status(200).json({ changed: false, reason: "error" });
-      if (subs.data.length === 0) return res.status(200).json({ changed: false, reason: "no_active_subscription" });
+  for (let serverId in planAssignments) {
+    let serverPath = `servers/${serverId}/server.json`;
+    if (!fs.existsSync(serverPath)) {
+      errors.push(`Server ${serverId} not found`);
+      continue;
+    }
 
-      // Use the most recent active subscription's product ID
-      let currentProductId = subs.data[0].items.data[0].plan.product;
+    let planName = planAssignments[serverId];
+    // Convert plan name to product ID
+    let productId = config.basic; // default
+    if (planName === "plus") productId = config.plus;
+    if (planName === "premium") productId = config.premium;
 
-      let changed = [];
-      for (let serverId of account.servers) {
-        let serverPath = `servers/${serverId}/server.json`;
-        if (!fs.existsSync(serverPath)) continue;
-        let server = readJSON(serverPath);
-        if (server.productID !== currentProductId) {
-          server.productID = currentProductId;
-          writeJSON(serverPath, server);
-          changed.push(serverId);
-        }
-      }
+    let server = readJSON(serverPath);
+    server.productID = productId;
+    try {
+      writeJSON(serverPath, server);
+      updated.push(serverId);
+    } catch (e) {
+      errors.push(`Failed to update server ${serverId}: ${e}`);
+    }
+  }
 
-      if (changed.length > 0) {
-        res.status(200).json({ changed: true, servers: changed });
-      } else {
-        res.status(200).json({ changed: false });
-      }
-    });
+  res.status(200).json({
+    updated: updated,
+    errors: errors,
+    message: "Server restart required to apply changes"
   });
 });
 
