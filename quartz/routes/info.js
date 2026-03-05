@@ -64,6 +64,7 @@ router.get(`/servers`, function (req, res) {
         let hasValidSubscription = true;
         let parsedSuccesfully = false;
                 let resetDate = -1;
+                let subscriptionCause = "unknown";
         if (mode === "provider") {
           hasValidSubscription = false;
                   let subscriptionsJson = readJSON(`logs/subscriptions.json`);
@@ -71,11 +72,11 @@ router.get(`/servers`, function (req, res) {
 
 try {
         for (let sub of subscriptionsJson) {
-        
+
 
             if (sub.owner == req.headers.username + ".json" && sub.subscriptions != undefined) {
               parsedSuccesfully = true;
-                        
+
             for (let item of sub.subscriptions) {
 
               if (item.start_date > latestStartDate) {
@@ -83,14 +84,21 @@ try {
               }
               if (item.status == "active") {
                 hasValidSubscription = true;
-          
+
               } else {
-         
+
                             //add 7 days to the current period end if the subscription is canceled
             resetDate = parseInt(item.current_period_end) + 604800;
+            if (item.status === "past_due" || item.status === "unpaid") {
+              subscriptionCause = "payment_failed";
+            } else if (item.status === "canceled") {
+              subscriptionCause = "canceled";
+            } else {
+              subscriptionCause = item.status || "unknown";
+            }
               }
             }
-          } 
+          }
       
           
         }
@@ -100,7 +108,7 @@ try {
       }
         console.log("hasValidSubscription: " + hasValidSubscription);
         //if the start date is from the past 24 hours, set hasValidSubscription to true
-        if (latestStartDate > 0 && latestStartDate < Date.now() - 86400000) {
+        if (latestStartDate > 0 && latestStartDate > Date.now() - 86400000) {
           hasValidSubscription = true;
         }
       }
@@ -109,7 +117,7 @@ try {
         if (account.servers[i].includes(":freed")) {
           account.servers[i] = account.servers[i].replace(":freed", "") + ":no valid subscription:" + -1;
         } else if (!hasValidSubscription && parsedSuccesfully) {
-          account.servers[i] = account.servers[i] + ":no valid subscription:" + resetDate;
+          account.servers[i] = account.servers[i] + ":no valid subscription:" + resetDate + ":" + subscriptionCause;
         } else if (fs.existsSync(`servers/${account.servers[i]}/server.json`)) {
         account.servers[i] = readJSON(
           `servers/${account.servers[i]}/server.json`

@@ -345,7 +345,7 @@ Invalid Account
   id="serverCard{parseInt(server.split(":")[0])}"
   class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-lg bg-base-200 cursor-pointer"
 >
-<ExpiredServerCard id={parseInt(server.split(":")[0])} timestamp={server.split(":")[2]}/>
+<ExpiredServerCard id={parseInt(server.split(":")[0])} timestamp={server.split(":")[2]} cause={server.split(":")[3]}/>
 </a>
 {:else}
 {#if parseInt(server.id) + 10000 == slug}
