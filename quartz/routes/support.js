@@ -26,52 +26,88 @@ router.get("/listExpiredServers", async (req, res) => {
     const expiredServers = [];
 
     // Check all servers in account
-    for (const serverId of account.servers) {
-      const serverPath = `servers/${serverId}`;
+    for (let serverEntry of account.servers) {
+      let serverId = serverEntry;
       let isExpired = false;
+      let serverData = null;
 
-      // Check if server is marked as expired in server.json
-      if (fs.existsSync(serverPath) && fs.existsSync(`${serverPath}/server.json`)) {
-        const server = readJSON(`${serverPath}/server.json`);
+      // Check if server entry has `:freed` flag (moved to trashbin)
+      if (typeof serverEntry === "string" && serverEntry.includes(":freed")) {
+        serverId = serverEntry.replace(":freed", "");
+        isExpired = true;
 
-        if (server.expired || server.markedExpired) {
-          isExpired = true;
-        }
-
-        // Also check subscription status (same logic as /servers endpoint)
-        if (!isExpired && mode === "provider") {
-          let hasValidSubscription = false;
-          try {
-            const subscriptionsJson = readJSON(`logs/subscriptions.json`);
-
-            for (let sub of subscriptionsJson) {
-              if (sub.owner == email + ".json" && sub.subscriptions != undefined) {
-                for (let item of sub.subscriptions) {
-                  if (item.status == "active") {
-                    hasValidSubscription = true;
-                    break;
-                  }
+        // Try to find server data in trashbin
+        try {
+          if (fs.existsSync("trashbin")) {
+            const trashbinItems = fs.readdirSync("trashbin");
+            for (const item of trashbinItems) {
+              // Trashbin format: "serverId-email"
+              if (item.startsWith(serverId + "-")) {
+                const trashPath = `trashbin/${item}`;
+                if (fs.existsSync(`${trashPath}/server.json`)) {
+                  serverData = readJSON(`${trashPath}/server.json`);
+                  break;
                 }
               }
-              if (hasValidSubscription) break;
             }
-          } catch (e) {
-            console.error("Error checking subscription status:", e);
           }
+        } catch (e) {
+          console.error("Error reading trashbin:", e);
+        }
+      } else {
+        // Check if server exists in servers directory
+        if (fs.existsSync(`servers/${serverId}/server.json`)) {
+          serverData = readJSON(`servers/${serverId}/server.json`);
 
-          if (!hasValidSubscription) {
-            isExpired = true;
+          // Check subscription status (same logic as /servers endpoint)
+          if (mode === "provider") {
+            let hasValidSubscription = false;
+            let latestStartDate = 0;
+
+            try {
+              const subscriptionsJson = readJSON(`logs/subscriptions.json`);
+
+              for (let sub of subscriptionsJson) {
+                if (sub.owner == email + ".json" && sub.subscriptions != undefined) {
+                  for (let item of sub.subscriptions) {
+                    if (item.start_date > latestStartDate) {
+                      latestStartDate = item.start_date;
+                    }
+                    if (item.status == "active") {
+                      hasValidSubscription = true;
+                      break;
+                    }
+                  }
+                }
+                if (hasValidSubscription) break;
+              }
+
+              // Check if recent subscription started (within 24 hours)
+              if (latestStartDate > 0 && latestStartDate > Date.now() - 86400000) {
+                hasValidSubscription = true;
+              }
+
+              if (!hasValidSubscription) {
+                isExpired = true;
+              }
+            } catch (e) {
+              console.error("Error checking subscription status:", e);
+            }
           }
         }
+      }
 
-        if (isExpired) {
-          expiredServers.push({
-            id: serverId,
-            name: server.serverName || `Server ${serverId}`,
-            software: server.software || "Unknown",
-            version: server.version || "Unknown"
-          });
-        }
+      // Add expired server to list
+      if (isExpired) {
+        const software = serverData?.software || "Unknown";
+        const version = serverData?.version || "Unknown";
+
+        expiredServers.push({
+          id: serverId,
+          name: serverData?.serverName || `Server ${serverId}`,
+          software: software,
+          version: version
+        });
       }
     }
 
