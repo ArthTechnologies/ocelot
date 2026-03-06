@@ -34,6 +34,14 @@ This monorepo structure keeps both projects in sync and allows coordinated devel
 - Use format: `claude/feature-name`
 - Example: `claude/backup-fix`, `claude/auth-improvement`
 
+**Branch Creation & Tracking**
+- When creating a feature branch, ensure it tracks the correct remote branch
+- **CRITICAL**: New branches created by Claude must use: `git checkout -b claude/feature-name origin/claude/feature-name`
+- Do NOT let a feature branch track `origin/main` - this causes commits to push to main instead of the feature branch
+- Verify tracking with: `git branch -vv` (should show `[origin/claude/feature-name]`, not `[origin/main]`)
+- If tracking is wrong, fix with: `git branch --set-upstream-to=origin/claude/feature-name claude/feature-name`
+- Example of what went wrong: A `claude/backup-fix` branch that tracked `origin/main` caused commits to appear on main remotely while appearing on the feature branch locally
+
 **Merge to Main**
 - If merging to main: Always create PR first
 - User unlikely to request this, but standard if asked
