@@ -1645,6 +1645,131 @@ router.get("/:id/backup/:timestamp", function (req, res) {
   }
 });
 
+// Restore backup endpoint
+router.post("/:id/backup/:timestamp/restore", async function (req, res) {
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON("accounts/" + email + ".json");
+
+  // Check authentication
+  if (!utils.hasAccess(token, account, req.params.id)) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
+
+  const backupPath = `backups/${req.params.id}/${req.params.timestamp}.zip`;
+  const serverPath = `servers/${req.params.id}`;
+  const worldPath = `${serverPath}/world`;
+
+  try {
+    // Check if backup exists
+    if (!fs.existsSync(backupPath)) {
+      return res.status(404).json({ success: false, message: "Backup not found" });
+    }
+
+    // Create temp directory for extraction
+    const tempExtractPath = `${serverPath}/temp_restore_${Date.now()}`;
+    if (!fs.existsSync(tempExtractPath)) {
+      fs.mkdirSync(tempExtractPath, { recursive: true });
+    }
+
+    // Extract backup using unzip command
+    const { spawn } = require("child_process");
+
+    const unzip = spawn("unzip", ["-q", backupPath, "-d", tempExtractPath]);
+
+    await new Promise((resolve, reject) => {
+      unzip.on("close", (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`Unzip failed with code ${code}`));
+        }
+      });
+      unzip.on("error", reject);
+    });
+
+    // Find the world folder in the extracted backup
+    // The zip contains servers/{id}/world, so we need to search for the world folder
+    let extractedWorldPath = null;
+
+    function findWorldFolder(dir) {
+      const items = fs.readdirSync(dir);
+      for (const item of items) {
+        const itemPath = path.join(dir, item);
+        const stat = fs.statSync(itemPath);
+
+        if (item === "world" && stat.isDirectory()) {
+          return itemPath;
+        }
+
+        if (stat.isDirectory()) {
+          const found = findWorldFolder(itemPath);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    extractedWorldPath = findWorldFolder(tempExtractPath);
+
+    if (!extractedWorldPath) {
+      // Clean up temp directory
+      fs.rmSync(tempExtractPath, { recursive: true });
+      return res.status(400).json({ success: false, message: "Invalid backup file structure - world folder not found" });
+    }
+
+    // Backup current world by renaming it
+    if (fs.existsSync(worldPath)) {
+      let oldWorldPath = `${serverPath}/world_old`;
+      let counter = 2;
+
+      while (fs.existsSync(oldWorldPath)) {
+        oldWorldPath = `${serverPath}/world_old_${counter}`;
+        counter++;
+      }
+
+      fs.renameSync(worldPath, oldWorldPath);
+      console.log(`Backed up current world to ${oldWorldPath}`);
+    }
+
+    // Move extracted world to the server path
+    fs.renameSync(extractedWorldPath, worldPath);
+    console.log(`Restored world from backup at ${req.params.timestamp}`);
+
+    // Clean up temp directory
+    fs.rmSync(tempExtractPath, { recursive: true });
+
+    // Restart the server
+    try {
+      const { spawn } = require("child_process");
+      const serverScript = require("../../scripts/mc.js");
+
+      // Stop the server first
+      await serverScript.stopServer(req.params.id);
+
+      // Wait a bit for clean shutdown
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Start the server
+      await serverScript.startServer(req.params.id);
+
+      res.status(200).json({
+        success: true,
+        message: "Backup restored successfully. Server is restarting."
+      });
+    } catch (restartError) {
+      console.error("Error restarting server during restore:", restartError);
+      res.status(200).json({
+        success: true,
+        message: "Backup restored successfully. Please restart the server manually."
+      });
+    }
+  } catch (error) {
+    console.error("Error restoring backup:", error);
+    res.status(500).json({ success: false, message: "Error restoring backup: " + error.message });
+  }
+});
+
 router.get("/:id/players", function (req, res) {
   let email = req.headers.username;
   let token = req.headers.token;

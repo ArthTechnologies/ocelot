@@ -11,6 +11,10 @@
   let isBackingUp = false;
   let backupProgress = null;
   let progressPoll = null;
+  let isRestoring = false;
+  let restoreError = '';
+  let restoreSuccess = false;
+  let restoringBackupId = null;
 
   function loadBackups() {
     if (browser) {
@@ -137,6 +141,51 @@
       })
       .catch((error) => {
         console.error("Error downloading backup:", error);
+      });
+  }
+
+  function restore(timestamp) {
+    isRestoring = true;
+    restoringBackupId = timestamp;
+    restoreError = '';
+    restoreSuccess = false;
+
+    fetch(
+      apiurl +
+        "server/" +
+        localStorage.getItem("serverID") +
+        "/backup/" +
+        timestamp +
+        "/restore",
+      {
+        method: "POST",
+        headers: {
+          token: localStorage.getItem("token"),
+          username: localStorage.getItem("accountEmail"),
+        },
+      }
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          restoreSuccess = true;
+          setTimeout(() => {
+            isRestoring = false;
+            restoringBackupId = null;
+            // Reload backups after restore
+            loadBackups();
+          }, 3000);
+        } else {
+          restoreError = data.message || "Failed to restore backup";
+          isRestoring = false;
+          restoringBackupId = null;
+        }
+      })
+      .catch((error) => {
+        console.error("Error restoring backup:", error);
+        restoreError = "Error restoring backup: " + error.message;
+        isRestoring = false;
+        restoringBackupId = null;
       });
   }
 </script>
@@ -288,6 +337,17 @@
                     <Download class="mr-1.5" size={16} />
                     <span class="hidden sm:inline">Download</span>
                   </a>
+                  <button
+                    on:click={() => restore(backup.timestamp)}
+                    disabled={isRestoring}
+                    class="btn btn-sm btn-ghost gap-1 hover:btn-warning"
+                    title="Restore this backup"
+                  >
+                    <svg class="mr-1.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span class="hidden sm:inline">Restore</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -301,7 +361,71 @@
   <div class="mt-5 pt-4 border-t border-base-100 text-xs text-gray-400">
     <p class="flex items-center gap-1.5">
       <InfoIcon size={14} />
-      Automatic backups run based on your scheduler, by default every 6 hours. 
+      Automatic backups run based on your scheduler, by default every 6 hours.
     </p>
   </div>
 </div>
+
+<!-- Restore Modal -->
+{#if isRestoring || restoreSuccess || restoreError}
+  <div class="modal modal-open">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg">
+        {#if isRestoring}
+          Restoring Backup...
+        {:else if restoreSuccess}
+          ✅ Backup Restored
+        {:else}
+          ❌ Restore Failed
+        {/if}
+      </h3>
+
+      {#if isRestoring}
+        <div class="py-6 text-center">
+          <div class="flex flex-col items-center gap-4">
+            <span class="loading loading-spinner loading-lg"></span>
+            <p class="text-sm text-gray-400">
+              Restoring your world... The server will restart automatically.
+            </p>
+          </div>
+        </div>
+      {:else if restoreSuccess}
+        <div class="py-4">
+          <p class="text-sm text-gray-300 mb-4">
+            Your backup has been successfully restored! The current world has been moved to a backup folder and your server will restart.
+          </p>
+          <div class="alert alert-info text-sm">
+            <span>The server is restarting now. You'll be back online shortly.</span>
+          </div>
+        </div>
+        <div class="modal-action">
+          <button
+            class="btn"
+            on:click={() => {
+              restoreSuccess = false;
+            }}
+          >
+            Close
+          </button>
+        </div>
+      {:else if restoreError}
+        <div class="py-4">
+          <p class="text-sm text-gray-300 mb-4">
+            {restoreError}
+          </p>
+        </div>
+        <div class="modal-action">
+          <button
+            class="btn"
+            on:click={() => {
+              restoreError = '';
+            }}
+          >
+            Close
+          </button>
+        </div>
+      {/if}
+    </div>
+    <div class="modal-backdrop" />
+  </div>
+{/if}
