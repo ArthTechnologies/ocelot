@@ -794,12 +794,18 @@ function run(
           );
 
           forgeInstaller.stdout.on("data", (data) => {
-            terminalOutput[id] += "\n[Forge Installer] " + data.toString();
+            // Prevent stdout from growing unbounded (100MB limit)
+            if (terminalOutput[id].length < 100 * 1024 * 1024) {
+              terminalOutput[id] += "\n[Forge Installer] " + data.toString();
+            }
             console.log("[Forge " + id + "] " + data.toString());
           });
 
           forgeInstaller.stderr.on("data", (data) => {
-            terminalOutput[id] += "\n[Forge Error] " + data.toString();
+            // Prevent stderr from growing unbounded (100MB limit)
+            if (terminalOutput[id].length < 100 * 1024 * 1024) {
+              terminalOutput[id] += "\n[Forge Error] " + data.toString();
+            }
             console.log("[Forge Error " + id + "] " + data.toString());
           });
 
@@ -948,6 +954,10 @@ function run(
           }
 
             terminalOutput[id] = out.join("\n");
+            // Prune buffer if it exceeds 100MB
+            if (terminalOutput[id].length > 100 * 1024 * 1024) {
+              terminalOutput[id] = "[...pruned first 50MB of logs...]\n" + terminalOutput[id].slice(50 * 1024 * 1024);
+            }
             if (
               terminalOutput[id].includes("Done (") &&
               states[id] != "stopping"
@@ -968,8 +978,11 @@ function run(
           });
           ls.stderr.on("data", data => {
   const text = data.toString("utf8");
- terminalOutput[id]+= "\n" + text;
-     
+  // Prevent stderr from growing unbounded (100MB limit)
+  if (terminalOutput[id].length < 100 * 1024 * 1024) {
+    terminalOutput[id]+= "\n" + text;
+  }
+
     if (terminalOutput[id].includes("to the Docker daemon")) {
       terminalOutput[id] = "[Crash]: Docker is not properly setup. Contact an admin.";
       states[id] = "false";
@@ -1001,6 +1014,10 @@ function run(
             states[id] = "false";
             console.log("setting status of " + id + " to false on line #7");
             terminalOutput[id] = out.join("\n");
+            // Prune buffer if it exceeds 100MB
+            if (terminalOutput[id].length > 100 * 1024 * 1024) {
+              terminalOutput[id] = "[...pruned first 50MB of logs...]\n" + terminalOutput[id].slice(50 * 1024 * 1024);
+            }
             clearInterval(intervalID);
           });
         }
@@ -1029,6 +1046,10 @@ function run(
         }
 
         terminalOutput[id] = out.join("\n");
+        // Prune buffer if it exceeds 100MB
+        if (terminalOutput[id].length > 100 * 1024 * 1024) {
+          terminalOutput[id] = "[...pruned first 50MB of logs...]\n" + terminalOutput[id].slice(50 * 1024 * 1024);
+        }
         if (terminalOutput[id].includes("Done (") && states[id] != "stopping") {
           //replace states[id] with true
           states[id] = "true";
@@ -1044,7 +1065,10 @@ function run(
       });
 ls.stderr.on("data", data => {
   const text = data.toString("utf8");
- terminalOutput[id] += "\n" + text;
+  // Prevent stderr from growing unbounded (100MB limit)
+  if (terminalOutput[id].length < 100 * 1024 * 1024) {
+    terminalOutput[id] += "\n" + text;
+  }
     if (terminalOutput[id].includes("to the Docker daemon")) {
       terminalOutput[id] = "[Crash]: Docker is not properly setup. Contact an admin.";
       states[id] = "false";
