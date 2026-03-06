@@ -40,9 +40,13 @@ router.get("/listExpiredServers", async (req, res) => {
         try {
           if (fs.existsSync("trashbin")) {
             const trashbinItems = fs.readdirSync("trashbin");
+            // Extract email owner from account email (without .json extension)
+            const emailOwner = email.includes(".json") ? email.replace(".json", "") : email;
+
             for (const item of trashbinItems) {
-              // Trashbin format: "serverId-email"
-              if (item.startsWith(serverId + "-")) {
+              // Trashbin format: "serverId-emailOwner"
+              // Only load if it matches both the server ID AND the correct email owner
+              if (item === `${serverId}-${emailOwner}`) {
                 const trashPath = `trashbin/${item}`;
                 if (fs.existsSync(`${trashPath}/server.json`)) {
                   serverData = readJSON(`${trashPath}/server.json`);
@@ -216,10 +220,25 @@ function handleServerRecovery(res, email, targetServerId, verified) {
         try {
           if (fs.existsSync("trashbin")) {
             const trashbinItems = fs.readdirSync("trashbin");
+            // Extract email owner from account email (without .json extension)
+            const emailOwner = email.includes(".json") ? email.replace(".json", "") : email;
+
             for (const item of trashbinItems) {
-              if (item.startsWith(serverId + "-")) {
+              // Trashbin format: "serverId-emailOwner"
+              // Only restore if it matches both the server ID AND the correct email owner
+              if (item === `${serverId}-${emailOwner}`) {
                 const trashPath = `trashbin/${item}`;
                 if (fs.existsSync(`${trashPath}/server.json`)) {
+                  // Check if slot is already taken by another user
+                  if (fs.existsSync(`servers/${serverId}`)) {
+                    // Slot is taken, cannot restore
+                    return res.status(409).json({
+                      success: false,
+                      message: "This server slot has been claimed by another user. Please contact support to resolve this issue.",
+                      recovered: false
+                    });
+                  }
+
                   recoveredServer = readJSON(`${trashPath}/server.json`);
                   recoveredServerId = serverId;
                   serverLocation = "trashbin";
