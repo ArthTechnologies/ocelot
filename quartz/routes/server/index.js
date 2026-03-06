@@ -1741,17 +1741,12 @@ router.post("/:id/backup/:timestamp/restore", async function (req, res) {
 
     // Restart the server
     try {
-      const { spawn } = require("child_process");
       const serverScript = require("../../scripts/mc.js");
 
-      // Stop the server first
-      await serverScript.stopServer(req.params.id);
-
-      // Wait a bit for clean shutdown
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Start the server
-      await serverScript.startServer(req.params.id);
+      // Stop the server and restart it
+      serverScript.stopAsync(req.params.id, () => {
+        serverScript.run(req.params.id, undefined, undefined, undefined, undefined, email, false);
+      });
 
       res.status(200).json({
         success: true,
