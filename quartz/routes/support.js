@@ -28,12 +28,43 @@ router.get("/listExpiredServers", async (req, res) => {
     // Check all servers in account
     for (const serverId of account.servers) {
       const serverPath = `servers/${serverId}`;
+      let isExpired = false;
 
+      // Check if server is marked as expired in server.json
       if (fs.existsSync(serverPath) && fs.existsSync(`${serverPath}/server.json`)) {
         const server = readJSON(`${serverPath}/server.json`);
 
-        // Check if server is marked as expired
         if (server.expired || server.markedExpired) {
+          isExpired = true;
+        }
+
+        // Also check subscription status (same logic as /servers endpoint)
+        if (!isExpired && mode === "provider") {
+          let hasValidSubscription = false;
+          try {
+            const subscriptionsJson = readJSON(`logs/subscriptions.json`);
+
+            for (let sub of subscriptionsJson) {
+              if (sub.owner == email + ".json" && sub.subscriptions != undefined) {
+                for (let item of sub.subscriptions) {
+                  if (item.status == "active") {
+                    hasValidSubscription = true;
+                    break;
+                  }
+                }
+              }
+              if (hasValidSubscription) break;
+            }
+          } catch (e) {
+            console.error("Error checking subscription status:", e);
+          }
+
+          if (!hasValidSubscription) {
+            isExpired = true;
+          }
+        }
+
+        if (isExpired) {
           expiredServers.push({
             id: serverId,
             name: server.serverName || `Server ${serverId}`,
