@@ -87,6 +87,7 @@
     planAssignments = {};
     expiredServers = [];
     selectedExpiredServerId = '';
+    showFixIssueModal = true;
 
     try {
       // If paymentRecovered is selected, load expired servers
@@ -102,12 +103,23 @@
           },
         });
 
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
         const data = await response.json();
+
+        // Validate response structure
+        if (!data || !data.subscriptions || !data.servers) {
+          throw new Error("Invalid response format from API");
+        }
 
         // Process plans
         const planCounts: Record<string, number> = {};
         data.subscriptions.forEach((sub: any) => {
-          planCounts[sub.name] = (planCounts[sub.name] || 0) + 1;
+          if (sub.name) {
+            planCounts[sub.name] = (planCounts[sub.name] || 0) + 1;
+          }
         });
 
         modalPlans = Object.entries(planCounts).map(([name, count]) => ({
@@ -117,22 +129,27 @@
         }));
 
         // Process servers - include all servers to show pending status
-        modalServers = data.servers.map((server: any) => {
-          const isPending = server.plan === "not created yet";
-          return {
-            id: server.id,
-            software: server.software,
-            version: server.version,
-            currentPlan: server.plan,
-            isPending
-          };
-        });
-      }
+        modalServers = data.servers
+          .filter((server: any) => server.id !== undefined && server.id !== null)
+          .map((server: any) => {
+            const isPending = server.plan === "not created yet";
+            return {
+              id: server.id,
+              software: server.software || "Unknown",
+              version: server.version || "Unknown",
+              currentPlan: server.plan,
+              isPending
+            };
+          });
 
-      showFixIssueModal = true;
+        if (modalServers.length === 0) {
+          throw new Error("No valid servers available");
+        }
+      }
     } catch (e) {
-      modalError = "Failed to load data";
-      console.error(e);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      modalError = `Failed to load data: ${errorMsg}`;
+      console.error("openFixIssueModal error:", e);
     }
 
     modalLoading = false;
