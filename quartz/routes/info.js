@@ -56,6 +56,7 @@ router.get(`/servers`, function (req, res) {
 
 
     for (let i in account.servers) {
+                const serverId = account.servers[i];
 
 
   
@@ -64,6 +65,7 @@ router.get(`/servers`, function (req, res) {
         let hasValidSubscription = true;
         let parsedSuccesfully = false;
                 let resetDate = -1;
+                let subscriptionCause = "unknown";
         if (mode === "provider") {
           hasValidSubscription = false;
                   let subscriptionsJson = readJSON(`logs/subscriptions.json`);
@@ -71,11 +73,11 @@ router.get(`/servers`, function (req, res) {
 
 try {
         for (let sub of subscriptionsJson) {
-        
+
 
             if (sub.owner == req.headers.username + ".json" && sub.subscriptions != undefined) {
               parsedSuccesfully = true;
-                        
+
             for (let item of sub.subscriptions) {
 
               if (item.start_date > latestStartDate) {
@@ -83,14 +85,21 @@ try {
               }
               if (item.status == "active") {
                 hasValidSubscription = true;
-          
+
               } else {
-         
+
                             //add 7 days to the current period end if the subscription is canceled
             resetDate = parseInt(item.current_period_end) + 604800;
+            if (item.status === "past_due" || item.status === "unpaid") {
+              subscriptionCause = "payment_failed";
+            } else if (item.status === "canceled") {
+              subscriptionCause = "canceled";
+            } else {
+              subscriptionCause = item.status || "unknown";
+            }
               }
             }
-          } 
+          }
       
           
         }
@@ -100,7 +109,7 @@ try {
       }
         console.log("hasValidSubscription: " + hasValidSubscription);
         //if the start date is from the past 24 hours, set hasValidSubscription to true
-        if (latestStartDate > 0 && latestStartDate < Date.now() - 86400000) {
+        if (latestStartDate > 0 && latestStartDate > Date.now() - 86400000) {
           hasValidSubscription = true;
         }
       }
@@ -109,8 +118,9 @@ try {
         if (account.servers[i].includes(":freed")) {
           account.servers[i] = account.servers[i].replace(":freed", "") + ":no valid subscription:" + -1;
         } else if (!hasValidSubscription && parsedSuccesfully) {
-          account.servers[i] = account.servers[i] + ":no valid subscription:" + resetDate;
-        } else if (fs.existsSync(`servers/${account.servers[i]}/server.json`)) {
+          account.servers[i] = account.servers[i] + ":no valid subscription:" + resetDate + ":" + subscriptionCause;
+        } else if (fs.existsSync(`servers/${serverId}/server.json`)) {
+                  let serverData = readJSON(`servers/${serverId}/server.json`);
         account.servers[i] = readJSON(
           `servers/${account.servers[i]}/server.json`
         );
@@ -189,13 +199,25 @@ router.get(`/billing`, function (req, res) {
               }
               let serversArray = [];
               for (let i in account.servers) {
-                if (fs.existsSync(`servers/${account.servers[i]}/server.json`)) {
+                const serverId = account.servers[i];
+                if (fs.existsSync(`servers/${serverId}/server.json`)) {
+                  let serverData = readJSON(`servers/${serverId}/server.json`);
                   let planName = "basic";
-                  if (account.servers[i].productID == config.plus) planName = "plus"; 
-                  if (account.servers[i].productID == config.premium) planName = "premium";
-                  serversArray.push(account.servers[i].id + ":" + planName);
+                  if (serverData.productID == config.plus) planName = "plus";
+                  if (serverData.productID == config.premium) planName = "premium";
+                  serversArray.push({
+                    id: serverId,
+                    software: serverData.software || "Unknown",
+                    version: serverData.version || "Unknown",
+                    plan: planName
+                  });
                 } else {
-                  serversArray.push(account.servers[i] + ":undefined");
+                  serversArray.push({
+                    id: serverId,
+                    software: "Unknown",
+                    version: "Unknown",
+                    plan: "not created yet"
+                  });
                 }
               }
               res.status(200).json({
@@ -523,6 +545,48 @@ setInterval(captureSnapshot, 60000);
 // Route to get thread and memory snapshot
 router.get("/snapshot", (req, res) => {
     res.json(snapshotHistory);
+});
+
+router.post(`/updatePlans`, function (req, res) {
+  if (mode !== "provider") return res.status(400).json({ msg: "Not in provider mode." });
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON(`accounts/${email}.json`);
+  if (!account || token !== account.token) return res.status(401).json({ msg: "Invalid credentials." });
+
+  // req.body should contain { planAssignments: { serverId: planName, serverId: planName, ... } }
+  let planAssignments = req.body.planAssignments || {};
+  let updated = [];
+  let errors = [];
+
+  for (let serverId in planAssignments) {
+    let serverPath = `servers/${serverId}/server.json`;
+    if (!fs.existsSync(serverPath)) {
+      errors.push(`Server ${serverId} not found`);
+      continue;
+    }
+
+    let planName = planAssignments[serverId];
+    // Convert plan name to product ID
+    let productId = config.basic; // default
+    if (planName === "plus") productId = config.plus;
+    if (planName === "premium") productId = config.premium;
+
+    let server = readJSON(serverPath);
+    server.productID = productId;
+    try {
+      writeJSON(serverPath, server);
+      updated.push(serverId);
+    } catch (e) {
+      errors.push(`Failed to update server ${serverId}: ${e}`);
+    }
+  }
+
+  res.status(200).json({
+    updated: updated,
+    errors: errors,
+    message: "Server restart required to apply changes"
+  });
 });
 
 module.exports = router;

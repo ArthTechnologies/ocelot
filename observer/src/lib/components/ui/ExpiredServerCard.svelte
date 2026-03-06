@@ -36,8 +36,15 @@
 
   export let id: number;
   export let timestamp: number = 0;
+  export let cause: string = "unknown";
 
   const daysUntil = timestamp => Math.ceil((timestamp * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
+
+  const causeText = (cause: string) => {
+    if (cause === "payment_failed") return "Unable to charge payment method.";
+    if (cause === "canceled") return "Subscription was cancelled.";
+    return null;
+  };
 </script>
 
 
@@ -57,7 +64,12 @@
         Slot {parseInt(id)} has been freed up due to expired subscription.
       {/if}
     </p>
-        <p class="font-poppins text-xs mb-0.5 -mt-1">
+    {#if causeText(cause)}
+    <p class="font-poppins text-xs mb-0.5 -mt-1 opacity-75">
+      Cause: {causeText(cause)}
+    </p>
+    {/if}
+    <p class="font-poppins text-xs mb-0.5 -mt-1">
       Contact support to renew.
     </p>
   </div>

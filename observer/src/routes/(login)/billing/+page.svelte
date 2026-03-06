@@ -2,7 +2,8 @@
   import { apiurl, customerPortalLink } from "$lib/scripts/req";
   import { t, locale, locales } from "$lib/scripts/i18n";
   import { browser } from "$app/environment";
-  import { ClipboardList, MessagesSquare, CreditCard, Server, CheckCircle, XCircle, AlertCircle, Clock, ExternalLink } from "lucide-svelte";
+  import { ClipboardList, MessagesSquare, CreditCard, Server, CheckCircle, XCircle, AlertCircle, Clock, ExternalLink, Zap } from "lucide-svelte";
+  import { alert } from "$lib/scripts/utils";
 
   let servers = [];
   var email: string = "";
@@ -40,6 +41,208 @@
     if (browser) {
       localStorage.setItem("subscribed", "true");
     }
+  }
+
+  let showFixIssueModal = false;
+  let selectedIssue: 'planUpgrade' | 'paymentRecovered' | null = null;
+  let modalPlans = [];
+  let modalServers = [];
+  let planAssignments: Record<string, string> = {};
+  let modalLoading = false;
+  let modalError = '';
+  let modalSubmitting = false;
+  let expiredServers = [];
+  let selectedExpiredServerId = '';
+
+  async function loadExpiredServers() {
+    try {
+      const response = await fetch(apiurl + "support/listExpiredServers", {
+        method: "GET",
+        headers: {
+          username: localStorage.getItem("accountEmail"),
+          token: localStorage.getItem("token"),
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        expiredServers = data.expiredServers || [];
+        // Auto-select first expired server if available
+        if (expiredServers.length > 0) {
+          selectedExpiredServerId = expiredServers[0].id;
+        }
+      } else {
+        modalError = "Failed to load expired servers";
+      }
+    } catch (e) {
+      modalError = "Failed to load expired servers";
+      console.error(e);
+    }
+  }
+
+  async function openFixIssueModal() {
+    modalLoading = true;
+    modalError = '';
+    planAssignments = {};
+    expiredServers = [];
+    selectedExpiredServerId = '';
+    showFixIssueModal = true;
+
+    try {
+      // If paymentRecovered is selected, load expired servers
+      if (selectedIssue === 'paymentRecovered') {
+        await loadExpiredServers();
+      } else {
+        // For other issues, load current plans and servers
+        const response = await fetch(apiurl + "info/billing", {
+          method: "GET",
+          headers: {
+            username: localStorage.getItem("accountEmail"),
+            token: localStorage.getItem("token"),
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Validate response structure
+        if (!data || !data.subscriptions || !data.servers) {
+          throw new Error("Invalid response format from API");
+        }
+
+        // Process plans
+        const planCounts: Record<string, number> = {};
+        data.subscriptions.forEach((sub: any) => {
+          if (sub.name) {
+            planCounts[sub.name] = (planCounts[sub.name] || 0) + 1;
+          }
+        });
+
+        modalPlans = Object.entries(planCounts).map(([name, count]) => ({
+          name,
+          count,
+          displayName: `${count}x ${name.charAt(0).toUpperCase() + name.slice(1)} Plan`
+        }));
+
+        // Process servers - include all servers to show pending status
+        modalServers = data.servers
+          .filter((server: any) => server.id !== undefined && server.id !== null)
+          .map((server: any) => {
+            const isPending = server.plan === "not created yet";
+            return {
+              id: server.id,
+              software: server.software || "Unknown",
+              version: server.version || "Unknown",
+              currentPlan: server.plan,
+              isPending
+            };
+          });
+
+        if (modalServers.length === 0) {
+          throw new Error("No valid servers available");
+        }
+      }
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      modalError = `Failed to load data: ${errorMsg}`;
+      console.error("openFixIssueModal error:", e);
+    }
+
+    modalLoading = false;
+  }
+
+  async function submitPlanUpdates() {
+    modalSubmitting = true;
+
+    try {
+      const response = await fetch(apiurl + "info/updatePlans", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          username: localStorage.getItem("accountEmail"),
+          token: localStorage.getItem("token"),
+        },
+        body: JSON.stringify({ planAssignments }),
+      });
+
+      const data = await response.json();
+
+      if (data.updated && data.updated.length > 0) {
+        alert(`Updated ${data.updated.length} server(s). Server restart required to apply changes.`, "success");
+        showFixIssueModal = false;
+      } else if (data.errors && data.errors.length > 0) {
+        modalError = "Some servers failed to update: " + data.errors.join(", ");
+      } else {
+        alert("No changes were made", "info");
+      }
+    } catch (e) {
+      modalError = "Failed to update plans";
+      console.error(e);
+    }
+
+    modalSubmitting = false;
+  }
+
+  async function submitIssueRequest() {
+    modalSubmitting = true;
+    modalError = '';
+
+    try {
+      // Handle different issue types
+      if (selectedIssue === 'paymentRecovered') {
+        // Validate that a server is selected
+        if (!selectedExpiredServerId) {
+          modalError = "Please select a server to recover";
+          modalSubmitting = false;
+          return;
+        }
+
+        // For payment recovery, call the server recovery endpoint
+        const response = await fetch(apiurl + "support/serverRecovery", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            username: localStorage.getItem("accountEmail"),
+            token: localStorage.getItem("token"),
+          },
+          body: JSON.stringify({
+            accountId: accountId,
+            targetServerId: selectedExpiredServerId
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          modalError = data.message || "Failed to process your request";
+          modalSubmitting = false;
+          return;
+        }
+
+        if (data.success) {
+          if (data.recovered === false) {
+            // Slot freed but server gone
+            alert(data.message, "warning");
+          } else {
+            // Server restored
+            alert(`Great! ${data.message} Your server "${data.serverName}" is ready to use.`, "success");
+          }
+          showFixIssueModal = false;
+          selectedIssue = null;
+        } else {
+          modalError = data.message || "An error occurred";
+        }
+      }
+    } catch (e) {
+      modalError = "Failed to process your request";
+      console.error(e);
+    }
+
+    modalSubmitting = false;
   }
 
   function getStatusColor(status: string) {
@@ -241,6 +444,47 @@
       </div>
     </div>
 
+    <!-- Subscription Tools -->
+    <div class="card bg-base-100 shadow-lg">
+      <div class="card-body p-4">
+        <div class="flex items-center justify-between">
+          <h2 class="card-title flex items-center gap-2 text-base">
+            <Zap size="18" class="text-info" />
+            Subscription Tools
+          </h2>
+          <button
+            class="btn btn-sm btn-primary"
+            on:click={openFixIssueModal}
+            disabled={!selectedIssue}
+          >
+            Fix Issue
+          </button>
+        </div>
+        <div class="space-y-2 mt-3">
+          <label class="flex items-center gap-3 p-2 rounded hover:bg-base-200/50 transition cursor-pointer">
+            <input
+              type="radio"
+              name="subscription-issue"
+              class="radio radio-sm"
+              value="planUpgrade"
+              bind:group={selectedIssue}
+            />
+            <span class="text-sm">Plan upgrade not applied</span>
+          </label>
+          <label class="flex items-center gap-3 p-2 rounded hover:bg-base-200/50 transition cursor-pointer">
+            <input
+              type="radio"
+              name="subscription-issue"
+              class="radio radio-sm"
+              value="paymentRecovered"
+              bind:group={selectedIssue}
+            />
+            <span class="text-sm">My server is expired but it shouldn't be</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
     <!-- Refunds Info Card -->
     <div class="card bg-base-100 shadow-lg">
       <div class="card-body">
@@ -283,3 +527,148 @@
     </div>
   </div>
 </div>
+
+<!-- Fix Issue Modal -->
+{#if showFixIssueModal}
+  <div class="modal modal-open">
+    <div class="modal-box max-w-3xl max-h-[80vh] overflow-y-auto">
+      <div class="mb-4">
+        <h3 class="font-bold text-lg">
+          {selectedIssue === 'planUpgrade' ? 'Update Server Plans' : 'Recover Expired Server'}
+        </h3>
+        {#if selectedIssue === 'planUpgrade'}
+          <p class="text-sm text-gray-400 mt-1">Let's make sure your plans are allocated properly</p>
+        {:else if selectedIssue === 'paymentRecovered'}
+          <p class="text-sm text-gray-400 mt-1">We'll help you restore your server after payment recovery</p>
+        {/if}
+      </div>
+
+      {#if modalLoading}
+        <div class="py-6 text-center">
+          <span class="loading loading-spinner loading-lg"></span>
+        </div>
+      {:else if modalError}
+        <div class="alert alert-error mb-4">
+          <span>{modalError}</span>
+        </div>
+      {:else if selectedIssue === 'planUpgrade'}
+        <div class="space-y-4">
+          <!-- Assignment Interface -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[200px]">
+            <!-- Servers (Left) -->
+            <div>
+              <p class="text-sm font-semibold text-gray-400 mb-3">Your Servers:</p>
+              <div class="space-y-2">
+                {#each modalServers as server, idx}
+                  <div class="flex items-center gap-2 p-2 bg-base-200/30 rounded">
+                    {#if server.isPending}
+                      <div class="flex-1">
+                        <p class="text-xs text-gray-500 font-mono">{server.id}</p>
+                        <p class="text-xs text-gray-600">Pending creation</p>
+                      </div>
+                      <div class="badge badge-ghost badge-sm">—</div>
+                    {:else}
+                      <div class="flex-1">
+                        <p class="text-xs font-mono text-gray-300">Slot {server.id} - {server.software.charAt(0).toUpperCase() + server.software.slice(1)} {server.version}</p>
+                      </div>
+                      <select
+                        class="select select-sm select-bordered w-20"
+                        bind:value={planAssignments[server.id]}
+                        disabled={server.isPending}
+                      >
+                        <option value="" disabled selected>—</option>
+                        {#each modalPlans as plan, letterIdx}
+                          <option value={plan.name}>
+                            {String.fromCharCode(65 + letterIdx)}
+                          </option>
+                        {/each}
+                      </select>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            </div>
+
+            <!-- Plans (Right) -->
+            <div>
+              <p class="text-sm font-semibold text-gray-400 mb-3">Plan Assignments:</p>
+              <div class="space-y-2">
+                {#each modalPlans as plan, letterIdx}
+                  <div class="flex items-center gap-2 p-2 bg-base-200/30 rounded">
+                    <div class="badge badge-lg badge-primary w-10 flex justify-center">
+                      {String.fromCharCode(65 + letterIdx)}
+                    </div>
+                    <div class="flex-1">
+                      <p class="text-xs text-gray-300">{plan.displayName}</p>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          </div>
+
+          <!-- Notice -->
+          <div class="alert alert-info text-sm">
+            <span>Server restart required to apply changes</span>
+          </div>
+        </div>
+      {:else if selectedIssue === 'paymentRecovered'}
+        <div class="space-y-4">
+          {#if expiredServers.length > 0}
+            <div>
+              <label class="block text-sm font-semibold text-gray-400 mb-2">Select server to recover:</label>
+              <select
+                class="select select-bordered w-full"
+                bind:value={selectedExpiredServerId}
+              >
+                <option value="">-- Choose a server --</option>
+                {#each expiredServers as server}
+                  <option value={server.id}>
+                    Slot {server.id} - {server.software.charAt(0).toUpperCase() + server.software.slice(1)} {server.version}
+                  </option>
+                {/each}
+              </select>
+            </div>
+          {:else}
+            <div class="alert alert-warning">
+              <p class="text-sm">No expired servers found. All your servers are currently active.</p>
+            </div>
+          {/if}
+
+          <div class="alert alert-info">
+            <p class="text-sm">We'll check if your server can be recovered. If it's marked as expired but still exists, it will be restored automatically and you can use it immediately.</p>
+          </div>
+          <p class="text-sm text-gray-400">If your server was deleted past the grace period, you'll see a message with instructions on how to recover your data.</p>
+        </div>
+      {/if}
+
+      <div class="modal-action mt-6">
+        <button
+          class="btn btn-ghost"
+          on:click={() => showFixIssueModal = false}
+          disabled={modalSubmitting}
+        >
+          Cancel
+        </button>
+        {#if selectedIssue === 'planUpgrade'}
+          <button
+            class="btn btn-primary"
+            on:click={submitPlanUpdates}
+            disabled={modalSubmitting || modalServers.some(s => !s.isPending && !planAssignments[s.id])}
+          >
+            {modalSubmitting ? 'Updating...' : 'Apply Changes'}
+          </button>
+        {:else}
+          <button
+            class="btn btn-primary"
+            on:click={submitIssueRequest}
+            disabled={modalSubmitting || (selectedIssue === 'paymentRecovered' && !selectedExpiredServerId)}
+          >
+            {modalSubmitting ? 'Submitting...' : 'Submit Request'}
+          </button>
+        {/if}
+      </div>
+    </div>
+    <div class="modal-backdrop" on:click={() => showFixIssueModal = false}></div>
+  </div>
+{/if}
