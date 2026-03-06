@@ -13,6 +13,37 @@ This monorepo structure keeps both projects in sync and allows coordinated devel
 
 ---
 
+## Git Workflow Standards
+
+**File Changes Only**
+- Never commit files - only modify them
+- User handles all commits
+- Focus exclusively on code changes
+
+**Remote Operations**
+- Never push to remote unless explicitly asked
+- When user requests a push:
+  - Ask for permission first
+  - Specify which branch will be pushed
+  - Confirm before proceeding
+- For wider git operations (branch creation, history changes, rebases):
+  - Ask permission and clarify intent first
+  - Specify affected branches
+
+**Branch Naming**
+- Use format: `claude/feature-name`
+- Example: `claude/backup-fix`, `claude/auth-improvement`
+
+**Merge to Main**
+- If merging to main: Always create PR first
+- User unlikely to request this, but standard if asked
+
+**Commit Messages**
+- Current format acceptable if user requests commits (unlikely)
+- Format: "Brief description of changes"
+
+---
+
 ## Project Structure
 
 ```
