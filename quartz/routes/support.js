@@ -144,8 +144,12 @@ router.post("/serverRecovery", async (req, res) => {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    // Verify server belongs to user
-    if (!account.servers.includes(targetServerId)) {
+    // Verify server belongs to user (handle both regular and :freed entries)
+    const serverExists = account.servers.some(s => {
+      const serverId = typeof s === "string" ? s.replace(":freed", "") : s;
+      return serverId === targetServerId;
+    });
+    if (!serverExists) {
       return res.status(403).json({ success: false, message: "Server not found" });
     }
 
@@ -182,58 +186,93 @@ router.post("/serverRecovery", async (req, res) => {
   }
 });
 
-function handleServerRecovery(res, email, accountId, verified) {
+function handleServerRecovery(res, email, targetServerId, verified) {
   try {
     if (!verified) {
       return res.status(403).json({ success: false, message: "Verification failed" });
     }
 
     const account = readJSON(`accounts/${email}.json`);
-
-    // Find the server - look for most recently expired/unmarked server
     let recoveredServer = null;
     let recoveredServerId = null;
+    let serverLocation = null; // "servers" or "trashbin"
 
-    // Check all servers in account
-    for (const serverId of account.servers) {
-      const serverPath = `servers/${serverId}`;
+    // Find the server to recover
+    for (let serverEntry of account.servers) {
+      let serverId = serverEntry;
 
-      // Check if server directory exists
-      if (fs.existsSync(serverPath)) {
-        // Check if server.json exists
-        if (fs.existsSync(`${serverPath}/server.json`)) {
-          const server = readJSON(`${serverPath}/server.json`);
+      // Handle :freed flag
+      if (typeof serverEntry === "string" && serverEntry.includes(":freed")) {
+        serverId = serverEntry.replace(":freed", "");
+      }
 
-          // Check if server is marked as expired
-          if (server.expired || server.markedExpired) {
-            // Server exists but is marked expired - restore it
-            recoveredServer = server;
-            recoveredServerId = serverId;
-            break; // Recover the first expired one found
+      // Check if this is the server we're trying to recover
+      if (serverId !== targetServerId) {
+        continue;
+      }
+
+      // Check if server is in trashbin (has :freed flag)
+      if (typeof serverEntry === "string" && serverEntry.includes(":freed")) {
+        try {
+          if (fs.existsSync("trashbin")) {
+            const trashbinItems = fs.readdirSync("trashbin");
+            for (const item of trashbinItems) {
+              if (item.startsWith(serverId + "-")) {
+                const trashPath = `trashbin/${item}`;
+                if (fs.existsSync(`${trashPath}/server.json`)) {
+                  recoveredServer = readJSON(`${trashPath}/server.json`);
+                  recoveredServerId = serverId;
+                  serverLocation = "trashbin";
+                  // Move server back from trashbin to servers/
+                  fs.renameSync(trashPath, `servers/${serverId}`);
+                  // Remove :freed from account.servers
+                  account.servers = account.servers.map(s =>
+                    typeof s === "string" && s.includes(":freed") && s.startsWith(serverId) ? serverId : s
+                  );
+                  writeJSON(`accounts/${email}.json`, account);
+                  break;
+                }
+              }
+            }
           }
+        } catch (e) {
+          console.error("Error recovering server from trashbin:", e);
+        }
+      } else {
+        // Check if server is in servers directory
+        if (fs.existsSync(`servers/${serverId}/server.json`)) {
+          recoveredServer = readJSON(`servers/${serverId}/server.json`);
+          recoveredServerId = serverId;
+          serverLocation = "servers";
+          break;
         }
       }
+
+      if (recoveredServer) break;
     }
 
     if (recoveredServer) {
-      // Restore the server
-      recoveredServer.expired = false;
-      recoveredServer.markedExpired = false;
+      // If server was in servers/ and marked with flags, clear them
+      if (serverLocation === "servers") {
+        recoveredServer.expired = false;
+        recoveredServer.markedExpired = false;
+      }
       recoveredServer.restoredDate = Date.now();
 
       writeJSON(`servers/${recoveredServerId}/server.json`, recoveredServer);
 
       // Log recovery
-      console.log(`Server ${recoveredServerId} recovered for account ${email}`);
+      console.log(`Server ${recoveredServerId} recovered for account ${email} from ${serverLocation}`);
 
       return res.status(200).json({
         success: true,
         message: "Your server has been restored! You can now start using it again.",
         serverId: recoveredServerId,
-        serverName: recoveredServer.serverName || `Server ${recoveredServerId}`
+        serverName: recoveredServer.serverName || `Server ${recoveredServerId}`,
+        recovered: true
       });
     } else {
-      // Server not found in servers directory - must be deleted/trashed
+      // Server not found - may have been permanently deleted
       return res.status(200).json({
         success: true,
         message: "Your slot has been freed up. You have gone past the grace period, but you may still be able to recover your data. Please contact support for assistance.",
