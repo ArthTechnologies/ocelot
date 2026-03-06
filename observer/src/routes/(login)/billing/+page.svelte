@@ -44,7 +44,7 @@
   }
 
   let showFixIssueModal = false;
-  let selectedIssue: 'planUpgrade' | 'resubscribedSlot' | 'paymentRecovered' | null = null;
+  let selectedIssue: 'planUpgrade' | 'paymentRecovered' | null = null;
   let modalPlans = [];
   let modalServers = [];
   let planAssignments: Record<string, string> = {};
@@ -176,15 +176,6 @@
 
     try {
       // Handle different issue types
-      if (selectedIssue === 'resubscribedSlot') {
-        // For re-subscribed slot issue, show a generic message
-        alert("Your request has been submitted to our support team. We'll review your account and reassign your server slot as soon as possible.", "success");
-        showFixIssueModal = false;
-        selectedIssue = null;
-        modalSubmitting = false;
-        return;
-      }
-
       if (selectedIssue === 'paymentRecovered') {
         // Validate that a server is selected
         if (!selectedExpiredServerId) {
@@ -468,20 +459,10 @@
               type="radio"
               name="subscription-issue"
               class="radio radio-sm"
-              value="resubscribedSlot"
-              bind:group={selectedIssue}
-            />
-            <span class="text-sm">Re-subscribed, can't use server slot</span>
-          </label>
-          <label class="flex items-center gap-3 p-2 rounded hover:bg-base-200/50 transition cursor-pointer">
-            <input
-              type="radio"
-              name="subscription-issue"
-              class="radio radio-sm"
               value="paymentRecovered"
               bind:group={selectedIssue}
             />
-            <span class="text-sm">My server expired due to payment issues, and I have resolved them</span>
+            <span class="text-sm">My server is expired but it shouldn't be</span>
           </label>
         </div>
       </div>
@@ -536,7 +517,7 @@
     <div class="modal-box max-w-3xl max-h-[80vh] overflow-y-auto">
       <div class="mb-4">
         <h3 class="font-bold text-lg">
-          {selectedIssue === 'planUpgrade' ? 'Update Server Plans' : selectedIssue === 'resubscribedSlot' ? 'Reassign Server Slot' : 'Recover Expired Server'}
+          {selectedIssue === 'planUpgrade' ? 'Update Server Plans' : 'Recover Expired Server'}
         </h3>
         {#if selectedIssue === 'planUpgrade'}
           <p class="text-sm text-gray-400 mt-1">Let's make sure your plans are allocated properly</p>
@@ -613,13 +594,6 @@
           <div class="alert alert-info text-sm">
             <span>Server restart required to apply changes</span>
           </div>
-        </div>
-      {:else if selectedIssue === 'resubscribedSlot'}
-        <div class="space-y-4">
-          <div class="alert alert-info">
-            <p class="text-sm">Our support team will review your account and reassign your server slot so you can start using your server again.</p>
-          </div>
-          <p class="text-sm text-gray-400">You'll receive an email update once your slot has been reassigned.</p>
         </div>
       {:else if selectedIssue === 'paymentRecovered'}
         <div class="space-y-4">
