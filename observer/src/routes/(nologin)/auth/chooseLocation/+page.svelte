@@ -61,11 +61,11 @@ class="relative bg-base-100 rounded-xl shadow-xl  flex flex-col items-center max
                       localStorage.setItem("userNode", nodeurl);
                         selectedNode = node[0].split("https://")[1].split(".")[0];
                   }} />
-    <span class="text-4xl">
+    <span>
       {#if node[0].includes("us")}
-    &#127482;&#127480;
+    <img src="/images/flag-us.svg" alt="US" class="w-9 h-9" />
     {:else if node[0].includes("germany")}
-    &#127465;&#127466;
+    <img src="/images/flag-de.svg" alt="DE" class="w-9 h-9" />
     {/if}
     </span>
                   <div class="flex flex-col mb-1">
@@ -96,9 +96,9 @@ class="relative bg-base-100 rounded-xl shadow-xl  flex flex-col items-center max
 <div class="flex justify-between gap-2.5 bg-neutral bg-opacity-75 px-2 p-1 rounded-md">
     
     <p class="text-xl flex items-center gap-1.5 ml-0.5">      {#if selectedNode.includes("us")}
-        &#127482;&#127480;
+        <img src="/images/flag-us.svg" alt="US" class="w-7 h-7" />
         {:else if selectedNode.includes("germany")}
-        &#127465;&#127466;
+        <img src="/images/flag-de.svg" alt="DE" class="w-7 h-7" />
         {/if} <span class="text-base font-poppins-bold">{selectedNode}</span></p>
 
     <a href="/login" class="btn btn-base-200 btn-sm">Continue</a>
@@ -108,7 +108,7 @@ class="relative bg-base-100 rounded-xl shadow-xl  flex flex-col items-center max
 {:else}
 <div class="flex justify-between gap-2.5 bg-neutral opacity-50 disabled bg-opacity-75 px-2 py-1.5 rounded-md">
     <p class="text-xl flex items-center gap-1.5 ml-0.5">   
-        &#127470;&#127465;
+        <img src="/images/flag-us.svg" alt="" class="w-7 h-7 opacity-40" />
       <span class="text-base font-poppins-bold">No location selected</span></p>
    
  
