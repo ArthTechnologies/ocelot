@@ -1038,3 +1038,36 @@ export function changeSoftware(id: number, software: string, version: string) {
     });
 }
 }
+
+export function getAdminDashboard() {
+  if(browser) {
+    let url = apiurl + "admin/dashboard";
+    return fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        token: localStorage.getItem("token"),
+        username: localStorage.getItem("accountEmail"),
+      }
+    })
+    .then((res) => {
+      if (res.status === 403) {
+        return { error: "You do not have admin access. Contact the server administrator." };
+      }
+      if (!res.ok) {
+        return { error: `Server error: ${res.status} ${res.statusText}` };
+      }
+      return res.json();
+    })
+    .then((data) => {
+      if (data?.error) {
+        console.error("Admin dashboard error:", data.error);
+        return data;
+      }
+      return data;
+    })
+    .catch((err) => {
+      console.error("Error fetching admin dashboard:", err);
+      return { error: `Network error: ${err instanceof Error ? err.message : String(err)}` };
+    });
+  }
+}
