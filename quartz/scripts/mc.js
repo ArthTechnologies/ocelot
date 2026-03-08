@@ -170,6 +170,7 @@ function run(
     let server = readJSON("servers/" + id + "/server.json");
     states[id] = "starting";
     players[id] = [];
+    terminalOutput[id] = "";
     
 
     // i isNew is undefined, set it to true
@@ -861,6 +862,7 @@ function run(
         if (doneInstallingServer && timeToLoad) {
           timeToLoad = false;
           states[id] = "starting";
+          terminalOutput[id] = "";
 
           let startupFlags = server.startupFlags || getDefaultStartupFlags(allocatedRAM);
           let args = startupFlags;
