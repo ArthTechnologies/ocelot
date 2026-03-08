@@ -223,9 +223,14 @@ router.get("/dashboard", (req, res) => {
       }
     }
 
-    // Third pass: add subscription data for each account
+    // Fourth pass: add subscription data for each account (deduplicated by email)
+    const processedEmails = new Set(); // Track which emails already have subscriptions added
     for (const subData of subscriptionsData) {
       const email = subData.email;
+      // Skip if already processed this email (subscriptions.json has one entry per server, not per user)
+      if (processedEmails.has(email)) continue;
+      processedEmails.add(email);
+
       // Find account by email
       for (const accountId in accountMap) {
         if (accountMap[accountId].email === email) {
