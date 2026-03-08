@@ -133,6 +133,7 @@ router.get("/dashboard", (req, res) => {
     // Build account list with servers and subscriptions
     const accounts = [];
     const accountMap = {}; // Map to group servers by account
+    const serverMap = {}; // Map of server ID to actual owner accountId
 
     // First: Read all account files to get email and accountId mapping
     if (fs.existsSync("accounts")) {
@@ -148,8 +149,10 @@ router.get("/dashboard", (req, res) => {
               accountId: accountData.accountId,
               email: accountData.email || file.split(":")[1]?.split(".")[0] || "unknown",
               servers: [],
+              orphanedServers: [],
               subscriptions: [],
               freeServers: accountData.freeServers || 0,
+              claimedServers: accountData.servers || [], // Store claimed servers for orphan detection
             };
           }
         } catch (err) {
@@ -158,7 +161,7 @@ router.get("/dashboard", (req, res) => {
       }
     }
 
-    // Second pass: group servers by account
+    // Second pass: group servers by account and build server map
     if (fs.existsSync("servers")) {
       const serverDirs = fs.readdirSync("servers");
 
@@ -172,6 +175,7 @@ router.get("/dashboard", (req, res) => {
           try {
             const serverData = readJSON(serverJsonPath);
             const accountId = serverData.accountId;
+            serverMap[parseInt(serverId)] = accountId; // Track actual ownership
 
             if (accountMap[accountId]) {
               const playerList = mc.getPlayerList(serverId);
@@ -185,6 +189,35 @@ router.get("/dashboard", (req, res) => {
             }
           } catch (err) {
             console.error(`Error reading server ${serverId}:`, err);
+          }
+        }
+      }
+    }
+
+    // Third pass: detect orphaned servers (claimed but owned by someone else)
+    for (const accountId in accountMap) {
+      const account = accountMap[accountId];
+      for (const claimedServerId of account.claimedServers) {
+        const actualOwner = serverMap[claimedServerId];
+        // If claimed server exists but is owned by someone else
+        if (actualOwner && actualOwner !== accountId) {
+          const serverId = claimedServerId.toString();
+          const serverJsonPath = `servers/${serverId}/server.json`;
+          if (fs.existsSync(serverJsonPath)) {
+            try {
+              const serverData = readJSON(serverJsonPath);
+              const playerList = mc.getPlayerList(serverId);
+              account.orphanedServers.push({
+                id: claimedServerId,
+                name: serverData.name || `Server ${serverId}`,
+                software: serverData.software || "Unknown",
+                version: serverData.version || "Unknown",
+                players: playerList ? playerList.length : 0,
+                actualOwner: actualOwner,
+              });
+            } catch (err) {
+              console.error(`Error reading orphaned server ${serverId}:`, err);
+            }
           }
         }
       }
@@ -227,6 +260,7 @@ router.get("/dashboard", (req, res) => {
         email: account.email,
         name,
         servers: account.servers.sort((a, b) => a.id - b.id),
+        orphanedServers: account.orphanedServers.sort((a, b) => a.id - b.id),
         subscriptions: account.subscriptions,
         accountId: account.accountId,
         freeServers: account.freeServers,
