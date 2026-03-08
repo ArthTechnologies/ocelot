@@ -16,8 +16,9 @@ async function downloadAndLogJar(filename, url) {
     try {
         const jarPath = path.join("assets/jars", filename);
 
-        // Check if file already exists
-        if (fs.existsSync(jarPath)) {
+        // Check if file already exists (but always download geyser and floodgate)
+        const isGeyserOrFloodgate = filename.includes("geyser") || filename.includes("floodgate");
+        if (fs.existsSync(jarPath) && !isGeyserOrFloodgate) {
             index[filename] = url;
             scraperLog.push({
                 filename: filename,
