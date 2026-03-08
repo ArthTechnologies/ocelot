@@ -168,7 +168,6 @@ function run(
     }
 
     let server = readJSON("servers/" + id + "/server.json");
-    let out = [];
     states[id] = "starting";
     players[id] = [];
     
@@ -952,16 +951,10 @@ function run(
           ls.stdout.on("data", (data) => {
             count++;
             if (count >= 3) {
-              //make sure out isnt super long
-            if (out.length < 1000* 100) {
-              out.push(data);
-            }
-          }
-
-            terminalOutput[id] = out.join("\n");
-            // Prune buffer if it exceeds 100MB
-            if (terminalOutput[id].length > 100 * 1024 * 1024) {
-              terminalOutput[id] = "[...pruned first 50MB of logs...]\n" + terminalOutput[id].slice(50 * 1024 * 1024);
+              terminalOutput[id] += "\n" + data.toString();
+              if (terminalOutput[id].length > 100 * 1024 * 1024) {
+                terminalOutput[id] = "[...pruned first 50MB of logs...]\n" + terminalOutput[id].slice(50 * 1024 * 1024);
+              }
             }
             if (
               terminalOutput[id].includes("Done (") &&
@@ -1018,11 +1011,6 @@ function run(
           ls.on("exit", () => {
             states[id] = "false";
             console.log("setting status of " + id + " to false on line #7");
-            terminalOutput[id] = out.join("\n");
-            // Prune buffer if it exceeds 100MB
-            if (terminalOutput[id].length > 100 * 1024 * 1024) {
-              terminalOutput[id] = "[...pruned first 50MB of logs...]\n" + terminalOutput[id].slice(50 * 1024 * 1024);
-            }
             clearInterval(intervalID);
           });
         }
@@ -1044,16 +1032,10 @@ function run(
       ls.stdout.on("data", (data) => {
         count++;
         if (count >= 3) {
-          //make sure out isnt super long
-          if (out.length < 1000 * 100) {
-            out.push(data);
+          terminalOutput[id] += "\n" + data.toString();
+          if (terminalOutput[id].length > 100 * 1024 * 1024) {
+            terminalOutput[id] = "[...pruned first 50MB of logs...]\n" + terminalOutput[id].slice(50 * 1024 * 1024);
           }
-        }
-
-        terminalOutput[id] = out.join("\n");
-        // Prune buffer if it exceeds 100MB
-        if (terminalOutput[id].length > 100 * 1024 * 1024) {
-          terminalOutput[id] = "[...pruned first 50MB of logs...]\n" + terminalOutput[id].slice(50 * 1024 * 1024);
         }
         if (terminalOutput[id].includes("Done (") && states[id] != "stopping") {
           //replace states[id] with true
@@ -1097,7 +1079,7 @@ ls.stderr.on("data", data => {
         ls.stdin.write(terminalInput + "\n");
       });
       ls.on("exit", (code) => {
-                  if (states[id] != "false") terminalOutput[id] = out.join("\n");
+                  // terminalOutput[id] already up to date via stdout append
         states[id] = "false";
         console.log(id + " exit, line #11, code " + code);
         console.log(terminalOutput[id].substring(terminalOutput[id].length-500, terminalOutput[id].length));
