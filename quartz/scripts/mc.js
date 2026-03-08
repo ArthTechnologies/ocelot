@@ -154,8 +154,6 @@ function run(
 ) {
   try {
     const { exec, execSync, spawn } = require("child_process");
-    //this looks for servers running on the same port that may obstruct startup
-    killObstructingProcess(parseInt(id));
 
     if (fs.existsSync("servers/" + id + "/world/session.lock")) {
       fs.unlinkSync("servers/" + id + "/world/session.lock");
@@ -1096,8 +1094,8 @@ ls.stderr.on("data", data => {
           !terminalOutput[id].includes("Server stopped")
         ) {
           fs.appendFileSync(
-            "logs/crash.txt", Date.now().toString() + "\n" + 
-            out[out.length-1] + "\n"
+            "logs/crash.txt", Date.now().toString() + "\n" +
+            terminalOutput[id].slice(-2000) + "\n"
           );
         }
         clearInterval(intervalID);

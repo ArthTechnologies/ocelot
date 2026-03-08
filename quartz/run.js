@@ -901,6 +901,11 @@ function getServerStates() {
   writeJSON("./assets/data.json", data);
 }
 
+// Kill any containers using server ports left over from a previous run
+exec(`docker ps --format "{{.ID}} {{.Ports}}" | awk '/1[0-9][0-9][0-9][0-9]->/{print $1}' | xargs -r docker stop`, (err) => {
+  if (err) console.log("Startup port cleanup error (non-fatal):", err.message);
+});
+
 //automatic server start-up system
 const data = readJSON("./assets/data.json");
 console.log("Server states");
