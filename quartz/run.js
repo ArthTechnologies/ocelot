@@ -1021,32 +1021,29 @@ if (fs.existsSync(extensionsPath)) {
   });
 }
 
-const adminApp = express();
-const adminPort = process.env.ADMIN_PORT || 4001;
-
-
-
-
-// Admin-specific middleware stack
-adminApp.use(express.json(), cors());
-adminApp.use((req, res, next) => {
-  console.log(`Admin access: ${req.method} ${req.path}`);
-  next();
-});
-
-
-// Error handling for admin routes
-adminApp.use((err, req, res, next) => {
-  console.error('Admin route error:', err);
-  res.status(500).json({ error: 'Internal admin server error' });
-});
-
-// Start admin server
-adminApp.listen(adminPort, () => {
-  console.log(`Admin API running on port ${adminPort}`);
-});
-
-adminApp.use("/", require("./routes/dashboard"));
+// Port 4001 admin dashboard disabled - use /admin/dashboard endpoint instead
+// const adminApp = express();
+// const adminPort = process.env.ADMIN_PORT || 4001;
+//
+// // Admin-specific middleware stack
+// adminApp.use(express.json(), cors());
+// adminApp.use((req, res, next) => {
+//   console.log(`Admin access: ${req.method} ${req.path}`);
+//   next();
+// });
+//
+// // Error handling for admin routes
+// adminApp.use((err, req, res, next) => {
+//   console.error('Admin route error:', err);
+//   res.status(500).json({ error: 'Internal admin server error' });
+// });
+//
+// // Start admin server
+// adminApp.listen(adminPort, () => {
+//   console.log(`Admin API running on port ${adminPort}`);
+// });
+//
+// adminApp.use("/", require("./routes/dashboard"));
 
 // port
 const port = process.env.PORT || 4000;

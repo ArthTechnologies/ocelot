@@ -590,3 +590,4 @@ router.post(`/updatePlans`, function (req, res) {
 });
 
 module.exports = router;
+module.exports.snapshotHistory = () => snapshotHistory;
