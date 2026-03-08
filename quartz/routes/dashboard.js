@@ -97,65 +97,77 @@ Router.get("/servers", async (req, res) => {
   } else {
     let servers = fs.readdirSync("servers");
     let data = [];
-    for (let i in servers) {
-      let owner = null;
-      let email = null;
-      try {
-        const serverId = servers[i];
-        let storage = 0;
 
+    try {
+      // Calculate all storage sizes in parallel
+      const storageSizes = await Promise.all(
+        servers.map(serverId =>
+          files.folderSizeRecursiveAsync("servers/" + serverId)
+            .catch(e => {
+              console.log("Error calculating storage for " + serverId + ":", e);
+              return 0;
+            })
+        )
+      );
+
+      for (let i in servers) {
+        let owner = null;
+        let email = null;
         try {
-          storage = files.folderSizeRecursive("servers/" + serverId);
-        } catch (e) {
-          console.log(e);
-        }
-        if (fs.existsSync(`servers/${serverId}/server.json`)) {
-          let json = utils.readJSON(`servers/${serverId}/server.json`);
-          if (json.adminServer == undefined || json.adminServer == false) {
-            const accountId = json.accountId;
+          const serverId = servers[i];
+          const storage = storageSizes[i];
+
+          if (fs.existsSync(`servers/${serverId}/server.json`)) {
+            let json = utils.readJSON(`servers/${serverId}/server.json`);
+            if (json.adminServer == undefined || json.adminServer == false) {
+              const accountId = json.accountId;
+              fs.readdirSync("accounts").forEach((file) => {
+                const account = utils.readJSON(`accounts/${file}`);
+                if (account.accountId == accountId) {
+                  owner = file;
+                  if (!file.includes("email:")) email = account.email;
+                  data.push({
+                    serverId: servers[i],
+                    owner: owner,
+                    email: email,
+                    storage: storage,
+                  });
+                }
+              });
+            }
+          } else {
             fs.readdirSync("accounts").forEach((file) => {
-              const account = utils.readJSON(`accounts/${file}`);
-              if (account.accountId == accountId) {
-                owner = file;
-                if (!file.includes("email:")) email = account.email;
-                data.push({
-                  serverId: servers[i],
-                  owner: owner,
-                  email: email,
-                  storage: storage,
-                });
+              try {
+                let account = utils.readJSON(`accounts/${file}`);
+
+                if (
+                  account.servers.includes(serverId) ||
+                  account.servers.includes(parseInt(serverId))
+                ) {
+                  owner = file + "?";
+                  if (!file.includes("email:")) email = account.email + "?";
+
+                  data.push({
+                    serverId: servers[i],
+                    owner: owner,
+                    email: email,
+                    storage: storage,
+                  });
+                }
+              } catch (error) {
+                console.log("error scanning account " + file);
+                console.log(error);
+                data = [];
               }
             });
           }
-        } else {
-          fs.readdirSync("accounts").forEach((file) => {
-            try {
-              let account = utils.readJSON(`accounts/${file}`);
-
-              if (
-                account.servers.includes(serverId) ||
-                account.servers.includes(parseInt(serverId))
-              ) {
-                owner = file + "?";
-                if (!file.includes("email:")) email = account.email + "?";
-
-                data.push({
-                  serverId: servers[i],
-                  owner: owner,
-                  email: email,
-                  storage: storage,
-                });
-              }
-            } catch (error) {
-              console.log("error scanning account " + file);
-              console.log(error);
-              data = [];
-            }
-          });
+        } catch {
+          console.log("error getting server owner");
         }
-      } catch {
-        console.log("error getting server owner");
       }
+    } catch (err) {
+      console.error("Error fetching server list:", err);
+      return res.status(500).send({ error: "Failed to fetch server list" });
     }
     res.status(200).send(data);
   }

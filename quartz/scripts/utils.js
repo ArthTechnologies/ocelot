@@ -110,27 +110,33 @@ function sanitizePath(userInput) {
   return sanitized;
 }
 
-function checkSubscriptions() {
+async function checkSubscriptions() {
       let servers = fs.readdirSync("servers");
-      //sort the folder alphanumerically for debugging purposes 
+      //sort the folder alphanumerically for debugging purposes
       servers.sort((a, b) => {
         return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
       });
             console.log("[STAGE0] " + servers);
       let data = [];
+
+      // Calculate all storage sizes in parallel
+      const storageSizes = await Promise.all(
+        servers.map(serverId =>
+          files.folderSizeRecursiveAsync("servers/" + serverId)
+            .catch(e => {
+              console.log("Error calculating storage for " + serverId + ":", e);
+              return 0;
+            })
+        )
+      );
+
       for (let i in servers) {
-   
+
           const serverId = servers[i];
       console.log("[STAGE1] " + serverId);
         try {
-      
-          let storage = 0;
-      
-          try {
-            storage = files.folderSizeRecursive("servers/" + serverId);
-          } catch (e) {
-            console.log(e);
-          }
+
+          const storage = storageSizes[i];
              console.log("[STAGE2] " + `servers/${serverId}/server.json`);
           if (fs.existsSync(`servers/${serverId}/server.json`)) {
 try {

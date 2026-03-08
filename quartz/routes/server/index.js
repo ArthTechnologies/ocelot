@@ -1208,31 +1208,41 @@ router.post("/:id/world", upload.single("file"), function (req, res) {
                         //this makes sure that the unzipped folder is valid
                         if (!fs.existsSync(`servers/${id}/world/level.dat`)) {
                           //checks which folder is the biggest. this should eb the proper world folder
-                          let worldFolders = fs.readdirSync(
-                            `servers/${id}/world`
-                          );
-                          console.log("worldFolders: " + worldFolders);
-                          let biggestFolder = "";
-                          let biggestSize = 0;
-                          for (let i in worldFolders) {
-                            let folder = worldFolders[i];
-                            let size = files.folderSizeRecursive(
-                              `servers/${id}/world/${folder}`
-                            );
-                            if (size > biggestSize) {
-                              biggestSize = size;
-                              biggestFolder = folder;
+                          (async () => {
+                            try {
+                              let worldFolders = fs.readdirSync(`servers/${id}/world`);
+                              console.log("worldFolders: " + worldFolders);
+                              let biggestFolder = "";
+                              let biggestSize = 0;
+
+                              // Calculate sizes in parallel
+                              const sizes = await Promise.all(
+                                worldFolders.map(folder =>
+                                  files.folderSizeRecursiveAsync(`servers/${id}/world/${folder}`)
+                                )
+                              );
+
+                              sizes.forEach((size, idx) => {
+                                if (size > biggestSize) {
+                                  biggestSize = size;
+                                  biggestFolder = worldFolders[idx];
+                                }
+                              });
+
+                              exec(
+                                `mv servers/${id}/world/${biggestFolder}/* servers/${id}/world/`,
+                                (err) => {
+                                  if (err) {
+                                    console.log(err);
+                                    doneUnzipping();
+                                  }
+                                }
+                              );
+                            } catch (err) {
+                              console.error("Error finding biggest folder:", err);
+                              doneUnzipping();
                             }
-                          }
-                          exec(
-                            `mv servers/${id}/world/${biggestFolder}/* servers/${id}/world/`,
-                            (err) => {
-                              if (err) {
-                                console.log(err);
-                                doneUnzipping();
-                              }
-                            }
-                          );
+                          })();
                         } else {
                           doneUnzipping();
                         }
@@ -1293,7 +1303,7 @@ router.post("/:id/world", upload.single("file"), function (req, res) {
 
 
 
-router.get("/:id/storageInfo", function (req, res) {
+router.get("/:id/storageInfo", async function (req, res) {
   let email = req.headers.username;
   let token = req.headers.token;
   let account = readJSON("accounts/" + email + ".json");
@@ -1302,28 +1312,37 @@ router.get("/:id/storageInfo", function (req, res) {
     utils.hasAccess(token, account, req.params.id) &&
     fs.existsSync(`servers/${req.params.id}/`)
   ) {
-    let limit = -1;
-    let used = files.folderSizeRecursive(`servers/${req.params.id}/`);
-    let plugins = files.folderSizeRecursive(`servers/${req.params.id}/plugins`);
-    let mods = files.folderSizeRecursive(`servers/${req.params.id}/mods`);
-    let worlds = files.folderSizeRecursive(`servers/${req.params.id}/world`);
-    let serverStorageLimit = 16;
-    if (config.plus == server.productID) {
-      serverStorageLimit = 24;
-    } else if (config.premium == server.productID) {
-      serverStorageLimit = 32;
-    } else if (config.max == server.productID) {
-      serverStorageLimit = 48;
-    }
-    limit = serverStorageLimit * 1024 * 1024 * 1024;
+    try {
+      // Run all size calculations in parallel instead of sequentially
+      const [used, plugins, mods, worlds] = await Promise.all([
+        files.folderSizeRecursiveAsync(`servers/${req.params.id}/`),
+        files.folderSizeRecursiveAsync(`servers/${req.params.id}/plugins`),
+        files.folderSizeRecursiveAsync(`servers/${req.params.id}/mods`),
+        files.folderSizeRecursiveAsync(`servers/${req.params.id}/world`),
+      ]);
 
-    res.status(200).json({
-      used: used,
-      limit: limit,
-      plugins: plugins,
-      mods: mods,
-      worlds: worlds,
-    });
+      let limit = -1;
+      let serverStorageLimit = 16;
+      if (config.plus == server.productID) {
+        serverStorageLimit = 24;
+      } else if (config.premium == server.productID) {
+        serverStorageLimit = 32;
+      } else if (config.max == server.productID) {
+        serverStorageLimit = 48;
+      }
+      limit = serverStorageLimit * 1024 * 1024 * 1024;
+
+      res.status(200).json({
+        used: used,
+        limit: limit,
+        plugins: plugins,
+        mods: mods,
+        worlds: worlds,
+      });
+    } catch (err) {
+      console.error("Error calculating storage:", err);
+      res.status(500).json({ error: "Failed to calculate storage info" });
+    }
   } else {
     res.status(401).json({ msg: "Invalid credentials." });
   }
