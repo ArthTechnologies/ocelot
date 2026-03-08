@@ -56,6 +56,21 @@
   $: currentMemoryPercent = latestSnapshot?.memory ?
     Math.round((latestSnapshot.memory.used / latestSnapshot.memory.total) * 100) : 0;
 
+  $: slotMapping = (() => {
+    // Get all servers with their account info and create a map by slot number
+    // Slot number is derived from server ID minus location offset (ID % 100)
+    const slots = {};
+    for (const account of accounts) {
+      for (const server of account.servers) {
+        const slotNum = server.id % 100; // Get slot from last 2 digits of ID
+        if (slotNum > 0 && slotNum <= 32) {
+          slots[slotNum] = { serverId: server.id, server, account };
+        }
+      }
+    }
+    return slots;
+  })();
+
   const downloadAsJSON = () => {
     const data = {
       timestamp: new Date().toISOString(),
@@ -148,16 +163,16 @@
         </h2>
 
         {#if latestSnapshot}
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div class="flex flex-col md:flex-row gap-6 mb-8">
             <!-- Overall CPU -->
-            <div class="stat bg-gradient-to-br from-base-200/40 to-base-300/20 rounded-xl p-5 border border-base-300/30 hover:border-base-300/60 transition-colors">
+            <div class="stat bg-gradient-to-br from-base-200/40 to-base-300/20 rounded-xl p-5 border border-base-300/30 hover:border-base-300/60 transition-colors flex-grow" style="flex-basis: 25%;">
               <div class="stat-title text-xs font-semibold uppercase text-base-content/60 tracking-wider">Overall CPU Usage</div>
               <div class="stat-value text-3xl text-primary font-bold mt-2">{latestSnapshot.cpuUsage}%</div>
               <div class="stat-desc text-xs text-base-content/50">Current load</div>
             </div>
 
             <!-- Memory -->
-            <div class="stat bg-gradient-to-br from-base-200/40 to-base-300/20 rounded-xl p-5 border border-base-300/30 hover:border-base-300/60 transition-colors">
+            <div class="stat bg-gradient-to-br from-base-200/40 to-base-300/20 rounded-xl p-5 border border-base-300/30 hover:border-base-300/60 transition-colors flex-grow" style="flex-basis: 30%;">
               <div class="stat-title text-xs font-semibold uppercase text-base-content/60 tracking-wider">Memory Usage</div>
               <div class="stat-value text-2xl text-base-content font-bold mt-2">
                 {fileSizeShort(latestSnapshot.memory.used * 1000000)} <span class="text-base-content/40">/</span> {fileSizeShort(latestSnapshot.memory.total * 1000000)}
@@ -166,7 +181,7 @@
             </div>
 
             <!-- CPU Model -->
-            <div class="stat bg-gradient-to-br from-base-200/40 to-base-300/20 rounded-xl p-5 border border-base-300/30 hover:border-base-300/60 transition-colors col-span-1 md:col-span-2">
+            <div class="stat bg-gradient-to-br from-base-200/40 to-base-300/20 rounded-xl p-5 border border-base-300/30 hover:border-base-300/60 transition-colors flex-grow" style="flex-basis: 45%;">
               <div class="stat-title text-xs font-semibold uppercase text-base-content/60 tracking-wider">Processor</div>
               <div class="stat-value text-lg line-clamp-2 mt-2 text-base-content font-semibold">{latestSnapshot.cpuName}</div>
             </div>
@@ -255,18 +270,18 @@
     <div class="mb-8">
       <!-- Slot Visualization -->
       <div class="mb-6 p-4 bg-base-100 rounded-xl border border-base-300/30">
-        <p class="text-xs font-bold uppercase text-base-content/50 tracking-wider mb-3">Server Slots (32 Total)</p>
+        <p class="text-xs font-bold uppercase text-base-content/50 tracking-wider mb-3">Server Slots ({totalServers} / {totalSlots})</p>
         <div class="flex flex-wrap gap-1">
-          {#each Array(32) as _, slotNum}
-            {@const slotId = slotNum + 1}
-            {@const slotOwner = accounts.find(acc => acc.servers.some(s => s.id === slotId))}
-            {#if slotOwner}
+          {#each Array(32) as _, slotIndex}
+            {@const slotNum = slotIndex + 1}
+            {@const slotData = slotMapping[slotNum]}
+            {#if slotData}
               <button
-                on:click={() => document.getElementById(`account-${slotOwner.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                on:click={() => document.getElementById(`account-${slotData.account.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                 class="w-6 h-6 rounded-md bg-primary text-primary-content text-xs font-bold hover:bg-primary-focus transition-all cursor-pointer flex items-center justify-center"
-                title="Slot {slotId} - {slotOwner.name}"
+                title="Slot #{slotNum} - {slotData.server.name} ({slotData.account.name})"
               >
-                {slotId}
+                {slotNum}
               </button>
             {:else}
               <div class="w-6 h-6 rounded-md bg-base-300 border border-base-300/50"></div>
