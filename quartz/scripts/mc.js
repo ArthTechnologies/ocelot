@@ -221,18 +221,23 @@ function run(
       serverStorageLimit = 32;
     }
 
-    let size = files.folderSizeRecursive(folder);
-      //convert size to gb
-      size = size / 1000000000;
-          console.log("storage: " + size.toFixed(2)+ "/" + serverStorageLimit + "GB");
-      if (size > serverStorageLimit) {
-        states[id] = "false";
-        console.log("setting status of " + id + " to false on line #12");
-
-        throw new Error(
-          "Server is over storage limit."
-        );
+    // Check storage asynchronously without blocking
+    (async () => {
+      try {
+        let size = await files.folderSizeRecursiveAsync(folder);
+        //convert size to gb
+        size = size / 1000000000;
+        console.log("storage: " + size.toFixed(2)+ "/" + serverStorageLimit + "GB");
+        if (size > serverStorageLimit) {
+          states[id] = "false";
+          console.log("setting status of " + id + " to false on line #12");
+          // Stop the server if over limit
+          throw new Error("Server is over storage limit.");
+        }
+      } catch (err) {
+        console.error("Storage check failed for server " + id + ":", err);
       }
+    })();
     
 
     let allocatedRAM;

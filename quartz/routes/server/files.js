@@ -331,7 +331,7 @@ router.post(
   }
 );
 
-router.get("/", function (req, res) {
+router.get("/", async function (req, res) {
   let email = req.headers.username;
   let token = req.headers.token;
   let account = readJSON("accounts/" + email + ".json");
@@ -339,9 +339,13 @@ router.get("/", function (req, res) {
 
   if (utils.hasAccess(token, account, req.params.id)) {
     if (fs.existsSync(`servers/${req.params.id}/`)) {
-      res
-        .status(200)
-        .json(files.readFilesRecursive(`servers/${req.params.id}/`));
+      try {
+        const fileTree = await files.readFilesRecursiveAsync(`servers/${req.params.id}/`);
+        res.status(200).json(fileTree);
+      } catch (err) {
+        console.error("Error reading file tree:", err);
+        res.status(500).json({ error: "Failed to read file tree" });
+      }
     } else {
       res.status(200).json([]);
     }

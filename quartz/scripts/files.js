@@ -1,6 +1,7 @@
 const { createHash, scryptSync, randomBytes } = require("crypto");
 
 const fs = require("fs");
+const fsPromises = require("fs").promises;
 
 function download(file, url) {
   exec(`curl -o ${file} -LO "${url}"`);
@@ -131,6 +132,103 @@ function readFilesRecursive(directoryPath) {
         console.warn(`Could not stat "${curPath}":`, err);
       }
       result.push(`${entry}:${curPath}:${size}`);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Async version of folderSizeRecursive - non-blocking directory traversal
+ * Returns promise that resolves to total bytes in directory tree
+ */
+async function folderSizeRecursiveAsync(directoryPath) {
+  try {
+    // Check if directory exists
+    await fsPromises.stat(directoryPath);
+  } catch (err) {
+    console.log(`Directory "${directoryPath}" does not exist.`);
+    return 0;
+  }
+
+  let bytes = 0;
+  const entries = await fsPromises.readdir(directoryPath);
+
+  // Process files and folders concurrently where possible
+  for (const entry of entries) {
+    const curPath = `${directoryPath}/${entry}`;
+    try {
+      const stats = await fsPromises.lstat(curPath);
+      if (stats.isDirectory()) {
+        bytes += await folderSizeRecursiveAsync(curPath);
+      } else {
+        bytes += stats.size;
+      }
+    } catch (err) {
+      console.warn(`Could not stat "${curPath}":`, err);
+    }
+  }
+
+  return bytes;
+}
+
+/**
+ * Async version of readFilesRecursive - non-blocking directory tree reading
+ * Returns promise that resolves to nested file structure
+ */
+async function readFilesRecursiveAsync(directoryPath) {
+  // normalize the incoming path once
+  directoryPath = directoryPath.replace(/\/\//g, '/');
+
+  try {
+    await fsPromises.stat(directoryPath);
+  } catch (err) {
+    console.log(`Directory "${directoryPath}" does not exist.`);
+    return [];
+  }
+
+  const result = [];
+  const entries = await fsPromises.readdir(directoryPath);
+
+  for (const entry of entries) {
+    if (entry.startsWith('.')) continue;           // skip hidden
+    const curPath = path.join(directoryPath, entry)
+                        .replace(/\/\//g, '/');
+
+    try {
+      const stats = await fsPromises.lstat(curPath);
+
+      if (stats.isDirectory()) {
+        // 1) Recurse
+        const subTree = await readFilesRecursiveAsync(curPath);
+
+        // 2) Sum sizes in subtree
+        let totalSize = 0;
+        const accumulate = (node) => {
+          if (typeof node === 'string') {
+            // "name:path:size"
+            const parts = node.split(':');
+            totalSize += Number(parts[2]) || 0;
+          } else if (Array.isArray(node)) {
+            // [ "name:path:size", [ ... ] ]
+            const [dirDescriptor, children] = node;
+            const sizePart = Number(dirDescriptor.split(':')[2]) || 0;
+            totalSize += sizePart;
+            children.forEach(accumulate);
+          }
+        };
+        subTree.forEach(accumulate);
+
+        // 3) Build descriptor with summed size
+        const dirDescriptor = `${entry}:${curPath}:${totalSize}`;
+        result.push([dirDescriptor, subTree]);
+
+      } else {
+        // file: just stat its size
+        result.push(`${entry}:${curPath}:${stats.size}`);
+      }
+    } catch (err) {
+      console.warn(`Could not stat "${curPath}":`, err);
     }
   }
 
@@ -376,7 +474,9 @@ module.exports = {
   downloadAsync,
   removeDirectoryRecursiveAsync,
   readFilesRecursive,
+  readFilesRecursiveAsync,
   simplifyTerminal,
   folderSizeRecursive,
+  folderSizeRecursiveAsync,
   getIndex,
 };
