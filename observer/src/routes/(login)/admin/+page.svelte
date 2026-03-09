@@ -35,7 +35,7 @@
         totalSubscriptions = data.totalSubscriptions || 0;
         estimatedMRR = data.estimatedMRR || 0;
 
-        // Calculate capacity info
+        // Calculate capacity info (only count active servers, not orphaned ones)
         totalServers = accounts.reduce((sum, acc) => sum + acc.servers.length, 0);
         totalPlayers = accounts.reduce((sum, acc) =>
           sum + acc.servers.reduce((serverSum, server) => serverSum + (server.players || 0), 0), 0);
@@ -332,8 +332,36 @@
                       {/each}
                     </div>
                   </div>
-                {:else}
+                {:else if account.orphanedServers.length === 0}
                   <div class="text-sm text-base-content/60 italic">No servers</div>
+                {/if}
+
+                <!-- Orphaned Servers Row -->
+                {#if account.orphanedServers && account.orphanedServers.length > 0}
+                  <div class="mt-2">
+                    <div class="flex items-center gap-2 mb-2">
+                      <p class="text-xs font-bold uppercase text-warning tracking-wider">Orphaned Servers ({account.orphanedServers.length})</p>
+                      <div class="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded">Taken by another owner</div>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                      {#each account.orphanedServers as server}
+                        <div class="bg-warning/5 rounded-lg px-3.5 py-2.5 flex items-center gap-2.5 border border-warning/30 hover:border-warning/50 transition-all group opacity-75">
+                          <Server class="w-4 h-4 text-warning/60" />
+                          <div>
+                            <div class="font-mono text-sm font-semibold text-warning/80">{server.name}</div>
+                            <div class="text-xs text-warning/60">
+                              Slot #{server.id} • {server.software} {server.version}
+                            </div>
+                          </div>
+                          {#if server.players > 0}
+                            <div class="ml-2 text-xs font-semibold text-warning/70 bg-warning/10 rounded px-2 py-0.5">
+                              {server.players} players
+                            </div>
+                          {/if}
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
                 {/if}
 
                 <!-- Subscriptions Row -->
