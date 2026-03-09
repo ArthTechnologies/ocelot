@@ -221,13 +221,13 @@
   {:else}
     <div class="rounded-xl">
       <div class=" text-center">
-        <div class="max-w-md space-y-5">
-          <div class="flex flex-col items-start space-y-4">
+        <div class="max-w-md space-y-3">
+          <div class="flex flex-col items-start space-y-2.5">
             <input
               id="email"
               type="text"
               placeholder={$t("auth.email")}
-              class="input sm:w-full bg-base-200"
+              class="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-orange-500/50 focus:bg-slate-700 transition-all"
             />
             <div class="w-full flex space-x-2">
               <div class="w-full flex space-x-2">
@@ -235,27 +235,26 @@
                   type={pwdVisible}
                   id="pwd"
                   placeholder={$t("auth.password")}
-                  class="input sm:w-full max-sm:w-48 max-w-xs bg-base-200"
+                  class="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-orange-500/50 focus:bg-slate-700 transition-all"
                 />
-                <label class="btn btn-circle swap swap-rotate btn-ghost">
-                  <!-- this hidden checkbox controls the state -->
-                  <input type="checkbox" on:click={pwdVisibility} />
-
-                  <Eye size="28" class="swap-off" />
-
-                  <EyeOff size="28" class="swap-on" />
-                </label>
+                <button on:click={pwdVisibility} class="px-2 py-2 text-slate-400 hover:text-slate-200 transition-colors">
+                  {#if pwdVisible === "password"}
+                    <Eye size={20} />
+                  {:else}
+                    <EyeOff size={20} />
+                  {/if}
+                </button>
               </div>
             </div>
             <input
               type="password"
               id="confPwd"
               placeholder={$t("auth.confirmPassword")}
-              class="input sm:w-full bg-base-200"
+              class="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-orange-500/50 focus:bg-slate-700 transition-all"
             />
 
-            <div class="space-y-5 flex flex-col md:items-start md:w-full">
-              <div class="w-[100%] flex justify-start h-[4.1rem]">
+            <div class="space-y-2 flex flex-col md:items-start md:w-full">
+              <div class="w-[100%] h-[65px] flex justify-start origin-top-left scale-90">
                 {#if !checkingIfCloudflareVerify}
                   <Turnstile
                     on:turnstile-callback={cloudflareVerifyCallback}
@@ -264,8 +263,8 @@
                   />
                 {/if}
               </div>
-              <button on:click={submit} class="btn btn-neutral rounded-xl"
-                >{$t("auth.continue")}<ArrowRight class="ml-1.5" />
+              <button on:click={submit} class="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-800 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 text-sm flex items-center gap-2 w-fit"
+                >{$t("auth.continue")}<ArrowRight size={16} />
               </button>
             </div>
           </div>

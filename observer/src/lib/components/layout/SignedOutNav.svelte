@@ -15,24 +15,30 @@
 <footer
   class="flex justify-between items-start p-4 fixed top-0 w-full z-50 pointer-events-none "
 >
-<img src="/favicon.png" width="40" class="mx-2" />
-<div class="flex gap-1">
-  <button
-onclick="modal_language.show()"
-
-class="btn btn-sm btn-ghost btn-square pointer-events-auto"
+<img src="/favicon.png" width="40" class="mx-2 hidden md:block" />
+<button
+  onclick="modal_language.show()"
+  class="btn btn-sm md:btn-sm btn-ghost btn-square md:btn-square pointer-events-auto md:hidden"
+  title="Language"
 >
-<Languages  size="18" />
-
+  <Languages size="20" />
 </button>
+
+<div class="flex gap-1 md:gap-1">
+  <button
+    onclick="modal_language.show()"
+    class="btn btn-sm btn-ghost btn-square pointer-events-auto hidden md:flex"
+  >
+    <Languages size="18" />
+  </button>
 
   <label
     for="support-modal"
     style="margin:0rem;"
-    class="btn btn-sm btn-ghost flex items-center justify-self-end pointer-events-auto"
+    class="btn btn-sm md:btn-sm btn-ghost flex items-center justify-self-end pointer-events-auto"
   >
-    <HelpCircle class="mr-1.5 mt-[0.05rem]" size="18" />
-    {$t("support")}
+    <HelpCircle class="mr-1.5 md:mr-1.5 mt-[0.05rem]" size="18" />
+    <span class="hidden md:inline">{$t("support")}</span>
   </label>
 </div>
 

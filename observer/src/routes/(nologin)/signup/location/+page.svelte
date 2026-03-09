@@ -1,192 +1,166 @@
 <script>
     import { browser } from "$app/environment";
-    import { goto } from "$app/navigation";
-
-
     import { t } from "$lib/scripts/i18n";
-    import { MapPin, ShoppingCart, User } from "lucide-svelte";
+    import { MapPin, ShoppingCart, User, Zap, AlertCircle } from "lucide-svelte";
+
     let nodeInfo = [];
     let selectedNode = "";
     let pings = [];
-
     let btest = false;
 
     if (browser) {
-      //50% chance to enable the btest
       let rand = Math.random();
-      if (rand < 0.5) {
-        btest = true;
-      }
+      btest = rand < 0.5;
       localStorage.setItem("btest", btest.toString());
-        fetch('/api/nodeInfo')
-            .then(response => response.json())
-            .then(data => {
-                nodeInfo = data;
-                for (let i in nodeInfo) {
-                    let ping = "Pinging...";
-                    pings.push(ping);
-                    // send a request to the base url of each node and calculate latency
-                       let start = performance.now();
-                    fetch(nodeInfo[i][0],
-                        {
-                            method: "GET",
-                            mode: "no-cors",
-                        })
-                        .then(response => {
-                        
-                             
-                                return response.text().then(() => {
-                                    let end = performance.now();
-                                    pings[i] = Math.round(end - start) + "ms";
-                                });
-                       
-                        })
-                        .catch(() => {
-                            pings[i] = "Offline";
-                        });
 
-                }
-            });
+      fetch('/api/nodeInfo')
+        .then(r => r.json())
+        .then(data => {
+          nodeInfo = data;
+          nodeInfo.forEach((node, i) => {
+            pings[i] = "Pinging...";
+            const start = performance.now();
+            fetch(node[0], { method: "GET", mode: "no-cors" })
+              .then(() => {
+                pings[i] = Math.round(performance.now() - start) + "ms";
+              })
+              .catch(() => {
+                pings[i] = "Offline";
+              });
+          });
+        });
     }
 
     function prettyText(text) {
-        // Replace hyphens with spaces and capitalize both letters of the first word, first letter of following words
-       let words = text.split("-");
-        for (let i = 0; i < words.length; i++) {
-            if (i === 0) {
-                words[i] = words[i].toUpperCase();
-            } else {
-                words[i] = words[i].charAt(0).toUpperCase() + words[i].slice(1).toLowerCase();
-            }
-        }
-        return words.join(" ");
+      return text.split("-").map((w, i) =>
+        i === 0 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+      ).join(" ");
+    }
+
+    function selectNode(nodeUrl) {
+      if (!nodeUrl.endsWith("/")) nodeUrl += "/";
+      localStorage.setItem("userNode", nodeUrl);
+      const locationId = nodeUrl.split("https://")[1].split(".")[0];
+      selectedNode = locationId;
     }
 </script>
-<div
-style="background-size: cover;"
-class="bg-[url('/images/hostingbg3.png')] 0 hero min-h-screen"
->
-<div
-class=" absolute h-screen w-full bg-gradient-to-b from-[#1a141c] to-[#99402b] z-[-1]"
-></div>
-<div
-class="relative bg-base-100 rounded-xl shadow-xl  flex flex-col items-center h-[83%] w-[95%] md:w-[48rem]"
->
-<ul class="steps scale-90 mt-5 w-2/3 mb-5">
-  <li class="step step-neutral step-primary" data-content="">
-    <MapPin size="18" class="-mt-10 z-50 text-gray-200" />
-  </li>
-  <li class="step step-neutral" data-content="">
-    <User size="18" class="-mt-10 z-50 text-gray-200" />
-  </li>
+<div class="bg-[url('/images/hostingbg3.png')] bg-cover hero min-h-screen relative overflow-hidden">
+  <div class="absolute inset-0 bg-gradient-to-br from-slate-950/60 via-slate-900/60 to-slate-800/60 z-0"></div>
 
-
-  <li class="step step-neutral" data-content="">
-    <ShoppingCart size="18" class="-mt-10 z-50" />
-  </li>
-</ul>
-<!-- Signup Section-->
-<div class="w-full flex max-md:flex-col max-md:items-center z-10 -mt-6">
-    <div class="w-[47.5%] md:w-96 pb-6 max-md:hidden">
-    
-        <p class="text-[1.4rem] font-poppins-bold -mb-3 px-5 md:px-8 xl:px-12 text-center mt-2 invisible">Locations</p>
-      
-            
-              <img src="/images/world-map.svg" class=" opacity-90 md:w-[95%]" />
-             
-    
-      
-
-        
-
-      </div>
-      <div class="w-full md:w-96 flex flex-col justify-between items-center">
-        <div class=" w-full rounded-xl flex flex-col items-center">
-          
-            <p class="text-[1.4rem] font-poppins-bold mb-2 mt-12 px-5 md:px-8 xl:px-12 text-center ">Pick a location</p>
-    
-            <div class="flex flex-col gap-2 w-3/4">
-              {#each nodeInfo as node, i}
-              <div class="flex gap-2.5 bg-neutral bg-opacity-75 px-2 p-1 rounded-xl items-center">
-                {#if parseInt(node[1]) >= parseInt(node[2])}
-                <input type="radio" name="radio-2" class="radio pointer-events-none opacity-50" />
-                {:else}
-                  <input type="radio" name="radio-2" class="radio"  id={node[0]} value={node[0]} on:change={() => {
-                    let nodeurl = node[0];
-                    //add the / to the end of the url
-                    if (!nodeurl.endsWith("/")) {
-                        nodeurl += "/";
-                    }
-                      localStorage.setItem("userNode", nodeurl);
-                        selectedNode = node[0].split("https://")[1].split(".")[0];
-                  }} />{/if}
-    <span class="max-md:hidden">
-      {#if node[0].includes("us")}
-    <img src="/images/flag-us.svg" alt="US" class="w-9 h-9" />
-    {:else if node[0].includes("germany")}
-    <img src="/images/flag-de.svg" alt="DE" class="w-9 h-9" />
-    {/if}
-    </span>
-                  <div class="flex flex-col mb-1">
-
-                   <p class="font-bold max-md:text-lg">     <span class="md:hidden"> {#if node[0].includes("us")}
-                    <img src="/images/flag-us.svg" alt="US" class="w-6 h-6 inline" />
-                    {:else if node[0].includes("germany")}
-                    <img src="/images/flag-de.svg" alt="DE" class="w-6 h-6 inline" />
-                    {/if}</span>  {prettyText(node[0].split("https://")[1].split(".")[0])}</p>
-                   <div class="flex gap-2">
-                      <div class="bg-base-100
-                        rounded-full text-xs px-1.5">{pings[i]}</div>
-                      {#if parseInt(node[1]) >= parseInt(node[2])}
-                      <div class="bg-error text-black border border-black rounded-lg md:rounded-full text-xs px-1.5">At Capacity</div>
-                      {:else if parseInt(node[2]) - parseInt(node[1]) < 5 }
-                      <div class="bg-warning text-black border border-black rounded-lg md:rounded-full text-xs px-1.5">Only {parseInt(node[2]) - parseInt(node[1]) } Servers Left</div>
-                      {:else}
-                      <div class="bg-success
-                      text-black border border-black rounded-full text-xs px-1.5">Available</div>
-                      {/if}
-                  
-                   </div>
-                  </div>
-                  
-                  </div>
-              {/each}
-           
+  <div class="relative z-10 w-full max-w-2xl mx-auto px-4 py-12 md:py-0">
+    <div class="bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-700/50 overflow-hidden">
+      <div class="bg-gradient-to-r from-orange-500/18 via-red-500/18 to-orange-500/18 border-b border-slate-700/50 px-4 md:px-8 py-6 md:py-8">
+        <!-- Progress Steps - Hidden on mobile, shown on desktop -->
+        <div class="hidden md:flex justify-center gap-8 mb-8">
+          <div class="flex flex-col items-center gap-2">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/50">
+              <MapPin size={20} class="text-white" />
             </div>
-           
-      </div>
-      <div class="mb-32 w-3/4">
-{#if selectedNode}
-<div class="max-md:mt-12 flex justify-between gap-2.5 bg-neutral bg-opacity-75 px-2 p-1 rounded-md">
-    
-    <p class="text-xl flex items-center gap-1.5 ml-0.5">      {#if selectedNode.includes("us")}
-        <img src="/images/flag-us.svg" alt="US" class="w-7 h-7" />
-        {:else if selectedNode.includes("germany")}
-        <img src="/images/flag-de.svg" alt="DE" class="w-7 h-7" />
-        {/if} <span class="text-base font-poppins-bold">{selectedNode}</span></p>
-
-    <a href="/signup/account" class="btn btn-base-200 btn-sm" on:click={() => {
-      
-    }}>Continue</a>
- 
-   
-</div>
-{:else}
-<div class="max-md:mt-1 flex justify-between gap-2.5 bg-neutral opacity-50 disabled bg-opacity-75 px-2 py-1.5 rounded-md">
-    <p class="text-xl flex items-center gap-1.5 ml-0.5">   
-        <img src="/images/flag-us.svg" alt="" class="w-7 h-7 opacity-40" />
-      <span class="text-base font-poppins-bold">No location selected</span></p>
-   
- 
-</div>
-{/if}
-<span
-class="text-xs ml-1.5 font-poppins absolute bottom-3 left-2 md:w-[95%] text-center"
->{@html $t("auth.loginLink")}</span
->
-            
+            <span class="text-xs font-semibold text-orange-400">Location</span>
+          </div>
+          <div class="w-12 h-0.5 bg-gradient-to-r from-orange-500/50 to-slate-700 self-center"></div>
+          <div class="flex flex-col items-center gap-2 opacity-50">
+            <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
+              <User size={20} class="text-slate-400" />
+            </div>
+            <span class="text-xs font-semibold text-slate-400">Account</span>
+          </div>
+          <div class="w-12 h-0.5 bg-slate-700 self-center"></div>
+          <div class="flex flex-col items-center gap-2 opacity-50">
+            <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
+              <ShoppingCart size={20} class="text-slate-400" />
+            </div>
+            <span class="text-xs font-semibold text-slate-400">Plan</span>
+          </div>
         </div>
+
+        <!-- Mobile step indicator -->
+        <div class="md:hidden flex items-center justify-center gap-3 mb-6">
+          <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+            <MapPin size={16} class="text-white" />
+          </div>
+          <span class="text-xs font-semibold text-orange-400">Step 1 of 3</span>
+        </div>
+
+        <h1 class="text-2xl md:text-4xl font-bold text-center text-white mb-2">Choose Your Region</h1>
+        <p class="text-center text-slate-400 text-xs md:text-sm">Select a server location with the best performance for you</p>
+      </div>
+
+      <div class="p-6 md:p-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-6">
+          {#each nodeInfo as node, i}
+            {@const isAtCapacity = parseInt(node[1]) >= parseInt(node[2])}
+            {@const isSelected = node[0].split("https://")[1].split(".")[0] === selectedNode}
+            {@const locationName = prettyText(node[0].split("https://")[1].split(".")[0])}
+            {@const isFull = parseInt(node[1]) >= parseInt(node[2])}
+
+            <button
+              on:click={() => selectNode(node[0])}
+              disabled={isFull}
+              class={`group relative p-3 rounded-lg border-2 transition-all overflow-hidden
+                ${isSelected
+                  ? 'border-orange-500 bg-gradient-to-br from-orange-500/25 to-orange-600/25 shadow-lg shadow-orange-500/25'
+                  : isFull
+                  ? 'border-slate-700 bg-slate-800/50 cursor-not-allowed opacity-50'
+                  : 'border-slate-700 bg-slate-800/50 hover:border-orange-500/50 hover:bg-slate-800 hover:shadow-lg hover:shadow-orange-500/15'
+              }`}
+            >
+              <div class="relative flex items-start justify-between gap-4">
+                <div class="flex-1">
+                  <div class="flex items-center gap-1 mb-1">
+                    <h3 class="text-sm font-bold text-white">{locationName}</h3>
+                  </div>
+                  <div class="flex flex-wrap gap-1.5">
+                    <div class="flex items-center gap-1 px-2 py-1 rounded text-xs bg-slate-700/50 border border-slate-600/50">
+                      <Zap size={12} class="text-yellow-400" />
+                      <span class="font-semibold text-slate-300">{pings[i]}</span>
+                    </div>
+                    <div class="px-2 py-1 rounded text-xs font-semibold {isFull ? 'bg-red-500/20 text-red-300 border border-red-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'}">
+                      {isFull ? 'At Capacity' : 'Available'}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
+                  {isSelected ? 'border-primary bg-primary' : isFull ? 'border-slate-600' : 'border-slate-600 group-hover:border-primary'}">
+                  {#if isSelected}
+                    <div class="w-2 h-2 rounded-full bg-white"></div>
+                  {/if}
+                </div>
+              </div>
+            </button>
+          {/each}
+        </div>
+
+        <div class="space-y-4">
+          {#if selectedNode}
+            <div class="p-3 rounded-xl bg-gradient-to-r from-orange-500/25 to-red-600/25 border border-orange-500/35 flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs text-slate-400">Selected Region</p>
+                <p class="text-sm font-bold text-white">{prettyText(selectedNode)}</p>
+              </div>
+              <a
+                href="/signup/account"
+                class="px-5 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-800 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 whitespace-nowrap text-sm"
+              >
+                Continue →
+              </a>
+            </div>
+          {:else}
+            <div class="p-5 rounded-xl bg-slate-800/50 border border-slate-700/50 flex items-center justify-between gap-4 opacity-50">
+              <p class="text-sm text-slate-400">Choose a location to continue</p>
+            </div>
+          {/if}
+
+          <p class="text-center text-xs text-slate-500">
+            {@html $t("auth.loginLink")}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
-</div>
-</div>
-</div>
+
+<style lang="postcss">
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+</style>
