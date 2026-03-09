@@ -234,11 +234,17 @@ router.get("/dashboard", (req, res) => {
       // Find account by email
       for (const accountId in accountMap) {
         if (accountMap[accountId].email === email) {
-          // Extract subscription info
+          // Extract subscription info and deduplicate
           if (subData.subscriptions && Array.isArray(subData.subscriptions)) {
+            const seenSubs = new Set(); // Deduplicate subscriptions
             for (const sub of subData.subscriptions) {
               if (sub.status === "active" || sub.status === "canceled") {
-                const productId = subData.subscriptions[0]?.productID || "unknown";
+                // Create unique key for this subscription
+                const subKey = `${subData.plan}:${sub.status}`;
+                if (seenSubs.has(subKey)) continue; // Skip if already added
+                seenSubs.add(subKey);
+
+                const productId = sub.productID || "unknown";
                 const price = priceMap[productId] || 7.99; // Default price if not found
 
                 accountMap[accountId].subscriptions.push({
