@@ -78,7 +78,11 @@ setInterval(cycle, 1000 * 15);
 }
 
 function getLiveStats(serverId) {
-    return stats["server_" + serverId] || [];
+    const key = "server_" + serverId;
+    if (!stats[key] && fs.existsSync(`./servers/${serverId}`)) {
+        stats[key] = [];
+    }
+    return stats[key] || [];
 }
 
 module.exports = { getLiveStats };
