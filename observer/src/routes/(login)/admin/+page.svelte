@@ -332,7 +332,7 @@
                       {/each}
                     </div>
                   </div>
-                {:else if account.orphanedServers.length === 0}
+                {:else if !account.orphanedServers || account.orphanedServers.length === 0}
                   <div class="text-sm text-base-content/60 italic">No servers</div>
                 {/if}
 
