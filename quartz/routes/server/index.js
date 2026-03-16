@@ -1401,6 +1401,13 @@ router.post("/:id/claimSubdomain", function (req, res) {
     if (server.subdomain !== undefined) {
       res.status(400).json({ msg: "Server already has a subdomain." });
     } else {
+      //address without subdomain
+      let address;
+      if (config.address.split(".").length == 2) {
+        address = config.address;
+      } else if (config.address.split(".").length > 2) {
+        address = config.address.split(".")[config.address.split(".").length - 2] + "." + config.address.split(".")[config.address.split(".").length - 1];
+      }
       console.log(`curl https://api.cloudflare.com/client/v4/zones/${
         config.cloudflareZone
       }/dns_records \
@@ -1408,12 +1415,12 @@ router.post("/:id/claimSubdomain", function (req, res) {
     -H "X-Auth-Email: ${config.cloudflareEmail}" \
     -H "X-Auth-Key: ${config.cloudflareKey}" \
     -d '{
-    "name": "_minecraft._tcp.${subdomain}.${config.address}",
+    "name": "_minecraft._tcp.${subdomain}",
           "type": "SRV",
       "data": {
          "port": ${portOffset + parseInt(req.params.id)},
          "priority": ${portOffset + parseInt(req.params.id)},
-         "target": "${baseUrl}",
+         "target": "${baseUrl}.${address}",
          "weight": 5
       }
 
@@ -1426,12 +1433,12 @@ router.post("/:id/claimSubdomain", function (req, res) {
     -H "X-Auth-Email: ${config.cloudflareEmail}" \
     -H "X-Auth-Key: ${config.cloudflareKey}" \
     -d '{
-    "name": "_minecraft._tcp.${subdomain}.${config.address}",
+    "name": "_minecraft._tcp.${subdomain}",
           "type": "SRV",
       "data": {
          "port": ${portOffset + parseInt(req.params.id)},
          "priority": ${portOffset + parseInt(req.params.id)},
-         "target": "${baseUrl}",
+         "target": "${baseUrl}.${address}",
          "weight": 5
       }
 
@@ -1449,12 +1456,12 @@ router.post("/:id/claimSubdomain", function (req, res) {
         -H "X-Auth-Email: ${config.cloudflareEmail}" \
         -H "X-Auth-Key: ${config.cloudflareKey}" \
         -d '{
-        "name": "_minecraft._udp.${subdomain}.${config.address}",
+        "name": "_minecraft._udp.${subdomain}",
               "type": "SRV",
           "data": {
              "port": ${portOffset + parseInt(req.params.id)},
              "priority": ${portOffset + parseInt(req.params.id)},
-             "target": "${baseUrl}",
+             "target": "${baseUrl}.${address}",
              "weight": 5
           }
 
