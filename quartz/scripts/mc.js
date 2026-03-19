@@ -154,6 +154,8 @@ function run(
 ) {
   try {
     const { exec, execSync, spawn } = require("child_process");
+    //this looks for servers running on the same port that may obstruct startup
+    killObstructingProcess(parseInt(id));
 
     if (fs.existsSync("servers/" + id + "/world/session.lock")) {
       fs.unlinkSync("servers/" + id + "/world/session.lock");
