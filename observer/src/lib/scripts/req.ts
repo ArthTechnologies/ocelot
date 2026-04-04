@@ -1,7 +1,8 @@
 import accountEmail from "$lib/stores/accountEmail";
 import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
-import { env } from '$env/dynamic/public'
+import { env } from '$env/dynamic/public';
+import { PUBLIC_SITE_URL } from '$env/static/public';
 import Alert from "$lib/components/ui/Alert.svelte";
 import { alert } from "./utils";
 
@@ -516,6 +517,17 @@ export function signupEmail(em: string, pwd: string, cloudflareVerifyToken:strin
       if (JSON.parse(input).token == -1) {
         return JSON.parse(input).reason;
       }
+      // TikTok Pixel — CompleteRegistration event
+      (window as any).ttq?.track('CompleteRegistration');
+      // Report signup conversion back to the marketing site analytics
+      fetch(`${PUBLIC_SITE_URL}/api/analytics/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          referrer: localStorage.getItem("referrer") || "unknown",
+          campaign: localStorage.getItem("campaign_name") || "unknown",
+        }),
+      }).catch(() => {});
       return true;
     })
     .catch((err) => console.error(err));
