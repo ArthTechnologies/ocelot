@@ -2,6 +2,7 @@
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { apiurl, updateReqTemplates } from "$lib/scripts/req";
+  import { PUBLIC_SITE_URL } from '$env/static/public';
 
   if (browser) {
     // Extract authorization code from URL query parameters
@@ -48,6 +49,17 @@
           // Update request templates with new auth data
           updateReqTemplates();
 
+          if (data.firstTime) {
+            (window as any).ttq?.track('CompleteRegistration');
+            fetch(`${PUBLIC_SITE_URL}/api/analytics/signup`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                referrer: localStorage.getItem("referrer") || "unknown",
+                campaign: localStorage.getItem("campaign_name") || "unknown",
+              }),
+            }).catch(() => {});
+          }
           // Redirect to subscription page if first time, otherwise dashboard
           if (localStorage.getItem("mode") !== "solo" && data.firstTime) {
             goto("/signup/subscribe/basic");

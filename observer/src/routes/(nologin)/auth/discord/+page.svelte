@@ -3,6 +3,7 @@
   import { disableScrollHandling, goto } from "$app/navigation";
   import EmailSignin from "$lib/components/ui/EmailSignin.svelte";
   import { apiurl, allnodes, updateReqTemplates } from "$lib/scripts/req";
+  import { PUBLIC_SITE_URL } from '$env/static/public';
 
   import PocketBase from "pocketbase";
   import { compute_rest_props } from "svelte/internal";
@@ -35,6 +36,17 @@
         localStorage.setItem("accountEmail", "discord:" + data.username);
         localStorage.setItem("email", data.email.toLowerCase());
         updateReqTemplates();
+        if (data.firstTime) {
+          (window as any).ttq?.track('CompleteRegistration');
+          fetch(`${PUBLIC_SITE_URL}/api/analytics/signup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              referrer: localStorage.getItem("referrer") || "unknown",
+              campaign: localStorage.getItem("campaign_name") || "unknown",
+            }),
+          }).catch(() => {});
+        }
         if (localStorage.getItem("mode") !== "solo" && data.firstTime) {
           goto("/signup/subscribe/basic");
         } else {

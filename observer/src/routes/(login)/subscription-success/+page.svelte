@@ -26,9 +26,13 @@
             campaign: localStorage.getItem("campaign_name") || "unknown",
           }),
         }).catch(() => {});
-      });
 
-    // Redirect to newserver with fromSubscription flag
-    goto("/newserver?fromSubscription=true");
+        // Redirect only after claim + analytics are fired
+        goto("/newserver?fromSubscription=true");
+      })
+      .catch(() => {
+        // Claim failed — still redirect so user isn't stuck
+        goto("/newserver?fromSubscription=true");
+      });
   });
 </script>
