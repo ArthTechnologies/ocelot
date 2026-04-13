@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { browser } from "$app/environment";
   import { disableScrollHandling, goto } from "$app/navigation";
   import EmailSignin from "$lib/components/ui/EmailSignin.svelte";
