@@ -1,5 +1,6 @@
 <script>
   import { browser } from "$app/environment";
+  import { SITE_URL } from "$lib/config";
 
   //get the top 10 posts
   let hits = [];
@@ -30,7 +31,7 @@
 
   let getStartedButtonClicks;
   if (browser) {
-    promise = fetch("https://ocelot.arthmc.xyz/analytics")
+    promise = fetch(`${SITE_URL}/api/analytics`)
       .then((response) => response.json())
       .then((json) => {
         res = json;

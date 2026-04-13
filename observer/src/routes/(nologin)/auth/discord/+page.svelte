@@ -3,7 +3,7 @@
   import { disableScrollHandling, goto } from "$app/navigation";
   import EmailSignin from "$lib/components/ui/EmailSignin.svelte";
   import { apiurl, allnodes, updateReqTemplates } from "$lib/scripts/req";
-  import { PUBLIC_SITE_URL } from '$env/static/public';
+  import { SITE_URL } from "$lib/config";
 
   import PocketBase from "pocketbase";
   import { compute_rest_props } from "svelte/internal";
@@ -38,7 +38,7 @@
         updateReqTemplates();
         if (data.firstTime) {
           (window as any).ttq?.track('CompleteRegistration');
-          fetch(`${PUBLIC_SITE_URL}/api/analytics/signup`, {
+          fetch(`${SITE_URL}/api/analytics/signup`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

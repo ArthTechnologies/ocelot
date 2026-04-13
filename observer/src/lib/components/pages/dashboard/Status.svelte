@@ -2,6 +2,7 @@
   import { browser } from "$app/environment";
   import { t } from "$lib/scripts/i18n";
   import { apiurl } from "$lib/scripts/req";
+  import { SITE_URL } from "$lib/config";
   import { numShort } from "$lib/scripts/utils";
   import { Users, RotateCw, Database } from "lucide-svelte";
 
@@ -39,7 +40,7 @@
         numServers = res.numServers;
         maxServers = res.maxServers;
       });
-    const response = fetch("https://ocelot.arthmc.xyz/status")
+    const response = fetch(`${SITE_URL}/status`)
       .then((response) => response.json())
       .then((json) => {
         if (json != undefined) {

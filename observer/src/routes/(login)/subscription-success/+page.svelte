@@ -2,7 +2,7 @@
   import { apiurl } from "$lib/scripts/req";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
-  import { PUBLIC_SITE_URL } from '$env/static/public';
+  import { SITE_URL } from "$lib/config";
 
   onMount(async () => {
     let reservedId = localStorage.getItem("reservedId");
@@ -20,7 +20,7 @@
         // Report sale conversion back to the marketing site analytics
         const referrer = localStorage.getItem("referrer") || "unknown";
         const campaign_name = localStorage.getItem("campaign_name") || "unknown";
-        const saleUrl = new URL(`${PUBLIC_SITE_URL}/api/analytics/sale`);
+        const saleUrl = new URL(`${SITE_URL}/api/analytics/sale`);
         saleUrl.searchParams.append("referrer", referrer);
         saleUrl.searchParams.append("campaign_name", campaign_name);
 

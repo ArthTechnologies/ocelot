@@ -7,6 +7,7 @@
   import Modpacks from "$lib/components/ui/Modpacks.svelte";
   import UploadWorld from "$lib/components/ui/UploadWorld.svelte";
   import SourceModal from "$lib/components/ui/SourceModal.svelte";
+  import { SITE_URL } from "$lib/config";
 
   import { alert } from "$lib/scripts/utils";
 
@@ -94,7 +95,17 @@
     // Check if coming from subscription-success page
     const params = new URLSearchParams(window.location.search);
     if (params.get("fromSubscription") === "true") {
-      showSourceModal = true;
+      const referrer = localStorage.getItem("referrer") || "unknown";
+
+      // If we already know the referrer, send analytics directly
+      if (referrer && referrer !== "unknown") {
+        fetch(`${SITE_URL}/api/analytics/sale?referrer=` + encodeURIComponent(referrer), {
+          method: "POST"
+        }).catch((err) => console.error("Analytics error:", err));
+      } else {
+        // If no referrer known, ask the user
+        showSourceModal = true;
+      }
     }
 
     if (document.location.href.includes("?id=")) {
@@ -197,12 +208,9 @@
       referrer = `other:${other}`;
     }
 
-    // Send analytics to ocelot
-    fetch("https://ocelot.arthmc.xyz/analytics/sale?referrer=" + encodeURIComponent(referrer), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      }
+    // Send analytics to site
+    fetch(`${SITE_URL}/api/analytics/sale?referrer=` + encodeURIComponent(referrer), {
+      method: "POST"
     }).catch((err) => console.error("Analytics error:", err));
 
     // Close the modal and allow normal flow
