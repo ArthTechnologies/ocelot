@@ -17,14 +17,15 @@
         }
         // TikTok Pixel — Subscribe event
         (window as any).ttq?.track('Subscribe');
-        // Report payment conversion back to the marketing site analytics
-        fetch(`${PUBLIC_SITE_URL}/api/analytics/payment`, {
+        // Report sale conversion back to the marketing site analytics
+        const referrer = localStorage.getItem("referrer") || "unknown";
+        const campaign_name = localStorage.getItem("campaign_name") || "unknown";
+        const saleUrl = new URL(`${PUBLIC_SITE_URL}/api/analytics/sale`);
+        saleUrl.searchParams.append("referrer", referrer);
+        saleUrl.searchParams.append("campaign_name", campaign_name);
+
+        fetch(saleUrl.toString(), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            referrer: localStorage.getItem("referrer") || "unknown",
-            campaign: localStorage.getItem("campaign_name") || "unknown",
-          }),
         }).catch(() => {});
 
         // Redirect only after claim + analytics are fired
