@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { apiurl } from "$lib/scripts/req";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
