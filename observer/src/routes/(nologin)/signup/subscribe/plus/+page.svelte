@@ -18,17 +18,19 @@
   onMount(async () => {
     if (browser) {
       if (localStorage.getItem("currency") == null) {
-        fetch("https://ip2c.org/s")
-          .then((response) => response.text())
-          .then((data) => {
-            if (data.split(";")[1] == "MX") {
-              localStorage.setItem("currency", "mxn");
-              currency = "mxn";
-            } else {
-              localStorage.setItem("currency", "usd");
-              currency = "usd";
-            }
-          });
+        // fetch("https://ip2c.org/s")
+        //   .then((response) => response.text())
+        //   .then((data) => {
+        //     if (data.split(";")[1] == "MX") {
+        //       localStorage.setItem("currency", "mxn");
+        //       currency = "mxn";
+        //     } else {
+        //       localStorage.setItem("currency", "usd");
+        //       currency = "usd";
+        //     }
+        //   });
+        localStorage.setItem("currency", "usd");
+        currency = "usd";
       } else {
         currency = localStorage.getItem("currency");
       }
@@ -46,14 +48,14 @@
         return;
       }
 
-      let priceId;
+      let priceId = "price_1TPwpBJYPXquzaSzo80Ce8PW";
 
-      let billQuarterly = localStorage.getItem("quarterly");
-      if (billQuarterly == "true") {
-        priceId = "price_1RqfVEJYPXquzaSzUvlz5wcL";
-      } else {
-        priceId = "price_1R2G3zJYPXquzaSzRRkaQC4J";
-      }
+      // let billQuarterly = localStorage.getItem("quarterly");
+      // if (billQuarterly == "true") {
+      //   priceId = "price_1RqfVEJYPXquzaSzUvlz5wcL";
+      // } else {
+      //   priceId = "price_1R2G3zJYPXquzaSzRRkaQC4J";
+      // }
 
       stripe = await loadStripe(stripeKey);
       clientSecret = await fetch(
