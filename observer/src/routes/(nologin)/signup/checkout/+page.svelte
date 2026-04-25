@@ -56,31 +56,31 @@
       if (urlParams.has("plan")) {
         plan = urlParams.get("plan");
       }
-      let billQuarterly = localStorage.getItem("quarterly");
+      // let billQuarterly = localStorage.getItem("quarterly");
       //basic
       if (plan == "basic") {
-        if (billQuarterly == "true") {
-        priceId = "price_1RqfTEJYPXquzaSzw5syXRoh";
-      } else {
-        priceId = "price_1R2FxgJYPXquzaSzQyzJBmsx";
-      }
+        // if (billQuarterly == "true") {
+        //   priceId = "price_1RqfTEJYPXquzaSzw5syXRoh";
+        // } else {
+        priceId = "price_1TPwnCJYPXquzaSzkbjdv5Uw";
+        // }
       }
       //plus
-           if (plan == "plus") {
-            if (billQuarterly == "true") {
-        priceId = "price_1RqfVEJYPXquzaSzUvlz5wcL";
-      } else {
-        priceId = "price_1R2G3zJYPXquzaSzRRkaQC4J";
+      if (plan == "plus") {
+        // if (billQuarterly == "true") {
+        //   priceId = "price_1RqfVEJYPXquzaSzUvlz5wcL";
+        // } else {
+        priceId = "price_1TPwpBJYPXquzaSzo80Ce8PW";
+        // }
       }
-    }
       //premium
-           if (plan == "premium") {
-            if (billQuarterly == "true") {
-        priceId = "price_1RqfUeJYPXquzaSzRvqDjfVQ";
-      } else {
-        priceId = "price_1RrQfbJYPXquzaSzycdO5k05";
+      if (plan == "premium") {
+        // if (billQuarterly == "true") {
+        //   priceId = "price_1RqfUeJYPXquzaSzRvqDjfVQ";
+        // } else {
+        priceId = "price_1TPwlBJYPXquzaSzHZndAmvT";
+        // }
       }
-    }
 
       try {
         const response = await fetch(

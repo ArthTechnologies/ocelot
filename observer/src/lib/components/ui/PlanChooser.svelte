@@ -29,11 +29,11 @@
     premiumClass="neutralGradientStroke bg-base-200";
   }
 
-  let billingCycle = $t("perMonth");
+  // let billingCycle = $t("perMonth");
 
   let atCapacity = false;
   onMount(() => {
-    
+
 
     if (browser) {
 
@@ -51,50 +51,46 @@
         selectedPlan = "premium";
       }
       const usd = document.getElementById("usd");
-      const mxn = document.getElementById("mxn");
-      if (localStorage.getItem("currency") == "mxn") {
+      const eur = document.getElementById("eur");
+      if (localStorage.getItem("currency") == "eur") {
         usd?.classList.add("btn-neutral");
         usd?.classList.add("hover:bg-base-100");
         usd?.classList.remove("pointer-events-none");
-        mxn?.classList.remove("btn-neutral");
-        mxn?.classList.remove("hover:bg-base-100");
-        mxn?.classList.add("pointer-events-none");
+        eur?.classList.remove("btn-neutral");
+        eur?.classList.remove("hover:bg-base-100");
+        eur?.classList.add("pointer-events-none");
       }
     }
 
   });
 
 
-  let basicPlanPrice = 3.49;
-  let plusPlanPrice = 4.99;
-  let premiumPlanPrice = 7.99;
+  let basicPlanPrice = 5.99;
+  let plusPlanPrice = 8.99;
+  let premiumPlanPrice = 11.99;
 
   if (browser) {
     onMount(() => {
       if (localStorage.getItem("address") == "arthmc.xyz") {
-        if (localStorage.getItem("quarterly") == "true") {
-          document.getElementById("billPeriod").selectedIndex = 1;
+        // if (localStorage.getItem("quarterly") == "true") {
+        //   document.getElementById("billPeriod").selectedIndex = 1;
 
-          basicPlanPrice = 9.99;
-          plusPlanPrice = 13.99;
-          premiumPlanPrice = 23.49;
-          billingCycle = $t("perQuarter");
-          document.getElementById("billQuarterly").selected = true;
-        } else {
-          document.getElementById("billMonthly").selected = true;
-          billingCycle = $t("perMonth");
-        }
-       
+        //   basicPlanPrice = 9.99;
+        //   plusPlanPrice = 13.99;
+        //   premiumPlanPrice = 23.49;
+        //   billingCycle = $t("perQuarter");
+        //   document.getElementById("billQuarterly").selected = true;
+        // } else {
+        //   document.getElementById("billMonthly").selected = true;
+        //   billingCycle = $t("perMonth");
+        // }
+
 
         let currency = localStorage.getItem("currency");
-        if (currency == "mxn") {
-          basicPlanPrice = (basicPlanPrice * 18).toFixed(0);
-          plusPlanPrice = (plusPlanPrice * 18).toFixed(0);
-          premiumPlanPrice = (premiumPlanPrice * 18).toFixed(0);
-          //round up to nearest 5
-          basicPlanPrice = Math.ceil(basicPlanPrice / 5) * 5;
-          plusPlanPrice = Math.ceil(plusPlanPrice / 5) * 5;
-          premiumPlanPrice = Math.ceil(premiumPlanPrice / 5) * 5;
+        if (currency == "eur") {
+          basicPlanPrice = (basicPlanPrice - 1).toFixed(2);
+          plusPlanPrice = (plusPlanPrice - 1).toFixed(2);
+          premiumPlanPrice = (premiumPlanPrice - 1).toFixed(2);
         }
       } else {
         const currencyChooser = document.getElementById("currencyChooser");
@@ -118,19 +114,19 @@
             }
           }
         });
-      } 
+      }
     });
   }
 
-  function updateBillPeriod() {
-    let dropdown = document.getElementById("billPeriod")?.value;
-    if (dropdown == $t("billMonthly")) {
-      localStorage.setItem("quarterly", "false");
-    } else if (dropdown == $t("billQuarterly")) {
-      localStorage.setItem("quarterly", "true");
-    }
-    location.reload();
-  }
+  // function updateBillPeriod() {
+  //   let dropdown = document.getElementById("billPeriod")?.value;
+  //   if (dropdown == $t("billMonthly")) {
+  //     localStorage.setItem("quarterly", "false");
+  //   } else if (dropdown == $t("billQuarterly")) {
+  //     localStorage.setItem("quarterly", "true");
+  //   }
+  //   location.reload();
+  // }
 
   function selectBasic() {
     if (btest) {
@@ -201,13 +197,13 @@
         on:click={() => {
           if (browser) {
             const usd = document.getElementById("usd");
-            const mxn = document.getElementById("mxn");
+            const eur = document.getElementById("eur");
             usd?.classList.remove("btn-neutral");
             usd?.classList.remove("hover:bg-base-100");
             usd?.classList.add("pointer-events-none");
-            mxn?.classList.add("btn-neutral");
-            mxn?.classList.add("hover:bg-base-100");
-            mxn?.classList.remove("pointer-events-none");
+            eur?.classList.add("btn-neutral");
+            eur?.classList.add("hover:bg-base-100");
+            eur?.classList.remove("pointer-events-none");
 
             localStorage.setItem("currency", "usd");
             location.reload();
@@ -216,33 +212,34 @@
       >
 
       <button
-        id="mxn"
+        id="eur"
         class="btn btn-neutral btn-sm hover:bg-base-100"
         on:click={() => {
           if (browser) {
             const usd = document.getElementById("usd");
-            const mxn = document.getElementById("mxn");
+            const eur = document.getElementById("eur");
             usd?.classList.add("btn-neutral");
             usd?.classList.add("hover:bg-base-100");
             usd?.classList.remove("pointer-events-none");
-            mxn?.classList.remove("btn-neutral");
-            mxn?.classList.remove("hover:bg-base-100");
-            mxn?.classList.add("pointer-events-none");
+            eur?.classList.remove("btn-neutral");
+            eur?.classList.remove("hover:bg-base-100");
+            eur?.classList.add("pointer-events-none");
 
-            localStorage.setItem("currency", "mxn");
+            localStorage.setItem("currency", "eur");
             location.reload();
           }
-        }}>MX$</button
+        }}>€</button
       >
     </div>
-    <select
+    <!-- Quarterly billing commented out -->
+    <!-- <select
       id="billPeriod"
       on:change={updateBillPeriod}
       class="select select-sm select-ghost"
     >
       <option id ="billMonthly">{$t("billMonthly")}</option>
       <option id ="billQuarterly">{$t("billQuarterly")}</option>
-    </select>
+    </select> -->
   </div>
 
   <div
@@ -262,7 +259,7 @@
 
 
         <div class="flex gap-2">
-          <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">$3.99/mo</p>
+          <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">$5.99/mo</p>
           <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">4GB RAM</p>
 
         </div>
@@ -281,7 +278,7 @@
 
 
           <div class="flex gap-2">
-            <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">$5.99/mo</p>
+            <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">$8.99/mo</p>
             <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">6GB RAM</p>
 
           </div>
@@ -300,9 +297,9 @@
   
   
             <div class="flex gap-2">
-              <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">$7.99/mo</p>
+              <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">$11.99/mo</p>
               <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">8GB RAM</p>
-  
+
             </div>
         
         </div>

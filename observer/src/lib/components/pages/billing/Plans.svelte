@@ -21,20 +21,29 @@
     document.getElementById(plan+"Plan")?.classList.add("opacity-50", "pointer-events-none");
   };
   function getPriceId(billQuarterly, plan) {
+  // if (plan === "basic") {
+  //   return billQuarterly
+  //     ? "price_1RqfTEJYPXquzaSzw5syXRoh"
+  //     : "price_1TPwnCJYPXquzaSzkbjdv5Uw";
+  // }
   if (plan === "basic") {
-    return billQuarterly
-      ? "price_1RqfTEJYPXquzaSzw5syXRoh"
-      : "price_1R2FxgJYPXquzaSzQyzJBmsx";
+    return "price_1TPwnCJYPXquzaSzkbjdv5Uw";
   }
+  // if (plan === "plus") {
+  //   return billQuarterly
+  //     ? "price_1RqfVEJYPXquzaSzUvlz5wcL"
+  //     : "price_1R2G3zJYPXquzaSzRRkaQC4J";
+  // }
   if (plan === "plus") {
-    return billQuarterly
-      ? "price_1RqfVEJYPXquzaSzUvlz5wcL"
-      : "price_1R2G3zJYPXquzaSzRRkaQC4J";
+    return "price_1TPwpBJYPXquzaSzo80Ce8PW";
   }
+  // if (plan === "premium") {
+  //   return billQuarterly
+  //     ? "price_1RqfUeJYPXquzaSzRvqDjfVQ"
+  //     : "price_1RrQfbJYPXquzaSzycdO5k05";
+  // }
   if (plan === "premium") {
-    return billQuarterly
-      ? "price_1RqfUeJYPXquzaSzRvqDjfVQ"
-      : "price_1RrQfbJYPXquzaSzycdO5k05";
+    return "price_1TPwlBJYPXquzaSzHZndAmvT";
   }
   return null; // fallback if input is invalid
 }
@@ -77,9 +86,9 @@
       </div>
     </div>
     <p class="font-poppins font-bold text-xl  text-center max-md:flex flex-col mb-0.5">
-      $3.99<span class="text-sm">/mo</span>
+      $5.99<span class="text-sm">/mo</span>
     </p>
-<div class="flex items-center font-poppins gap-1.5 text-sm"><input type="checkbox"  bind:checked={billedQuarterly}  class="toggle toggle-xs" /> Billed Quarterly</div>
+<!-- <div class="flex items-center font-poppins gap-1.5 text-sm"><input type="checkbox"  bind:checked={billedQuarterly}  class="toggle toggle-xs" /> Billed Quarterly</div> -->
 <div class="divider w-full h-[1px] bg-gray-400 my-2"></div>
 <ul class="list-disc font-poppins list-inside text-sm">
       <li>4GB RAM</li>
@@ -130,9 +139,9 @@
       </div>
     </div>
     <p class="font-poppins font-bold text-xl  text-center max-md:flex flex-col mb-0.5">
-      $5.99<span class="text-sm">/mo</span>
+      $8.99<span class="text-sm">/mo</span>
     </p>
-<div class="flex items-center font-poppins gap-1.5 text-sm"><input type="checkbox"  bind:checked={billedQuarterly}  class="toggle toggle-xs" /> Billed Quarterly</div>
+<!-- <div class="flex items-center font-poppins gap-1.5 text-sm"><input type="checkbox"  bind:checked={billedQuarterly}  class="toggle toggle-xs" /> Billed Quarterly</div> -->
 <div class="divider w-full h-[1px] bg-gray-400 my-2"></div>
 <ul class="list-disc font-poppins list-inside text-sm">
       <li>6GB RAM</li>
@@ -183,9 +192,9 @@
       </div>
     </div>
     <p class="font-poppins font-bold text-xl  text-center max-md:flex flex-col mb-0.5 text-[#edcfb0]">
-      $7.99<span class="text-sm opacity-80">/mo</span>
+      $11.99<span class="text-sm opacity-80">/mo</span>
     </p>
-<div class="flex items-center font-poppins gap-1.5 text-sm"><input type="checkbox" bind:checked={billedQuarterly}  class="toggle toggle-xs" /> Billed Quarterly</div>
+<!-- <div class="flex items-center font-poppins gap-1.5 text-sm"><input type="checkbox" bind:checked={billedQuarterly}  class="toggle toggle-xs" /> Billed Quarterly</div> -->
 <div class="divider w-full h-[1px] bg-gray-400 my-2"></div>
 <ul class="list-disc font-poppins list-inside text-sm">
       <li>8GB RAM</li>
