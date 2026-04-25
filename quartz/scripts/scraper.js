@@ -95,8 +95,12 @@ async function downloadPaperJars() {
         let channel = builds.builds[builds.builds.length - 1].channel;
         if (channel == "experimental") {
             channel = "beta";
-        } else if (channel == "default") {
+        } else if (channel == "default" || channel == "STABLE") {
             channel = "release";
+        } else if (channel == "ALPHA") {
+            channel = "alpha";
+        } else if (channel == "BETA") {
+            channel = "beta";
         }
         const link = `https://api.papermc.io/v2/projects/paper/versions/${version}/builds/${build}/downloads/paper-${version}-${build}.jar`;
         const filename = `paper-${version}-${channel}.jar`;
