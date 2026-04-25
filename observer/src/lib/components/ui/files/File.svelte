@@ -27,6 +27,16 @@
   import { Warning } from "postcss";
   let id;
   let extension = filename.split(".")[filename.split(".").length - 1];
+
+  // Handle multi-dot extensions like .tar.gz, .tar.bz2
+  const parts = filename.split(".");
+  if (parts.length > 2) {
+    const lastTwo = parts[parts.length - 2] + "." + parts[parts.length - 1];
+    if (["tar.gz", "tar.bz2", "tar.xz"].includes(lastTwo.toLowerCase())) {
+      extension = lastTwo;
+    }
+  }
+
   let clickable = "auto";
   let accountType = "email";
   let uniqueId = Math.floor(Math.random() * 1000000000);
@@ -208,7 +218,7 @@
   function checkRenameText() {
     const renameInput = document.getElementById("renameInput"+uniqueId) as HTMLInputElement;
     const renameBtn = document.getElementById("renameBtn"+uniqueId) as HTMLButtonElement;
-    if (renameInput.value.length > 0 && renameInput.value != filename && renameInput.value.includes("." + extension)) {
+    if (renameInput.value.length > 0 && renameInput.value !== filename && renameInput.value.includes(".")) {
       renameBtn.classList.remove("btn-disabled");
     } else {
       renameBtn.classList.add("btn-disabled");
