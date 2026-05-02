@@ -292,8 +292,65 @@
     }).format(amount);
   }
 
+  // Subscription filter
+  let subscriptionFilter = "active";
+  let invoiceHistory: Record<string, any[]> = {};
+  let failureReasons: Record<string, string> = {};
+
   // Sort all subscriptions chronologically (oldest first)
-  $: sortedSubscriptions = [...subs.subscriptions].sort((a, b) => a.created - b.created);
+  $: sortedSubscriptions = [...subs.subscriptions]
+    .filter(sub => {
+      if (subscriptionFilter === "active") {
+        return sub.status === "active";
+      }
+      return true;
+    })
+    .sort((a, b) => a.created - b.created);
+
+  async function fetchInvoiceHistory(subscriptionId: string) {
+    try {
+      const response = await fetch(apiurl + "info/billing/invoiceHistory?subscriptionId=" + subscriptionId, {
+        method: "GET",
+        headers: {
+          username: localStorage.getItem("accountEmail"),
+          token: localStorage.getItem("token"),
+        },
+      });
+      const data = await response.json();
+      invoiceHistory[subscriptionId] = data.invoices || [];
+
+      // For non-paid invoices, fetch payment intent to get failure reason
+      for (let invoice of data.invoices || []) {
+        if (invoice.status !== 'paid' && invoice.payment_intent) {
+          fetchPaymentIntentReason(invoice.payment_intent);
+        }
+      }
+
+      return data.invoices || [];
+    } catch (e) {
+      console.error("Failed to fetch invoice history:", e);
+      invoiceHistory[subscriptionId] = [];
+      return [];
+    }
+  }
+
+  async function fetchPaymentIntentReason(paymentIntentId: string) {
+    try {
+      const response = await fetch(apiurl + "info/billing/paymentIntentReason?paymentIntentId=" + paymentIntentId, {
+        method: "GET",
+        headers: {
+          username: localStorage.getItem("accountEmail"),
+          token: localStorage.getItem("token"),
+        },
+      });
+      const data = await response.json();
+      if (data.reason) {
+        failureReasons[paymentIntentId] = data.reason;
+      }
+    } catch (e) {
+      console.error("Failed to fetch payment intent reason:", e);
+    }
+  }
 
   email = email.replace("@", "%40");
 </script>
@@ -347,6 +404,14 @@
           <p class="text-sm text-gray-400">Your billing history</p>
         </div>
 
+        <!-- Filter Dropdown -->
+        <div class="flex gap-2">
+          <select bind:value={subscriptionFilter} class="select select-bordered select-sm">
+            <option value="active">Active Only</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+
         <div class="bg-base-200 rounded-lg p-4">
           {#await promise}
             <div class="space-y-3">
@@ -372,15 +437,69 @@
                           <span class="font-normal text-gray-400">/ {subscription.interval}</span>
                         </p>
                       </div>
-                      <span class="badge badge-sm {getStatusColor(subscription.status)}">
-                        {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
-                      </span>
+                      {#if subscription.status === 'canceled' && invoiceHistory[subscription.id]?.[0] && invoiceHistory[subscription.id][0].status !== 'paid'}
+                        <span class="badge badge-sm badge-error">
+                          Expired
+                        </span>
+                      {:else}
+                        <span class="badge badge-sm {getStatusColor(subscription.status)}">
+                          {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
+                        </span>
+                      {/if}
                     </div>
                     <div class="text-xs text-gray-400 mt-2">
                       Started {formatDate(subscription.created)}
                       {#if subscription.canceled_at}
                         <span class="mx-1">·</span>
                         {subscription.status === 'active' ? 'Cancels' : 'Ended'} {formatDate(subscription.canceled_at)}
+                      {/if}
+                    </div>
+
+                    <!-- Invoice History Section -->
+                    <div class="mt-3 pt-3 border-t border-base-200">
+                      <p class="text-xs font-semibold text-gray-300 mb-2">Recent Invoices</p>
+                      {#if invoiceHistory[subscription.id] === undefined}
+                        <!-- Skeleton Loading -->
+                        <div class="space-y-2">
+                          {#each [1, 2, 3] as _}
+                            <div class="bg-base-200 rounded p-2 animate-pulse">
+                              <div class="h-3 bg-base-100 rounded w-1/2"></div>
+                            </div>
+                          {/each}
+                        </div>
+                        {#await fetchInvoiceHistory(subscription.id) then _}
+                        {/await}
+                      {:else if invoiceHistory[subscription.id].length > 0}
+                        <div class="space-y-1.5 text-xs">
+                          {#each invoiceHistory[subscription.id] as invoice}
+                            <div class="flex items-center justify-between gap-2 bg-base-200/50 rounded p-1.5">
+                              <div class="flex items-center gap-2 min-w-0 flex-1">
+                                <span class="font-medium whitespace-nowrap">
+                                  {formatCurrency(invoice.amount_paid / 100, invoice.currency)}
+                                </span>
+                                {#if invoice.status === 'open' && invoice.attempt_count}
+                                  <span class="badge badge-xs badge-warning whitespace-nowrap">
+                                    {invoice.attempt_count} failed {invoice.attempt_count === 1 ? 'attempt' : 'attempts'}
+                                  </span>
+                                {:else}
+                                  <span class="badge badge-xs {invoice.status === 'paid' ? 'badge-success' : invoice.status === 'void' || invoice.status === 'uncollectible' ? 'badge-error' : 'badge-warning'} whitespace-nowrap">
+                                    {invoice.status}
+                                  </span>
+                                {/if}
+                                {#if invoice.payment_intent && failureReasons[invoice.payment_intent]}
+                                  <span class="text-gray-400 truncate max-w-xs" title={`Stripe: "${failureReasons[invoice.payment_intent]}"`}>
+                                    Stripe: "{failureReasons[invoice.payment_intent].substring(0, 100)}"
+                                  </span>
+                                {/if}
+                              </div>
+                              <span class="text-gray-400 whitespace-nowrap">
+                                {formatDate((invoice.paid_at || invoice.created))}
+                              </span>
+                            </div>
+                          {/each}
+                        </div>
+                      {:else}
+                        <p class="text-xs text-gray-500">No invoice history</p>
                       {/if}
                     </div>
                   </div>
@@ -408,12 +527,12 @@
           {#if servers && servers.length > 0}
             <div class="space-y-3">
               {#each servers as server}
-                {#if JSON.stringify(server).includes(":not created yet")}
+                {#if !server.isStandard && server.error?.code === 101}
                   <div class="flex items-center justify-between p-3 bg-base-300/50 rounded-lg">
                     <div class="flex items-center gap-3">
                       <Server size="18" class="text-gray-500" />
                       <div>
-                        <p class="font-medium text-gray-400">{address}:{10000 + parseInt(server.split(":")[0])}</p>
+                        <p class="font-medium text-gray-400">{address}:{10000 + parseInt(server.id)}</p>
                         <p class="text-xs text-gray-500">Pending creation</p>
                       </div>
                     </div>

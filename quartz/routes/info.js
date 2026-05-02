@@ -55,6 +55,8 @@ router.get(`/servers`, function (req, res) {
     }
 
 
+    const actualAccountId = email;
+
     for (let i in account.servers) {
                 const serverId = account.servers[i];
 
@@ -62,79 +64,101 @@ router.get(`/servers`, function (req, res) {
   
 
 
-        let hasValidSubscription = true;
-        let parsedSuccesfully = false;
-                let resetDate = -1;
-                let subscriptionCause = "unknown";
-        if (mode === "provider") {
-          hasValidSubscription = false;
-                  let subscriptionsJson = readJSON(`logs/subscriptions.json`);
-                  let latestStartDate = 0;
+      let serverObject = { id: serverId };
 
-try {
-        for (let sub of subscriptionsJson) {
+      let hasValidSubscription = true;
+      let parsedSuccesfully = false;
+      let resetDate = -1;
+      let subscriptionCause = "unknown";
 
+      if (mode === "provider") {
+        hasValidSubscription = false;
+        let subscriptionsJson = readJSON(`logs/subscriptions.json`);
+        let latestStartDate = 0;
 
+        try {
+          for (let sub of subscriptionsJson) {
             if (sub.owner == req.headers.username + ".json" && sub.subscriptions != undefined) {
               parsedSuccesfully = true;
 
-            for (let item of sub.subscriptions) {
-
-              if (item.start_date > latestStartDate) {
-                latestStartDate = item.start_date;
-              }
-              if (item.status == "active") {
-                hasValidSubscription = true;
-
-              } else {
-
-                            //add 7 days to the current period end if the subscription is canceled
-            resetDate = parseInt(item.current_period_end) + 604800;
-            if (item.status === "past_due" || item.status === "unpaid") {
-              subscriptionCause = "payment_failed";
-            } else if (item.status === "canceled") {
-              subscriptionCause = "canceled";
-            } else {
-              subscriptionCause = item.status || "unknown";
-            }
+              for (let item of sub.subscriptions) {
+                if (item.start_date > latestStartDate) {
+                  latestStartDate = item.start_date;
+                }
+                if (item.status == "active") {
+                  hasValidSubscription = true;
+                } else {
+                  resetDate = parseInt(item.current_period_end) + 604800;
+                  if (item.status === "past_due" || item.status === "unpaid") {
+                    subscriptionCause = "payment_failed";
+                  } else if (item.status === "canceled") {
+                    subscriptionCause = "canceled";
+                  } else {
+                    subscriptionCause = item.status || "unknown";
+                  }
+                }
               }
             }
           }
-      
-          
+        } catch (e) {
+          console.log("Error parsing subscriptions.json: " + e);
         }
-      } catch (e) {
-        console.log("Error parsing subscriptions.json: " + e);
-       
-      }
+
         console.log("hasValidSubscription: " + hasValidSubscription);
-        //if the start date is from the past 24 hours, set hasValidSubscription to true
         if (latestStartDate > 0 && latestStartDate > Date.now() - 86400000) {
           hasValidSubscription = true;
         }
       }
 
-              
-        if (account.servers[i].includes(":freed")) {
-          account.servers[i] = account.servers[i].replace(":freed", "") + ":no valid subscription:" + -1;
-        } else if (!hasValidSubscription && parsedSuccesfully) {
-          account.servers[i] = account.servers[i] + ":no valid subscription:" + resetDate + ":" + subscriptionCause;
-        } else if (fs.existsSync(`servers/${serverId}/server.json`)) {
-                  let serverData = readJSON(`servers/${serverId}/server.json`);
-        account.servers[i] = readJSON(
-          `servers/${account.servers[i]}/server.json`
-        );
-        console.log(account.servers[i]);
+      if (fs.existsSync(`servers/${serverId}/server.json`)) {
+        let serverData = readJSON(`servers/${serverId}/server.json`);
+
+        if (serverId.includes(":freed")) {
+          serverObject.isStandard = false;
+          serverObject.error = {
+            code: 100,
+            resetDate: -1,
+            subscriptionCause: "freed"
+          };
+          account.servers[i] = serverObject;
+          continue;
+        }
+
+        if (serverData.accountId && serverData.accountId !== actualAccountId) {
+          serverObject.isStandard = false;
+          serverObject.error = {
+            code: 102
+          };
+          account.servers[i] = serverObject;
+          continue;
+        }
+
+        if (!hasValidSubscription && parsedSuccesfully) {
+          serverObject.isStandard = false;
+          serverObject.error = {
+            code: 100,
+            resetDate: resetDate,
+            subscriptionCause: subscriptionCause
+          };
+          account.servers[i] = serverObject;
+          continue;
+        }
+
+        account.servers[i] = serverData;
         account.servers[i].state = f.getState(account.servers[i].id);
         try {
-        account.servers[i].fileAccessKey = security.getFileAccessKey(account.servers[i].id);
+          account.servers[i].fileAccessKey = security.getFileAccessKey(account.servers[i].id);
         } catch (e) {
           console.log("Error getting file access key for server " + account.servers[i].id + ": " + e);
           account.servers[i].fileAccessKey = "error";
         }
+        account.servers[i].isStandard = true;
       } else {
-        console.log("server is not created yet");
-        account.servers[i] = account.servers[i] + ":not created yet";
+        serverObject.isStandard = false;
+        serverObject.error = {
+          code: 101
+        };
+        account.servers[i] = serverObject;
       }
     }
     res.status(200).json(account.servers);
@@ -152,7 +176,7 @@ router.get(`/billing`, function (req, res) {
     let subscriptionsArray = [];
     stripe.customers.list(
       {
-        limit: 100,
+        limit: 5,
         email: account.email,
       },
       function (err, customers) {
@@ -163,72 +187,158 @@ router.get(`/billing`, function (req, res) {
             res.status(200).json({subscriptions: [], servers: []});
             return;
           }
-          cid = customers.data[0].id;
 
-          //check the customer's subscriptions and return it (including expired/canceled ones)
-          stripe.subscriptions.list(
-            {
-              customer: cid,
-              limit: 100,
-              status: 'all',
-            },
-            function (err, subscriptions2) {
-          
+          let subscriptionsCount = 0;
+          let completedCustomers = 0;
 
-              for (let i in subscriptions2.data) {
-                let plan = subscriptions2.data[i].items.data[0].plan;
-                try {
-                  let name = "basic";
-                  if (config.plus == plan.product) name = "plus";
-                  if (config.premium == plan.product) name = "premium";
-                  subscriptionsArray.push({
-                      id: subscriptions2.data[i].id,
-                      product: plan.product,
-                      name: name,
-                      status: subscriptions2.data[i].status,
-                      price: plan.amount / 100,
-                      interval: plan.interval,
-                      currency: plan.currency,
-                      created: subscriptions2.data[i].created,
-                      canceled_at: subscriptions2.data[i].canceled_at,
-                    });
-                  
-                } catch {
+          // Iterate through all customers (up to 5) and fetch their subscriptions
+          customers.data.forEach((customer) => {
+            stripe.subscriptions.list(
+              {
+                customer: customer.id,
+                limit: 100,
+                status: 'all',
+              },
+              function (err, subscriptions2) {
+                completedCustomers++;
 
+                if (!err && subscriptions2 && subscriptions2.data) {
+                  for (let i in subscriptions2.data) {
+                    let plan = subscriptions2.data[i].items.data[0].plan;
+                    try {
+                      let name = "basic";
+                      if (config.plus == plan.product) name = "plus";
+                      if (config.premium == plan.product) name = "premium";
+                      subscriptionsArray.push({
+                        id: subscriptions2.data[i].id,
+                        name: name,
+                        status: subscriptions2.data[i].status,
+                        price: plan.amount / 100,
+                        interval: plan.interval,
+                        currency: plan.currency,
+                        created: subscriptions2.data[i].created,
+                        canceled_at: subscriptions2.data[i].canceled_at,
+                      });
+
+                    } catch {
+
+                    }
+                  }
+                }
+
+                // Once all customers have been processed, return the response
+                if (completedCustomers === customers.data.length) {
+                  let serversArray = [];
+                  for (let i in account.servers) {
+                    const serverId = account.servers[i];
+                    if (fs.existsSync(`servers/${serverId}/server.json`)) {
+                      let serverData = readJSON(`servers/${serverId}/server.json`);
+                      let planName = "basic";
+                      if (serverData.productID == config.plus) planName = "plus";
+                      if (serverData.productID == config.premium) planName = "premium";
+                      serversArray.push({
+                        id: serverId,
+                        software: serverData.software || "Unknown",
+                        version: serverData.version || "Unknown",
+                        plan: planName
+                      });
+                    } else {
+                      serversArray.push({
+                        id: serverId,
+                        software: "Unknown",
+                        version: "Unknown",
+                        plan: "not created yet"
+                      });
+                    }
+                  }
+                  res.status(200).json({
+                    subscriptions: subscriptionsArray,
+                    servers: serversArray,
+                  });
                 }
               }
-              let serversArray = [];
-              for (let i in account.servers) {
-                const serverId = account.servers[i];
-                if (fs.existsSync(`servers/${serverId}/server.json`)) {
-                  let serverData = readJSON(`servers/${serverId}/server.json`);
-                  let planName = "basic";
-                  if (serverData.productID == config.plus) planName = "plus";
-                  if (serverData.productID == config.premium) planName = "premium";
-                  serversArray.push({
-                    id: serverId,
-                    software: serverData.software || "Unknown",
-                    version: serverData.version || "Unknown",
-                    plan: planName
-                  });
-                } else {
-                  serversArray.push({
-                    id: serverId,
-                    software: "Unknown",
-                    version: "Unknown",
-                    plan: "not created yet"
-                  });
-                }
-              }
-              res.status(200).json({
-                subscriptions: subscriptionsArray,
-                servers: serversArray,
-              });
-            }
-          );
+            );
+          });
         }
       }
     );
+  } else {
+    res.status(401).json({ msg: `Invalid credentials.` });
+  }
+});
+
+router.get(`/billing/invoiceHistory`, function (req, res) {
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON(`accounts/${email}.json`);
+  if (mode === "solo") email = "noemail";
+  if (token === account.token || mode === "solo") {
+    let subscriptionId = req.query.subscriptionId;
+    if (!subscriptionId) {
+      return res.status(400).json({ msg: "subscriptionId required" });
+    }
+
+    stripe.invoices.list(
+      {
+        subscription: subscriptionId,
+        limit: 5,
+      },
+      function (err, invoices) {
+        if (err) {
+          console.log("Error fetching invoices:", err);
+          return res.status(500).json({ msg: "Failed to fetch invoice history" });
+        }
+
+        let invoicesData = [];
+        if (invoices && invoices.data) {
+          for (let invoice of invoices.data) {
+            invoicesData.push({
+              id: invoice.id,
+              amount_paid: invoice.amount_paid / 100,
+              currency: invoice.currency,
+              status: invoice.status,
+              paid_at: invoice.paid_at,
+              created: invoice.created,
+              payment_intent: invoice.payment_intent,
+              attempt_count: invoice.attempt_count,
+            });
+          }
+        }
+
+        res.status(200).json({ invoices: invoicesData });
+      }
+    );
+  } else {
+    res.status(401).json({ msg: `Invalid credentials.` });
+  }
+});
+
+router.get(`/billing/paymentIntentReason`, function (req, res) {
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON(`accounts/${email}.json`);
+  if (mode === "solo") email = "noemail";
+  if (token === account.token || mode === "solo") {
+    let paymentIntentId = req.query.paymentIntentId;
+    if (!paymentIntentId) {
+      return res.status(400).json({ msg: "paymentIntentId required" });
+    }
+
+    stripe.paymentIntents.retrieve(paymentIntentId, function (err, paymentIntent) {
+      if (err) {
+        console.log("Error fetching payment intent:", err);
+        return res.status(500).json({ msg: "Failed to fetch payment intent" });
+      }
+
+      let reason = null;
+      if (paymentIntent.last_payment_error) {
+        reason = paymentIntent.last_payment_error.message;
+      } else if (paymentIntent.cancellation_reason) {
+        reason = paymentIntent.cancellation_reason;
+      }
+
+      res.status(200).json({ reason: reason });
+    });
   } else {
     res.status(401).json({ msg: `Invalid credentials.` });
   }

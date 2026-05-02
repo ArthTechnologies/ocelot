@@ -37,6 +37,7 @@
   export let id: number;
   export let timestamp: number = 0;
   export let cause: string = "unknown";
+  export let errorCode: number = 100;
 
   const daysUntil = timestamp => Math.ceil((timestamp * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
 
@@ -49,29 +50,41 @@
 
 
 <div
-  
+
   class="bg-base-300 w-[3.75rem] h-[3.75rem] rounded-lg max-lg:hidden flex justify-center items-center"
 ><AlertOctagon size=32/></div>
 <div class="-mt-1">
-  <p class="font-poppins-bold text-gray-200 text-sm md:text-lg truncate max-md:hidden">Expired Server</p>
+  <p class="font-poppins-bold text-gray-200 text-sm md:text-lg truncate max-md:hidden">
+    {#if errorCode === 100}
+      Expired Server
+    {:else}
+      Error
+    {/if}
+  </p>
   <div class="md:hidden flex items-center justify-center"><PlusIcon size=20/></div>
   <!-- Only shows in sidebar mode-->
   <div class="max-md:hidden">
-    <p class="font-poppins text-xs mb-0.5 -mt-1">
-      {#if timestamp != -1}
-        Slot {parseInt(id)} will be reset in {daysUntil(timestamp)} days.
-      {:else}
-        Slot {parseInt(id)} has been freed up due to expired subscription.
+    {#if errorCode === 100}
+      <p class="font-poppins text-xs mb-0.5 -mt-1">
+        {#if timestamp != -1}
+          Slot {parseInt(id)} will be reset in {daysUntil(timestamp)} days.
+        {:else}
+          Slot {parseInt(id)} has been freed up due to expired subscription.
+        {/if}
+      </p>
+      {#if causeText(cause)}
+      <p class="font-poppins text-xs mb-0.5 -mt-1 opacity-75">
+        Cause: {causeText(cause)}
+      </p>
       {/if}
-    </p>
-    {#if causeText(cause)}
-    <p class="font-poppins text-xs mb-0.5 -mt-1 opacity-75">
-      Cause: {causeText(cause)}
-    </p>
+      <p class="font-poppins text-xs mb-0.5 -mt-1">
+        Contact support to renew.
+      </p>
+    {:else}
+      <p class="font-poppins text-xs mb-0.5 -mt-1">
+        Error code {errorCode}
+      </p>
     {/if}
-    <p class="font-poppins text-xs mb-0.5 -mt-1">
-      Contact support to renew.
-    </p>
   </div>
 </div>
 

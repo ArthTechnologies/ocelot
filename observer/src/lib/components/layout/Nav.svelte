@@ -186,9 +186,9 @@
 
                   if (slug2 == "/") {
                     console.log(servers[0])
-                    if (typeof servers[0] != "string") {
-                   
-             
+                    if (servers[0].isStandard) {
+
+
                       goto("/server/" + (10000 + parseInt(servers[0].id)));
                     }
                     update(servers[0].id, false);
@@ -197,9 +197,9 @@
               });
             });
         }
-      }else if (servers.length > 0 && typeof servers[0] == "string") {
+      }else if (servers.length > 0 && !servers[0].isStandard && servers[0].error?.code === 101) {
 
-         createServer( parseInt(servers[0].split(":")[0]))
+         createServer( parseInt(servers[0].id))
        }
     } else {
         servers[0] = "-1:invalid accoount";
@@ -316,38 +316,42 @@
         </div>
       {:then}
         {#each servers as server}
-{#if typeof server == "string" && server.split(":")[1] == "not created yet"}
-{#if parseInt(server.split(":")[0]) == -1}
-Invalid Account
-{:else}
-
-{#if parseInt(server.split(":")[0]) == slug}
-<a
-  on:click={() => createServer(parseInt(server.split(":")[0]))}
-  id="serverCard{parseInt(server.split(":")[0])}"
-  class="primaryGradientStroke pointer-events-none flex md:max-lg:px-4 gap-2.5 items-center p-4 w-12 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-lg bg-gradient-to-b from-base-300 to-[#2a2a36] cursor-pointer"
->
-<UncreatedServerCard id={parseInt(server.split(":")[0])}/>
-</a>
-{:else}
-<a
-  on:click={() => createServer(parseInt(server.split(":")[0]))}
-  id="serverCard{parseInt(server.split(":")[0])}"
-  class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-4 w-12 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-lg bg-base-200 cursor-pointer"
->
-<UncreatedServerCard id={parseInt(server.split(":")[0])}/>
-</a>
-{/if}
-{/if}
-{:else if typeof server == "string" && server.split(":")[1] == "no valid subscription"}
-<a
-  href="/billing"
-  id="serverCard{parseInt(server.split(":")[0])}"
-  class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-lg bg-base-200 cursor-pointer"
->
-<ExpiredServerCard id={parseInt(server.split(":")[0])} timestamp={server.split(":")[2]} cause={server.split(":")[3]}/>
-</a>
-{:else}
+{#if !server.isStandard && server.error}
+  {#if server.error.code === 101}
+    {#if parseInt(server.id) == slug}
+    <a
+      on:click={() => createServer(parseInt(server.id))}
+      id="serverCard{parseInt(server.id)}"
+      class="primaryGradientStroke pointer-events-none flex md:max-lg:px-4 gap-2.5 items-center p-4 w-12 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-lg bg-gradient-to-b from-base-300 to-[#2a2a36] cursor-pointer"
+    >
+    <UncreatedServerCard id={parseInt(server.id)}/>
+    </a>
+    {:else}
+    <a
+      on:click={() => createServer(parseInt(server.id))}
+      id="serverCard{parseInt(server.id)}"
+      class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-4 w-12 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-lg bg-base-200 cursor-pointer"
+    >
+    <UncreatedServerCard id={parseInt(server.id)}/>
+    </a>
+    {/if}
+  {:else if server.error.code === 100}
+    <a
+      href="/billing"
+      id="serverCard{parseInt(server.id)}"
+      class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-lg bg-base-200 cursor-pointer"
+    >
+    <ExpiredServerCard id={parseInt(server.id)} timestamp={server.error.resetDate || -1} cause={server.error.subscriptionCause || "unknown"} errorCode={100}/>
+    </a>
+  {:else}
+    <a
+      id="serverCard{parseInt(server.id)}"
+      class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-lg bg-base-200 cursor-pointer"
+    >
+    <ExpiredServerCard id={parseInt(server.id)} errorCode={server.error.code}/>
+    </a>
+  {/if}
+{:else if server.isStandard}
 {#if parseInt(server.id) + 10000 == slug}
 <a
   id="serverCard{10000 + parseInt(server.id)}"
