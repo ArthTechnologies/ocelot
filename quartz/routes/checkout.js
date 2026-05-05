@@ -15,6 +15,8 @@ Router.post("/:priceId", async (req, res) => {
     if (currency == "") currency = "usd";
     let locale = req.query.locale || "en";
     if (locale == "") locale = "en";
+    let promoCode = req.query.promo_code || null;
+    if (promoCode == "") promoCode = null;
     if (quantity == undefined) {
       quantity = 1;
     }
@@ -26,7 +28,9 @@ Router.post("/:priceId", async (req, res) => {
       ...(customer_email && { customer_email: customer_email }), // This line will only add the customer_email field if it's not null
       currency: currency,
       locale: locale,
-      allow_promotion_codes: true,
+      ...(promoCode
+        ? { discounts: [{ coupon: promoCode }] }
+        : { allow_promotion_codes: true }),
       line_items: [
         {
           // Provide the exact Price ID (for example, pr_1234) of the product you want to sell
