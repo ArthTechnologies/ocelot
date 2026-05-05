@@ -99,8 +99,11 @@
 
       // If we already know the referrer, send analytics directly
       if (referrer && referrer !== "unknown") {
-        fetch(`${SITE_URL}/api/analytics/sale?referrer=` + encodeURIComponent(referrer), {
-          method: "POST"
+        const campaign = localStorage.getItem("campaign_name") || "unknown";
+        fetch(`${SITE_URL}/api/analytics/payment`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ referrer, campaign }),
         }).catch((err) => console.error("Analytics error:", err));
       } else {
         // If no referrer known, ask the user
@@ -209,8 +212,11 @@
     }
 
     // Send analytics to site
-    fetch(`${SITE_URL}/api/analytics/sale?referrer=` + encodeURIComponent(referrer), {
-      method: "POST"
+    const campaign = localStorage.getItem("campaign_name") || "unknown";
+    fetch(`${SITE_URL}/api/analytics/payment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ referrer, campaign }),
     }).catch((err) => console.error("Analytics error:", err));
 
     // Close the modal and allow normal flow
