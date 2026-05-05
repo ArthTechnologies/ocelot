@@ -15,8 +15,6 @@
         if (!data.msg.includes("Success")) {
           //alert(data.msg, "error");
         }
-        // TikTok Pixel — Subscribe event
-        (window as any).ttq?.track('Subscribe');
         // Report payment conversion back to the marketing site analytics
         const referrer = localStorage.getItem("referrer") || "unknown";
         const campaign = localStorage.getItem("campaign_name") || "unknown";

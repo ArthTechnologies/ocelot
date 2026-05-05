@@ -517,8 +517,6 @@ export function signupEmail(em: string, pwd: string, cloudflareVerifyToken:strin
       if (JSON.parse(input).token == -1) {
         return JSON.parse(input).reason;
       }
-      // TikTok Pixel — CompleteRegistration event
-      (window as any).ttq?.track('CompleteRegistration');
       // Report signup conversion back to the marketing site analytics
       fetch(`${SITE_URL}/api/analytics/signup`, {
         method: "POST",

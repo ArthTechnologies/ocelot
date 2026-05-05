@@ -50,7 +50,6 @@
           updateReqTemplates();
 
           if (data.firstTime) {
-            (window as any).ttq?.track('CompleteRegistration');
             fetch(`${SITE_URL}/api/analytics/signup`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
