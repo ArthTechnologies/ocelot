@@ -55,7 +55,7 @@ router.get(`/servers`, function (req, res) {
     }
 
 
-    const actualAccountId = email;
+    const actualAccountId = account.accountId;
 
     for (let i in account.servers) {
                 const serverId = account.servers[i];
