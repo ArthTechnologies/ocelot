@@ -83,9 +83,9 @@
       }
 
       let promoQuery = "";
-      const utmSource = localStorage.getItem("utm_source");
-      if (utmSource && utmSource.startsWith("code_")) {
-        const couponId = utmSource.slice(5).toUpperCase();
+      const campaignName = localStorage.getItem("campaign_name");
+      if (campaignName && campaignName.startsWith("code_")) {
+        const couponId = campaignName.slice(5).toUpperCase();
         if (couponId) promoQuery = "&promo_code=" + encodeURIComponent(couponId);
       }
 
