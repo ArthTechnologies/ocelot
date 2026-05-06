@@ -23,13 +23,30 @@ Router.post("/:priceId", async (req, res) => {
 
     console.log("Customer Email: " + customer_email);
 
+    // If a promo code was provided, look up its Stripe promotion_code ID.
+    // Falls back to the manual-entry box if no code given or no active match.
+    let promoId = null;
+    if (promoCode) {
+      try {
+        const lookup = await stripe.promotionCodes.list({
+          code: promoCode,
+          active: true,
+          limit: 1,
+        });
+        if (lookup.data.length > 0) promoId = lookup.data[0].id;
+        else console.log("No active promotion code found for: " + promoCode);
+      } catch (e) {
+        console.log("Promotion code lookup failed: " + e.message);
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       ui_mode: uiMode,
       ...(customer_email && { customer_email: customer_email }), // This line will only add the customer_email field if it's not null
       currency: currency,
       locale: locale,
-      ...(promoCode
-        ? { discounts: [{ coupon: promoCode }] }
+      ...(promoId
+        ? { discounts: [{ promotion_code: promoId }] }
         : { allow_promotion_codes: true }),
       line_items: [
         {
