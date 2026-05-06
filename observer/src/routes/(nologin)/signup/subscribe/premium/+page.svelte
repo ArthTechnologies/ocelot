@@ -57,6 +57,14 @@
       //   priceId = "price_1RrQfbJYPXquzaSzycdO5k05";
       // }
 
+      // If campaign_name is "code_XYZ", pre-apply Stripe promo code XYZ at checkout.
+      let promoQuery = "";
+      const campaignName = localStorage.getItem("campaign_name");
+      if (campaignName && campaignName.startsWith("code_")) {
+        const couponId = campaignName.slice(5).toUpperCase();
+        if (couponId) promoQuery = "&promo_code=" + encodeURIComponent(couponId);
+      }
+
       stripe = await loadStripe(stripeKey);
       clientSecret = await fetch(
         apiurl +
@@ -67,7 +75,7 @@
           "&currency=" +
           currency +
           "&locale=" +
-          locale,
+          locale + promoQuery,
         {
           method: "POST",
         }

@@ -1,3 +1,11 @@
+<!--
+  ARCHAIC PAGE — DO NOT EXTEND.
+  This is the old hosted-Stripe-checkout flow. The live signup path goes
+  through /signup/subscribe/{basic,plus,premium} (embedded Stripe checkout).
+  All new logic — promo codes, pricing changes, plan-routing tweaks — should
+  go in the subscribe/{plan}/+page.svelte files, NOT here.
+  Kept around only because some legacy links may still resolve to it.
+-->
 <script lang="ts">
   import { onMount } from "svelte";
   import { EmbeddedCheckout } from "svelte-stripe";
@@ -82,13 +90,6 @@
         // }
       }
 
-      let promoQuery = "";
-      const campaignName = localStorage.getItem("campaign_name");
-      if (campaignName && campaignName.startsWith("code_")) {
-        const couponId = campaignName.slice(5).toUpperCase();
-        if (couponId) promoQuery = "&promo_code=" + encodeURIComponent(couponId);
-      }
-
       try {
         const response = await fetch(
           apiurl +
@@ -99,7 +100,7 @@
             "&currency=" +
             currency +
             "&locale=" +
-            locale + "&ui_mode=hosted" + promoQuery,
+            locale + "&ui_mode=hosted",
           {
             method: "POST",
           }
