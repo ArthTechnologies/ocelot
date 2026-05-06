@@ -11,7 +11,7 @@
     if (browser) {
       let rand = Math.random();
       btest = rand < 0.5;
-      localStorage.setItem("btest", btest.toString());
+      localStorage.setItem("btest", false);
 
       fetch('/api/nodeInfo')
         .then(r => r.json())
