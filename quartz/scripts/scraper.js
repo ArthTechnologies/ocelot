@@ -105,7 +105,7 @@ async function downloadPaperJars() {
         const link = `https://api.papermc.io/v2/projects/paper/versions/${version}/builds/${build}/downloads/paper-${version}-${build}.jar`;
         const filename = `paper-${version}-${channel}.jar`;
 
-        if (!skipOldVersions || getMajorVersion(version, 1) >= 21) {
+        if (!skipOldVersions || isRecentMinecraftVersion(version)) {
             await downloadAndLogJar(filename, link);
     }
     //if the channel is release and theres an existing beta jar, delete it
@@ -257,7 +257,7 @@ async function downloadNeoforgeJars() {
             let filename = `neoforge-${minecraftVersion}-${channel}.jar`;
             console.log(`NeoForge: Version=${latestVersions[i]}, MinecraftVersion=${minecraftVersion}, Filename=${filename}`);
 
-            if (!skipOldVersions || getMajorVersion(minecraftVersion, 1) >= 20) {
+            if (!skipOldVersions || isRecentMinecraftVersion(minecraftVersion, 20)) {
                 await downloadAndLogJar(filename, url);
             }
         }
@@ -278,6 +278,16 @@ function getMajorVersion(version, i) {
     } catch (e) {
         return 0;
     }
+}
+
+// Minecraft switched from "1.X.Y" to year-based "26.0", "27.0", etc.
+// Anything with a leading segment >= 2 is the new scheme and always counts as recent.
+// Legacy "1.X.Y" versions must have minor >= minLegacyMinor.
+function isRecentMinecraftVersion(version, minLegacyMinor = 21) {
+    const major = getMajorVersion(version, 0);
+    if (major >= 2) return true;
+    if (major === 1) return getMajorVersion(version, 1) >= minLegacyMinor;
+    return false;
 }
 
 
@@ -364,7 +374,7 @@ async function downloadWorldgenMods() {
         let url = minecraftVersions[i].split("*")[1];
         let channel = minecraftVersions[i].split("*")[2];
         let filename = `${worldgenMods[z]}-${minecraftVersion}-${channel}.zip`;
-        if (!skipOldVersions || getMajorVersion(minecraftVersion, 1) >= 21) {
+        if (!skipOldVersions || isRecentMinecraftVersion(minecraftVersion)) {
             await downloadAndLogJar(filename, url);
     }
     }
@@ -413,7 +423,7 @@ function downloadSnapshotJars() {
                             try {
                                 const version = JSON.parse(data);
                                 if (version.downloads.server != undefined) {
-                                    if (!skipOldVersions || getMajorVersion(version.id, 1) >= 21) {
+                                    if (!skipOldVersions || isRecentMinecraftVersion(version.id)) {
                                     index["vanilla-" + version.id + ".jar"] = version.downloads.server.url;
                                     logJar("vanilla-" + version.id + ".jar", version.downloads.server.url);
                                     }
