@@ -319,7 +319,9 @@ function run(
     }
     let javaVer = "8";
     //this selects the correct version of java for the minecraft version
-    if (parseInt(version.split(".")[1]) >= 20) javaVer = "21";
+    // Year-based versions (26.x, 27.x, …) always need Java 21
+    if (parseInt(version.split(".")[0]) >= 2 && !version.startsWith("1.")) javaVer = "21";
+    else if (parseInt(version.split(".")[1]) >= 20) javaVer = "21";
     else if (version.includes("1.19")) javaVer = "21";
     else if (version.includes("1.18")) javaVer = "17";
     else if (version.includes("1.17")) javaVer = "17";

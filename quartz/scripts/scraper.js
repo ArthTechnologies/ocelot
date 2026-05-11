@@ -80,50 +80,55 @@ function logJar(filename, url, success = true) {
 
 //paper
 async function downloadPaperJars() {
-    const response = await fetch("https://api.papermc.io/v2/projects/paper");
-    const paperVersions = await response.json();
-    for (let i in paperVersions.versions) {
+    // v3 API: versions are grouped by family, e.g. { "26.1": ["26.1.2", "26.1.1"], "1.21": [...] }
+    const response = await fetch("https://fill.papermc.io/v3/projects/paper");
+    const paperProject = await response.json();
+    const allVersions = Object.values(paperProject.versions).flat();
+
+    for (const version of allVersions) {
         try {
-            let version = paperVersions.versions[i];
             // Skip pre-release and release candidate versions
             if (version.includes("-pre") || version.includes("-rc")) {
                 continue;
             }
-        const response = await fetch(`https://api.papermc.io/v2/projects/paper/versions/${version}/builds`);
-        const builds = await response.json();
-        const build = builds.builds[builds.builds.length - 1].build;
-        let channel = builds.builds[builds.builds.length - 1].channel;
-        if (channel == "experimental") {
-            channel = "beta";
-        } else if (channel == "default" || channel == "STABLE") {
-            channel = "release";
-        } else if (channel == "ALPHA") {
-            channel = "alpha";
-        } else if (channel == "BETA") {
-            channel = "beta";
-        }
-        const link = `https://api.papermc.io/v2/projects/paper/versions/${version}/builds/${build}/downloads/paper-${version}-${build}.jar`;
-        const filename = `paper-${version}-${channel}.jar`;
 
-        if (!skipOldVersions || isRecentMinecraftVersion(version)) {
-            await downloadAndLogJar(filename, link);
-    }
-    //if the channel is release and theres an existing beta jar, delete it
-    if (channel == "release") {
-        const betaFilename = `paper-${version}-beta.jar`;
-        if (index[betaFilename]) {
-            delete index[betaFilename];
-        }
-        if (fs.existsSync(`assets/jars/${betaFilename}`)) {
-            fs.unlinkSync(`assets/jars/${betaFilename}`);
-        }   
-    }
+            if (!skipOldVersions || isRecentMinecraftVersion(version)) {
+                // Use /builds/latest instead of fetching all builds and taking the last one
+                const buildRes = await fetch(`https://fill.papermc.io/v3/projects/paper/versions/${version}/builds/latest`);
+                if (!buildRes.ok) continue;
+                const build = await buildRes.json();
 
+                // v3 channel enum: ALPHA, BETA, STABLE, RECOMMENDED
+                let channel;
+                if (build.channel === "STABLE" || build.channel === "RECOMMENDED") {
+                    channel = "release";
+                } else if (build.channel === "BETA") {
+                    channel = "beta";
+                } else {
+                    channel = "alpha";
+                }
+
+                // v3 provides the CDN URL directly in downloads.server.url
+                const serverDownload = build.downloads?.server;
+                if (!serverDownload) continue;
+
+                const filename = `paper-${version}-${channel}.jar`;
+                await downloadAndLogJar(filename, serverDownload.url);
+
+                // If the channel is release, clean up any stale beta/alpha jars for this version
+                if (channel === "release") {
+                    for (const stale of ["beta", "alpha"]) {
+                        const staleFilename = `paper-${version}-${stale}.jar`;
+                        if (index[staleFilename]) delete index[staleFilename];
+                        if (fs.existsSync(`assets/jars/${staleFilename}`)) {
+                            fs.unlinkSync(`assets/jars/${staleFilename}`);
+                        }
+                    }
+                }
+            }
         } catch (e) {
             //console.log(e);
         }
-    
-
     }
 }
 
