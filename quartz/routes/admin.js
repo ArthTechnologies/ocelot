@@ -352,6 +352,7 @@ router.get("/lookup/:accountId", (req, res) => {
       lastSignIn: foundAccount.lastSignIn || null,
       resetAttempts: foundAccount.resetAttempts || 0,
       adminAccess: foundAccount.adminAccess === true,
+      token: foundAccount.token || null,
     };
 
     const servers = [];
