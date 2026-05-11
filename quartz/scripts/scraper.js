@@ -108,8 +108,8 @@ async function downloadPaperJars() {
                     channel = "alpha";
                 }
 
-                // v3 provides the CDN URL directly in downloads.server.url
-                const serverDownload = build.downloads?.server;
+                // v3 download key is "server:default" (not "server") — grab the first entry regardless of key name
+                const serverDownload = build.downloads && Object.values(build.downloads)[0];
                 if (!serverDownload) continue;
 
                 const filename = `paper-${version}-${channel}.jar`;
