@@ -311,4 +311,80 @@ router.get("/dashboard", (req, res) => {
   }
 });
 
+// Lookup a single customer's account + their servers by accountId
+router.get("/lookup/:accountId", (req, res) => {
+  try {
+    const targetId = req.params.accountId;
+
+    if (!fs.existsSync("accounts")) {
+      return res.status(404).json({ notFound: true, error: "No accounts directory" });
+    }
+
+    const accountFiles = fs.readdirSync("accounts");
+    let foundFile = null;
+    let foundAccount = null;
+
+    for (const file of accountFiles) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const data = readJSON(`accounts/${file}`);
+        if (data.accountId === targetId) {
+          foundFile = file;
+          foundAccount = data;
+          break;
+        }
+      } catch (err) {
+        // skip unreadable account files
+      }
+    }
+
+    if (!foundAccount) {
+      return res.status(404).json({ notFound: true });
+    }
+
+    const accountSafe = {
+      accountId: foundAccount.accountId,
+      name: foundFile.replace(/\.json$/, ""),
+      email: foundAccount.email || null,
+      type: foundAccount.type || null,
+      servers: Array.isArray(foundAccount.servers) ? foundAccount.servers : [],
+      freeServers: foundAccount.freeServers || 0,
+      lastSignIn: foundAccount.lastSignIn || null,
+      resetAttempts: foundAccount.resetAttempts || 0,
+      adminAccess: foundAccount.adminAccess === true,
+    };
+
+    const servers = [];
+    for (const serverId of accountSafe.servers) {
+      const idStr = String(serverId).split(":")[0]; // strip ":freed" suffix
+      const jsonPath = `servers/${idStr}/server.json`;
+      if (!fs.existsSync(jsonPath)) {
+        servers.push({ id: serverId, missing: true });
+        continue;
+      }
+      try {
+        const s = readJSON(jsonPath);
+        servers.push({
+          id: serverId,
+          name: s.name || null,
+          software: s.software || null,
+          version: s.version || null,
+          state: mc.getState(idStr),
+          accountId: s.accountId || null,
+          adminServer: s.adminServer === true,
+          productID: s.productID || null,
+          ownerMismatch: s.accountId && s.accountId !== foundAccount.accountId,
+        });
+      } catch (err) {
+        servers.push({ id: serverId, missing: true, error: String(err) });
+      }
+    }
+
+    res.json({ notFound: false, account: accountSafe, servers });
+  } catch (err) {
+    console.error("Error in /admin/lookup:", err);
+    res.status(500).json({ error: "Failed to lookup account" });
+  }
+});
+
 module.exports = router;
