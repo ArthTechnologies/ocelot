@@ -62,7 +62,7 @@ start_permission_loop
 SCREEN_SESSION="qua_$USERNAME"
 
 if command -v screen >/dev/null 2>&1; then
-  sudo -u "$USERNAME" screen -dmS "$SCREEN_SESSION" sh scripts/autorestart.sh
+  sudo -u "$USERNAME" screen -dmS "$SCREEN_SESSION" bash -lc "cd '$SCRIPT_DIR' && bash '$SCRIPT_DIR/scripts/autorestart.sh'"
   echo "[$(date)] Started screen session: $SCREEN_SESSION" >> "$LOG_FILE"
 else
   echo "Warning: screen not installed. Cannot start background session." >&2
