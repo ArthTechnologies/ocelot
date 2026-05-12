@@ -170,7 +170,45 @@ router.post("/serverRecovery", async (req, res) => {
       );
 
       if (!hasValidSubscription) {
-        // User doesn't have valid subscription - don't process
+        // Check if the subscription exists on a sibling account with a different
+        // login prefix (e.g. "email:user@x.com" vs "google:user@x.com").
+        const bareEmail = email.includes(":") ? email.split(":").slice(1).join(":") : email;
+        try {
+          const accountFiles = fs.readdirSync("accounts").filter(f => f.endsWith(".json"));
+          for (const file of accountFiles) {
+            const fileEmail = file.replace(".json", "");
+            if (fileEmail === email) continue;
+            const fileBareEmail = fileEmail.includes(":") ? fileEmail.split(":").slice(1).join(":") : fileEmail;
+            if (fileBareEmail !== bareEmail) continue;
+
+            // Same underlying email, different prefix — check its Stripe customer
+            const otherAccount = readJSON(`accounts/${file}`);
+            if (!otherAccount.stripeCustomerId) continue;
+            try {
+              const otherSubs = await stripe.subscriptions.list({
+                customer: otherAccount.stripeCustomerId,
+                limit: 100
+              });
+              const otherHasValid = otherSubs.data.some(sub =>
+                sub.status === "active" || sub.status === "past_due"
+              );
+              if (otherHasValid) {
+                return res.status(403).json({
+                  success: false,
+                  duplicateAccount: true,
+                  loginMethod: fileEmail.includes(":") ? fileEmail.split(":")[0] : "email",
+                  message: `Your subscription is linked to a different login method. Please sign in with "${fileEmail.split(":")[0]}" instead.`
+                });
+              }
+            } catch (stripeErr) {
+              console.error("Stripe check for sibling account failed:", stripeErr);
+            }
+          }
+        } catch (scanErr) {
+          console.error("Sibling account scan error:", scanErr);
+        }
+
+        // No sibling account found with a valid subscription
         return res.status(403).json({
           success: false,
           message: "You must have an active subscription to use this feature"

@@ -218,7 +218,11 @@
         const data = await response.json();
 
         if (!response.ok) {
-          modalError = data.message || "Failed to process your request";
+          if (data.duplicateAccount) {
+            modalError = `It looks like your subscription is on a different account. Try signing out and logging in with "${data.loginMethod}" instead.`;
+          } else {
+            modalError = data.message || "Failed to process your request";
+          }
           modalSubmitting = false;
           return;
         }
@@ -475,7 +479,7 @@
                             <div class="flex items-center justify-between gap-2 bg-base-200/50 rounded p-1.5">
                               <div class="flex items-center gap-2 min-w-0 flex-1">
                                 <span class="font-medium whitespace-nowrap">
-                                  {formatCurrency(invoice.amount_paid / 100, invoice.currency)}
+                                  {formatCurrency(invoice.amount_paid, invoice.currency)}
                                 </span>
                                 {#if invoice.status === 'open' && invoice.attempt_count}
                                   <span class="badge badge-xs badge-warning whitespace-nowrap">
