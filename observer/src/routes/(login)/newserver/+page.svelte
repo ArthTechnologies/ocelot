@@ -8,6 +8,7 @@
   import UploadWorld from "$lib/components/ui/UploadWorld.svelte";
   import SourceModal from "$lib/components/ui/SourceModal.svelte";
   import { SITE_URL } from "$lib/config";
+  import { Check } from "lucide-svelte";
 
   import { alert } from "$lib/scripts/utils";
 
@@ -473,6 +474,13 @@
             type="text"
             placeholder="{$t('general.ex')} My Minecraft Server"
           />
+
+          {#if showGeyserBar}
+            <div class="flex items-center gap-2 mt-3 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm">
+              <Check size="15" class="shrink-0" />
+              <span>Geyser crossplay will be automatically installed</span>
+            </div>
+          {/if}
 
           <div id="worldgen">
             <div class="justify-center flex mt-2 mb-1">
