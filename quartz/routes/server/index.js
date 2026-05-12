@@ -28,6 +28,20 @@ const schedules = require("../../scripts/schedules.js");
 
 const checkSubscriptions = require("../../scripts/utils.js").checkSubscriptions;
 
+// Mirrors the java version detection logic in mc.js.
+// Used when the user changes version/software so server.javaVersion stays correct.
+function detectJavaVersion(version, software) {
+  let javaVer = "8";
+  if (parseInt(version.split(".")[0]) >= 2 && !version.startsWith("1.")) javaVer = "25";
+  else if (parseInt(version.split(".")[1]) >= 20) javaVer = "21";
+  else if (version.includes("1.19")) javaVer = "21";
+  else if (version.includes("1.18")) javaVer = "17";
+  else if (version.includes("1.17")) javaVer = "17";
+  if (software === "velocity") javaVer = "17";
+  if (software === "snapshot") javaVer = "25";
+  return javaVer;
+}
+
 function writeServer(
   id,
   owner,
@@ -460,6 +474,7 @@ router.post(`/:id/version/`, function (req, res) {
     version = req.query.version;
 
     server.version = version;
+    server.javaVersion = detectJavaVersion(version, server.software);
     writeJSON("servers/" + id + "/server.json", server);
 
     f.stopAsync(id, () => {
@@ -488,6 +503,7 @@ router.post(`/:id/software/`, function (req, res) {
 
     server.software = newSoftware;
     server.version = newVersion;
+    server.javaVersion = detectJavaVersion(newVersion, newSoftware);
     writeJSON("servers/" + id + "/server.json", server);
 
     f.stopAsync(id, () => {
