@@ -272,86 +272,115 @@ Router.post("/email/resetPassword/", async (req, res) => {
 });
 
 //combined signin and signup for discord
-Router.post("/discord/", (req, res) => {
+Router.post("/discord/", async (req, res) => {
   res.header("Access-Control-Allow-Origin", "*");
 
   let account = {};
   let nameTaken = false;
   let token = req.query.token;
 
-  exec(
-    "curl -X GET https://discord.com/api/users/@me -H 'authorization: Bearer " +
-      token +
-      "'",
-    (req2, res2) => {
-      try {
-        res2 = JSON.parse(res2);
-      } catch {}
-      console.log(res2);
-      let username = res2.username;
-
-      if (fs.existsSync("accounts/discord:" + username + ".json")) {
-        nameTaken = true;
-      }
-      //if account exists, so the user is signing in not up...
-      if (nameTaken) {
-        let account = readJSON("accounts/discord:" + username + ".json");
-        let response = {};
-        account.ips = [];
-        if (account.ips.indexOf(files.getIPID(req.ip)) == -1) {
-          account.ips.push(files.getIPID(req.ip));
-        }
-        response = {
-          email: account.email,
-          token: account.token,
-          accountId: account.accountId,
-          username: username,
-          firstTime: false,
-          avatar: `https://cdn.discordapp.com/avatars/${res2.id}/${res2.avatar}.webp`,
-          bannerColor: res2.banner_color,
-        };
-        account.lastSignin = new Date().getTime();
-        writeJSON("accounts/discord:" + username + ".json", account);
-        writeAccount(account.accountId, "discord:"+username, account.email, account.servers, 0, account.freeServers, account.lastSignin, account.token, account.salt, account.password, account.resetAttempts);
-        res.status(200).send(response);
-      } else {
-        let email = res2.email;
-        email = email.toLowerCase();
-        if (email.includes("email:")) email = email.replace("email:", "");
-        let accountId = "acc_"+Buffer.from(nodeName + (nodeName.includes("*email:") ? "" : "*discord:") + username.substring(0, 7)).toString('base64url');
-
-        account.accountId = accountId;
-        account.token = uuidv4();
-        account.resetAttempts = 0;
-
-        account.ips = [];
-        if (account.ips.indexOf(files.getIPID(req.ip)) == -1) {
-          account.ips.push(files.getIPID(req.ip));
-        }
-
-        account.type = "discord";
-        account.email = email;
-        account.servers = [];
-        account.freeServers = 0;
-        account.lastSignin = new Date().getTime();
-        writeJSON(
-          "accounts/discord:" + username.toLowerCase() + ".json",
-          account
-        );
-        writeAccount(account.accountId, "discord:"+username.toLowerCase(), account.email, account.servers, 0, account.freeServers, account.lastSignin, account.token, account.salt, account.password, account.resetAttempts);
-        console.log("discord:", res2);
-        res.status(200).send({
-          token: account.token,
-          accountId: accountId,
-          username: username.toLowerCase(),
-          firstTime: true,
-          avatar: `https://cdn.discordapp.com/avatars/${res2.id}/${res2.avatar}.webp`,
-          bannerColor: res2.banner_color,
-          email: res2.email,
-        });
-      }
+  // Fetch the Discord user. Token is passed as a header value (never shell-
+  // interpolated) and the request is bounded by a timeout so it can't hang.
+  let res2;
+  try {
+    const discordRes = await fetch("https://discord.com/api/users/@me", {
+      method: "GET",
+      headers: { authorization: "Bearer " + token },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!discordRes.ok) {
+      return res
+        .status(401)
+        .send({ token: -1, reason: "Discord authentication failed" });
     }
-  );
+    res2 = await discordRes.json();
+  } catch (err) {
+    console.error("discord auth error:", err);
+    return res
+      .status(502)
+      .send({ token: -1, reason: "Could not reach Discord" });
+  }
+
+  console.log(res2);
+  let username = res2 && res2.username;
+  if (!username) {
+    return res
+      .status(401)
+      .send({ token: -1, reason: "Discord authentication failed" });
+  }
+
+  try {
+    if (fs.existsSync("accounts/discord:" + username + ".json")) {
+      nameTaken = true;
+    }
+    //if account exists, so the user is signing in not up...
+    if (nameTaken) {
+      let account = readJSON("accounts/discord:" + username + ".json");
+      let response = {};
+      account.ips = [];
+      if (account.ips.indexOf(files.getIPID(req.ip)) == -1) {
+        account.ips.push(files.getIPID(req.ip));
+      }
+      response = {
+        email: account.email,
+        token: account.token,
+        accountId: account.accountId,
+        username: username,
+        firstTime: false,
+        avatar: `https://cdn.discordapp.com/avatars/${res2.id}/${res2.avatar}.webp`,
+        bannerColor: res2.banner_color,
+      };
+      account.lastSignin = new Date().getTime();
+      writeJSON("accounts/discord:" + username + ".json", account);
+      writeAccount(account.accountId, "discord:"+username, account.email, account.servers, 0, account.freeServers, account.lastSignin, account.token, account.salt, account.password, account.resetAttempts);
+      res.status(200).send(response);
+    } else {
+      let email = res2.email;
+      if (!email) {
+        return res
+          .status(400)
+          .send({ token: -1, reason: "Discord account has no email" });
+      }
+      email = email.toLowerCase();
+      if (email.includes("email:")) email = email.replace("email:", "");
+      let accountId = "acc_"+Buffer.from(nodeName + (nodeName.includes("*email:") ? "" : "*discord:") + username.substring(0, 7)).toString('base64url');
+
+      account.accountId = accountId;
+      account.token = uuidv4();
+      account.resetAttempts = 0;
+
+      account.ips = [];
+      if (account.ips.indexOf(files.getIPID(req.ip)) == -1) {
+        account.ips.push(files.getIPID(req.ip));
+      }
+
+      account.type = "discord";
+      account.email = email;
+      account.servers = [];
+      account.freeServers = 0;
+      account.lastSignin = new Date().getTime();
+      writeJSON(
+        "accounts/discord:" + username.toLowerCase() + ".json",
+        account
+      );
+      writeAccount(account.accountId, "discord:"+username.toLowerCase(), account.email, account.servers, 0, account.freeServers, account.lastSignin, account.token, account.salt, account.password, account.resetAttempts);
+      console.log("discord:", res2);
+      res.status(200).send({
+        token: account.token,
+        accountId: accountId,
+        username: username.toLowerCase(),
+        firstTime: true,
+        avatar: `https://cdn.discordapp.com/avatars/${res2.id}/${res2.avatar}.webp`,
+        bannerColor: res2.banner_color,
+        email: res2.email,
+      });
+    }
+  } catch (err) {
+    console.error("discord route error:", err);
+    if (!res.headersSent) {
+      res.status(500).send({ token: -1, reason: "Internal error" });
+    }
+  }
 });
 
 Router.delete("/discord", (req, res) => {
