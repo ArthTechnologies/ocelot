@@ -245,7 +245,9 @@ router.get("/dashboard", (req, res) => {
                 seenSubs.add(subKey);
 
                 const productId = sub.productID || "unknown";
-                const price = priceMap[productId] || 7.99; // Default price if not found
+                const price = sub.unitAmount != null
+                  ? sub.unitAmount / 100
+                  : (priceMap[productId] ?? 7.99);
 
                 accountMap[accountId].subscriptions.push({
                   plan: subData.plan || "basic",

@@ -217,12 +217,14 @@ try {
                                                  subItem.ended_at = customerSubscriptions[i].ended_at;
                                                  subItem.current_period_end = customerSubscriptions[i].current_period_end;
                                                  subItem.start_date = customerSubscriptions[i].start_date;
+                                                 subItem.productID = customerSubscriptions[i].items?.data[0]?.price?.product;
+                                                 subItem.unitAmount = customerSubscriptions[i].items?.data[0]?.price?.unit_amount;
                                                  console.log(customers.data[k].id + " Server Slot " + data[j].serverId + " subscription: ");
                                                   console.log(JSON.stringify(subItem));
 
-                                                  
+
                                                   subscriptionsA.push(subItem);
-                                                  
+
                                                 }
                                               }
                                             }
@@ -332,11 +334,13 @@ try {
                                                  subItem.ended_at = customerSubscriptions[i].ended_at;
                                                  subItem.current_period_end = customerSubscriptions[i].current_period_end;
                                                  subItem.start_date = customerSubscriptions[i].start_date;
+                                                 subItem.productID = customerSubscriptions[i].items?.data[0]?.price?.product;
+                                                 subItem.unitAmount = customerSubscriptions[i].items?.data[0]?.price?.unit_amount;
                                                                                                   console.log(customers.data[k].id + "Server Slot " + data[j].serverId + " subscription: ");
                                                  console.log(subItem);
-                                              
+
                                                   subscriptionsA.push(subItem);
-                                                  
+
                                                 }
                                               }
                                             }
