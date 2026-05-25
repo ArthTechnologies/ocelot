@@ -377,7 +377,7 @@
                           <span class="text-xs font-semibold {getStatusColor(sub.status)} rounded px-2.5 py-1">
                             {sub.status}
                           </span>
-                          <span class="text-xs font-bold text-base-content/70 ml-1">${sub.price}/mo</span>
+                          <span class="text-xs font-bold text-base-content/70 ml-1">{sub.price != null ? `$${sub.price.toFixed(2)}/mo` : 'price unknown'}</span>
                         </div>
                       {/each}
                     </div>

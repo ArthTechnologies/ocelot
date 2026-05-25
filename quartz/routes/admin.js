@@ -7,6 +7,8 @@ const path = require("path");
 const readJSON = utils.readJSON;
 const mc = require("../scripts/mc.js");
 const infoRouter = require("./info.js");
+const stripeKey = utils.getConfig().stripeKey;
+const stripe = stripeKey ? require("stripe")(stripeKey) : null;
 
 // Middleware to verify admin access (solo mode or has adminAccess flag)
 function verifyAdmin(req, res, next) {
@@ -104,31 +106,13 @@ router.get("/subscriptions", (req, res) => {
 });
 
 // Get admin dashboard data (snapshot, accounts, subscriptions)
-router.get("/dashboard", (req, res) => {
+router.get("/dashboard", async (req, res) => {
   try {
     // Get latest snapshot
     const snapshotHistory = infoRouter.snapshotHistory();
     const latestSnapshot = snapshotHistory.length > 0
       ? snapshotHistory[snapshotHistory.length - 1]
       : null;
-
-    // Stripe productID to price mapping
-    const priceMap = {
-      "prod_Ox8pUPnCkKOdpj": 4.99,  // basic
-      "prod_P0QXFRXxZGLcmG": 7.99,  // plus
-      "prod_OxNVP2eRfUYgZC": 7.99,  // premium (adjust as needed)
-    };
-
-    // Read subscriptions data
-    let subscriptionsData = [];
-    if (fs.existsSync("logs/subscriptions.json")) {
-      try {
-        const subsFile = readJSON("logs/subscriptions.json");
-        subscriptionsData = Array.isArray(subsFile) ? subsFile : [];
-      } catch (err) {
-        console.error("Error reading subscriptions.json:", err);
-      }
-    }
 
     // Build account list with servers and subscriptions
     const accounts = [];
@@ -152,7 +136,7 @@ router.get("/dashboard", (req, res) => {
               orphanedServers: [],
               subscriptions: [],
               freeServers: accountData.freeServers || 0,
-              claimedServers: accountData.servers || [], // Store claimed servers for orphan detection
+              claimedServers: accountData.servers || [],
             };
           }
         } catch (err) {
@@ -175,7 +159,7 @@ router.get("/dashboard", (req, res) => {
           try {
             const serverData = readJSON(serverJsonPath);
             const accountId = serverData.accountId;
-            serverMap[parseInt(serverId)] = accountId; // Track actual ownership
+            serverMap[parseInt(serverId)] = accountId;
 
             if (accountMap[accountId]) {
               const playerList = mc.getPlayerList(serverId);
@@ -199,7 +183,6 @@ router.get("/dashboard", (req, res) => {
       const account = accountMap[accountId];
       for (const claimedServerId of account.claimedServers) {
         const actualOwner = serverMap[claimedServerId];
-        // If claimed server exists but is owned by someone else
         if (actualOwner && actualOwner !== accountId) {
           const serverId = claimedServerId.toString();
           const serverJsonPath = `servers/${serverId}/server.json`;
@@ -223,43 +206,53 @@ router.get("/dashboard", (req, res) => {
       }
     }
 
-    // Fourth pass: add subscription data for each account (deduplicated by email)
-    const processedEmails = new Set(); // Track which emails already have subscriptions added
-    for (const subData of subscriptionsData) {
-      const email = subData.email;
-      // Skip if already processed this email (subscriptions.json has one entry per server, not per user)
-      if (processedEmails.has(email)) continue;
-      processedEmails.add(email);
+    // Fourth pass: fetch live subscription data from Stripe for each unique account email
+    if (stripe) {
+      const emailsToQuery = new Set(
+        Object.values(accountMap).map(a => a.email).filter(e => e && e !== "unknown")
+      );
 
-      // Find account by email
-      for (const accountId in accountMap) {
-        if (accountMap[accountId].email === email) {
-          // Extract subscription info and deduplicate
-          if (subData.subscriptions && Array.isArray(subData.subscriptions)) {
-            const seenSubs = new Set(); // Deduplicate subscriptions
-            for (const sub of subData.subscriptions) {
-              if (sub.status === "active" || sub.status === "canceled") {
-                // Create unique key for this subscription
-                const subKey = `${subData.plan}:${sub.status}`;
-                if (seenSubs.has(subKey)) continue; // Skip if already added
-                seenSubs.add(subKey);
+      await Promise.all([...emailsToQuery].map(async (email) => {
+        try {
+          const customers = await stripe.customers.list({ email, limit: 10 });
+          if (customers.data.length === 0) return;
 
-                const productId = sub.productID || "unknown";
-                const price = sub.unitAmount != null
-                  ? sub.unitAmount / 100
-                  : (priceMap[productId] ?? 7.99);
+          const seenSubIds = new Set();
+          for (const customer of customers.data) {
+            const stripeSubs = await stripe.subscriptions.list({
+              customer: customer.id,
+              status: "all",
+              limit: 100,
+              expand: ["data.items.data.price.product"],
+            });
 
-                accountMap[accountId].subscriptions.push({
-                  plan: subData.plan || "basic",
-                  status: sub.status,
-                  price: price,
-                });
+            for (const sub of stripeSubs.data) {
+              if (seenSubIds.has(sub.id)) continue;
+              seenSubIds.add(sub.id);
+
+              if (sub.status !== "active" && sub.status !== "canceled") continue;
+
+              const item = sub.items?.data[0];
+              const unitAmount = item?.price?.unit_amount;
+              const price = unitAmount != null ? unitAmount / 100 : null;
+              const productName = item?.price?.product?.name || item?.price?.product || "unknown";
+
+              for (const accountId in accountMap) {
+                if (accountMap[accountId].email === email) {
+                  accountMap[accountId].subscriptions.push({
+                    plan: typeof productName === "string" ? productName : "unknown",
+                    status: sub.status,
+                    price: price,
+                  });
+                  break;
+                }
               }
             }
           }
-          break;
+        } catch (err) {
+          console.error(`Error fetching Stripe subscriptions for ${email}:`, err.message);
         }
-      }
+      }));
     }
 
     // Convert map to array and sort
@@ -296,7 +289,7 @@ router.get("/dashboard", (req, res) => {
       for (const sub of account.subscriptions) {
         if (sub.status === "active") {
           totalSubscriptions++;
-          estimatedMRR += sub.price;
+          if (sub.price != null) estimatedMRR += sub.price;
         }
       }
     }
