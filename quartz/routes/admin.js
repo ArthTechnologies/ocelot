@@ -240,9 +240,17 @@ router.get("/dashboard", (req, res) => {
                 seenSubs.add(subKey);
 
                 const productId = sub.productID || "unknown";
-                const price = sub.unitAmount != null
-                  ? sub.unitAmount / 100
-                  : (priceMap[productId] ?? 7.99);
+                let price;
+                if (sub.unitAmount != null) {
+                  const months = sub.interval === "year"
+                    ? (sub.intervalCount || 1) * 12
+                    : sub.interval === "week"
+                      ? (sub.intervalCount || 1) / 4.33
+                      : (sub.intervalCount || 1); // month or default
+                  price = (sub.unitAmount / 100) / months;
+                } else {
+                  price = priceMap[productId] ?? 7.99;
+                }
 
                 accountMap[accountId].subscriptions.push({
                   plan: subData.plan || "basic",

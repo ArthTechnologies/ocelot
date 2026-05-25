@@ -219,6 +219,8 @@ try {
                                                  subItem.start_date = customerSubscriptions[i].start_date;
                                                  subItem.productID = customerSubscriptions[i].items?.data[0]?.price?.product;
                                                  subItem.unitAmount = customerSubscriptions[i].items?.data[0]?.price?.unit_amount;
+                                                 subItem.interval = customerSubscriptions[i].items?.data[0]?.price?.recurring?.interval;
+                                                 subItem.intervalCount = customerSubscriptions[i].items?.data[0]?.price?.recurring?.interval_count;
                                                  console.log(customers.data[k].id + " Server Slot " + data[j].serverId + " subscription: ");
                                                   console.log(JSON.stringify(subItem));
 
@@ -336,6 +338,8 @@ try {
                                                  subItem.start_date = customerSubscriptions[i].start_date;
                                                  subItem.productID = customerSubscriptions[i].items?.data[0]?.price?.product;
                                                  subItem.unitAmount = customerSubscriptions[i].items?.data[0]?.price?.unit_amount;
+                                                 subItem.interval = customerSubscriptions[i].items?.data[0]?.price?.recurring?.interval;
+                                                 subItem.intervalCount = customerSubscriptions[i].items?.data[0]?.price?.recurring?.interval_count;
                                                                                                   console.log(customers.data[k].id + "Server Slot " + data[j].serverId + " subscription: ");
                                                  console.log(subItem);
 
