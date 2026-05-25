@@ -388,4 +388,177 @@ router.get("/lookup/:accountId", (req, res) => {
   }
 });
 
+// Helper: ensure URL ends with a slash
+function normalizeUrl(url) {
+  return url.endsWith("/") ? url : url + "/";
+}
+
+// Helper: collect account fingerprints from this node's accounts directory
+function getLocalAccountSummaries() {
+  const summaries = [];
+  if (!fs.existsSync("accounts")) return summaries;
+  for (const file of fs.readdirSync("accounts")) {
+    if (!file.endsWith(".json")) continue;
+    try {
+      const data = readJSON(`accounts/${file}`);
+      if (!data.accountId) continue;
+      const filenameKey = file.replace(/\.json$/, "");
+      // e.g. "email:user@example.com" → "user@example.com", "discord:123" → "123"
+      const username = filenameKey.includes(":") ? filenameKey.split(":").slice(1).join(":") : filenameKey;
+      summaries.push({
+        email: data.email || null,
+        username,
+        accountId: data.accountId,
+        type: data.type || null,
+      });
+    } catch (_) {}
+  }
+  return summaries;
+}
+
+// Check whether accounts with the given emails or usernames exist on this node.
+// Called by /admin/cross-node-duplicates on remote nodes. Requires admin auth.
+router.post("/check-accounts", (req, res) => {
+  try {
+    const { emails = [], usernames = [] } = req.body;
+
+    if (!Array.isArray(emails) || !Array.isArray(usernames)) {
+      return res.status(400).json({ error: "emails and usernames must be arrays" });
+    }
+
+    if (emails.length === 0 && usernames.length === 0) {
+      return res.json({ matches: [] });
+    }
+
+    const emailSet = new Set(emails.map((e) => e.toLowerCase()));
+    const usernameSet = new Set(usernames.map((u) => u.toLowerCase()));
+    const matches = [];
+
+    if (!fs.existsSync("accounts")) {
+      return res.json({ matches: [] });
+    }
+
+    for (const file of fs.readdirSync("accounts")) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const data = readJSON(`accounts/${file}`);
+        if (!data.accountId) continue;
+
+        const filenameKey = file.replace(/\.json$/, "");
+        const username = filenameKey.includes(":") ? filenameKey.split(":").slice(1).join(":") : filenameKey;
+        const email = data.email || null;
+
+        const emailMatch = email && emailSet.has(email.toLowerCase());
+        const usernameMatch = usernameSet.has(username.toLowerCase());
+
+        if (emailMatch || usernameMatch) {
+          matches.push({
+            email,
+            username,
+            accountId: data.accountId,
+            type: data.type || null,
+          });
+        }
+      } catch (_) {}
+    }
+
+    res.json({ matches });
+  } catch (err) {
+    console.error("Error in /admin/check-accounts:", err);
+    res.status(500).json({ error: "Failed to check accounts" });
+  }
+});
+
+// Scan all nodes registered with observer for accounts that duplicate any account on this node.
+// Duplicate = same billing email OR same login username, regardless of account type.
+// Body: { observerUrl: string, nodes: [{ url: string, username: string, token: string }] }
+router.post("/cross-node-duplicates", async (req, res) => {
+  try {
+    const { observerUrl, nodes } = req.body;
+
+    if (!observerUrl || !Array.isArray(nodes)) {
+      return res.status(400).json({ error: "observerUrl and nodes array are required" });
+    }
+
+    // Collect fingerprints from this node
+    const localAccounts = getLocalAccountSummaries();
+    const localEmails = localAccounts.map((a) => a.email).filter(Boolean);
+    const localUsernames = localAccounts.map((a) => a.username).filter(Boolean);
+
+    // Fetch node list from observer
+    const observerBase = normalizeUrl(observerUrl);
+    let nodeList;
+    try {
+      const resp = await fetch(`${observerBase}api/nodeInfo/list`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      nodeList = await resp.json();
+    } catch (err) {
+      return res.status(502).json({ error: `Failed to fetch node list from observer: ${err.message}` });
+    }
+
+    if (!Array.isArray(nodeList)) {
+      return res.status(502).json({ error: "Observer returned unexpected node list format" });
+    }
+
+    // For each node we have credentials for, call /admin/check-accounts
+    const results = [];
+    for (const nodeUrl of nodeList) {
+      const normalizedNodeUrl = normalizeUrl(nodeUrl);
+      const creds = nodes.find((n) => normalizeUrl(n.url) === normalizedNodeUrl);
+      if (!creds) continue;
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
+        const resp = await fetch(`${normalizedNodeUrl}admin/check-accounts`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            username: creds.username,
+            token: creds.token,
+          },
+          body: JSON.stringify({ emails: localEmails, usernames: localUsernames }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (resp.ok) {
+          const data = await resp.json();
+          results.push({ node: normalizedNodeUrl, matches: data.matches || [], error: null });
+        } else {
+          results.push({ node: normalizedNodeUrl, matches: [], error: `HTTP ${resp.status}` });
+        }
+      } catch (err) {
+        results.push({ node: normalizedNodeUrl, matches: [], error: err.message });
+      }
+    }
+
+    // Group duplicate accounts: keyed by email (preferred) or username
+    const duplicateMap = {};
+    for (const { node, matches } of results) {
+      for (const match of matches) {
+        const key = match.email ? match.email.toLowerCase() : match.username.toLowerCase();
+        if (!duplicateMap[key]) {
+          duplicateMap[key] = { email: match.email, username: match.username, nodes: [] };
+        }
+        duplicateMap[key].nodes.push({ node, accountId: match.accountId, type: match.type });
+      }
+    }
+
+    const config = utils.getConfig();
+    res.json({
+      localNode: config.nodeName || null,
+      scannedNodes: nodeList.length,
+      checkedNodes: results.filter((r) => !r.error).length,
+      duplicates: Object.values(duplicateMap),
+      errors: results.filter((r) => r.error).map((r) => ({ node: r.node, error: r.error })),
+    });
+  } catch (err) {
+    console.error("Error in /admin/cross-node-duplicates:", err);
+    res.status(500).json({ error: "Failed to scan cross-node duplicates" });
+  }
+});
+
 module.exports = router;
