@@ -1,8 +1,8 @@
 const express = require("express");
 const Router = express.Router();
-let stripeKey = require("../scripts/utils.js").getConfig().stripeKey;
-const stripe = require("stripe")(stripeKey);
 const config = require("../scripts/utils.js").getConfig();
+let stripeKey = config.stripeKey;
+const stripe = require("stripe")(stripeKey);
 
 Router.post("/:priceId", async (req, res) => {
   try {
@@ -40,6 +40,8 @@ Router.post("/:priceId", async (req, res) => {
       }
     }
 
+    const freeTrialEnabled = config.enableFreeTrial === "true";
+
     const session = await stripe.checkout.sessions.create({
       ui_mode: uiMode,
       ...(customer_email && { customer_email: customer_email }), // This line will only add the customer_email field if it's not null
@@ -56,8 +58,9 @@ Router.post("/:priceId", async (req, res) => {
         },
       ],
       mode: "subscription",
-...(uiMode === "embedded" && { return_url: config.stripeReturnUrl }),
-...(uiMode === "hosted" && { success_url: config.stripeReturnUrl, cancel_url: "https://servers.arthmc.xyz/signup/plans" }),
+      ...(freeTrialEnabled && { subscription_data: { trial_period_days: 14 } }),
+      ...(uiMode === "embedded" && { return_url: config.stripeReturnUrl }),
+      ...(uiMode === "hosted" && { success_url: config.stripeReturnUrl, cancel_url: "https://servers.arthmc.xyz/signup/plans" }),
       automatic_tax: { enabled: true },
     });
 

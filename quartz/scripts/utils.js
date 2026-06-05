@@ -410,7 +410,8 @@ try {
           if (data[i].subscriptions != undefined) {
             for (let j in data[i].subscriptions) {
               if (
-                data[i].subscriptions[j].status == "active"
+                data[i].subscriptions[j].status == "active" ||
+                data[i].subscriptions[j].status == "trialing"
               ) {
                 isActiveSubscription = true;
                 break;
@@ -457,19 +458,21 @@ if (Date.now() - latestEndDate > 1000 * 60 * 60 * 24 * 7) {
     if (customers.data.length > 0) {
       const customerId = customers.data[0].id;
       
-      // Get all subscriptions for this customer
+      // Get all subscriptions for this customer (active or trialing both protect the server)
       return stripe.subscriptions.list({
         customer: customerId,
-        status: 'active',
+        status: 'all',
         limit: 100
-      });
+      }).then(all => ({
+        data: all.data.filter(s => s.status === 'active' || s.status === 'trialing')
+      }));
     } else {
       // No customer found, return empty result
       return { data: [] };
     }
   })
   .then(subscriptions => {
-    // Check if any active subscriptions exist
+    // Check if any active or trialing subscriptions exist
     if (subscriptions.data.length > 0) {
       console.log("Found active subscription(s) for " + data[i].email + ", skipping server " + data[i].serverId);
       return; // Exit early if subscriptions found

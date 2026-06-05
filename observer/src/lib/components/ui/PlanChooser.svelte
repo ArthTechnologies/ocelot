@@ -34,6 +34,12 @@
   let atCapacity = false;
   onMount(() => {
 
+    if (browser) {
+      fetch(apiurl + "info/")
+        .then(r => r.json())
+        .then(d => { freeTrialEnabled = d.enableFreeTrial || false; })
+        .catch(() => {});
+    }
 
     if (browser) {
 
@@ -64,6 +70,8 @@
 
   });
 
+
+  let freeTrialEnabled = false;
 
   let basicPlanPrice = 5.99;
   let plusPlanPrice = 8.99;
@@ -258,10 +266,10 @@
       <p class="font-poppins-bold text-gray-200 text-sm md:text-lg truncate">Basic</p>
 
 
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
           <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">$5.99/mo</p>
           <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">4GB RAM</p>
-
+          {#if freeTrialEnabled}<p class="bg-success bg-opacity-20 text-success px-1.5 rounded text-xs font-poppins">14-day free trial</p>{/if}
         </div>
     
     </div>
@@ -277,10 +285,10 @@
         <p class="font-poppins-bold text-gray-200 text-sm md:text-lg truncate">Plus</p>
 
 
-          <div class="flex gap-2">
+          <div class="flex gap-2 flex-wrap">
             <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">$8.99/mo</p>
             <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">6GB RAM</p>
-
+            {#if freeTrialEnabled}<p class="bg-success bg-opacity-20 text-success px-1.5 rounded text-xs font-poppins">14-day free trial</p>{/if}
           </div>
       
       </div>
@@ -296,10 +304,10 @@
           <p class="font-poppins-bold text-gray-200 text-sm md:text-lg truncate">Premium</p>
   
   
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap">
               <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">$11.99/mo</p>
               <p class="bg-base-300 bg-opacity-80 px-1.5 rounded text-xs font-poppins">8GB RAM</p>
-
+              {#if freeTrialEnabled}<p class="bg-success bg-opacity-20 text-success px-1.5 rounded text-xs font-poppins">14-day free trial</p>{/if}
             </div>
         
         </div>

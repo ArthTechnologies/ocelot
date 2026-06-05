@@ -85,7 +85,7 @@ router.get(`/servers`, function (req, res) {
                 if (item.start_date > latestStartDate) {
                   latestStartDate = item.start_date;
                 }
-                if (item.status == "active") {
+                if (item.status == "active" || item.status == "trialing") {
                   hasValidSubscription = true;
                 } else {
                   resetDate = parseInt(item.current_period_end) + 604800;
@@ -218,6 +218,7 @@ router.get(`/billing`, function (req, res) {
                         currency: plan.currency,
                         created: subscriptions2.data[i].created,
                         canceled_at: subscriptions2.data[i].canceled_at,
+                        trial_end: subscriptions2.data[i].trial_end,
                       });
 
                     } catch {
@@ -362,6 +363,7 @@ router.get(`/`, function (req, res) {
   returnObject["cloudflareVerifySiteKey"] = config.cloudflareVerifySiteKey;
   returnObject["enableDeepL"] =
     config.deeplKey != "" && config.deeplKey != null;
+  returnObject["enableFreeTrial"] = config.enableFreeTrial === "true";
   for (var key in readJSON("assets/data.json")) {
     returnObject[key] = readJSON("assets/data.json")[key];
   }

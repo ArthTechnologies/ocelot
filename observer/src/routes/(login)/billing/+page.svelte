@@ -253,6 +253,8 @@
     switch (status) {
       case 'active':
         return 'badge-success';
+      case 'trialing':
+        return 'badge-info';
       case 'canceled':
         return 'badge-warning';
       case 'past_due':
@@ -270,6 +272,8 @@
     switch (status) {
       case 'active':
         return CheckCircle;
+      case 'trialing':
+        return Clock;
       case 'canceled':
         return XCircle;
       case 'past_due':
@@ -305,7 +309,7 @@
   $: sortedSubscriptions = [...subs.subscriptions]
     .filter(sub => {
       if (subscriptionFilter === "active") {
-        return sub.status === "active";
+        return sub.status === "active" || sub.status === "trialing";
       }
       return true;
     })
@@ -453,7 +457,10 @@
                     </div>
                     <div class="text-xs text-gray-400 mt-2">
                       Started {formatDate(subscription.created)}
-                      {#if subscription.canceled_at}
+                      {#if subscription.status === 'trialing' && subscription.trial_end}
+                        <span class="mx-1">·</span>
+                        <span class="text-info">Free trial ends {formatDate(subscription.trial_end)}</span>
+                      {:else if subscription.canceled_at}
                         <span class="mx-1">·</span>
                         {subscription.status === 'active' ? 'Cancels' : 'Ended'} {formatDate(subscription.canceled_at)}
                       {/if}
