@@ -90,33 +90,121 @@ router.post("/extract/:path", function (req, res) {
       filename.includes(".zip")
     ) {
       //unzip the file and put it in /servers/id/{filename}
-      const exec = require("child_process").exec;
-      console.log(
-        `unzip -o "servers/` +
-          req.params.id +
-          `/${path}" -d "servers/` +
-          req.params.id +
-          `/${filename.split(".zip")[0]}"`
-      );
-      exec(
-        `unzip -o "servers/` +
-          req.params.id +
-          `/${path}" -d "servers/` +
-          req.params.id +
-          `/${path.split(".zip")[0]}"`,
-        (err, stdout, stderr) => {
-          if (err) {
-            console.log(err);
-          } else {
-            res.status(200).json({ msg: "Done" });
-          }
+      const spawn = require("child_process").spawn;
+      const srcPath = `servers/${req.params.id}/${path}`;
+      const destPath = `servers/${req.params.id}/${path.split(".zip")[0]}`;
+      console.log(`unzip -o "${srcPath}" -d "${destPath}"`);
+
+      // Stream newline-delimited JSON progress events so the client can render
+      // an accurate progress bar. Progress is derived from unzip's own output,
+      // not estimated.
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("X-Accel-Buffering", "no"); // don't let a proxy buffer the stream
+
+      // Emit an error event (and close the stream). Always uses an `error`
+      // field so the client can surface it regardless of which step failed.
+      const sendError = (message) => {
+        if (res.writableEnded) return;
+        res.write(JSON.stringify({ error: message }) + "\n");
+        res.end();
+      };
+
+      // If the client navigates away or closes the modal, stop unzipping
+      // instead of leaving an orphaned process writing to a dead socket.
+      let activeChild = null;
+      res.on("close", () => {
+        if (activeChild && !activeChild.killed) activeChild.kill();
+      });
+
+      // Step 1: count the archive's members. `unzip -Z -1` prints one member
+      // (file or directory) per line, which is the real total to extract.
+      let listBuffer = "";
+      let listErr = "";
+      const lister = spawn("unzip", ["-Z", "-1", srcPath]);
+      activeChild = lister;
+      lister.stdout.on("data", (chunk) => (listBuffer += chunk.toString()));
+      lister.stderr.on("data", (chunk) => (listErr += chunk.toString()));
+      lister.on("error", (err) => {
+        console.log(err);
+        sendError(
+          "Couldn't read the archive — is the `unzip` command installed on the host?"
+        );
+      });
+      lister.on("close", (listCode) => {
+        if (listCode !== 0) {
+          console.log("unzip -Z exited with code " + listCode + ": " + listErr);
+          sendError(
+            "Couldn't read the archive (it may be corrupt or not a valid zip)."
+          );
+          return;
         }
-      );
+
+        const total = listBuffer
+          .split("\n")
+          .filter((l) => l.trim().length > 0).length;
+
+        // Step 2: extract (without -q) so unzip prints one line per member as
+        // it processes it. We count those lines to track real progress.
+        const unzip = spawn("unzip", ["-o", srcPath, "-d", destPath]);
+        activeChild = unzip;
+        // matches "  inflating: x", "  extracting: x" (stored), " creating: x/" (dir)
+        const memberLine = /^\s*(inflating|extracting|creating):/;
+        let extracted = 0;
+        let lineBuffer = "";
+        let errBuffer = "";
+
+        unzip.stdout.on("data", (chunk) => {
+          lineBuffer += chunk.toString();
+          let nl;
+          while ((nl = lineBuffer.indexOf("\n")) !== -1) {
+            const line = lineBuffer.slice(0, nl);
+            lineBuffer = lineBuffer.slice(nl + 1);
+            if (memberLine.test(line)) {
+              extracted++;
+              const progress =
+                total > 0
+                  ? Math.min(100, Math.round((extracted / total) * 100))
+                  : 0;
+              res.write(JSON.stringify({ extracted, total, progress }) + "\n");
+            }
+          }
+        });
+        unzip.stderr.on("data", (chunk) => (errBuffer += chunk.toString()));
+
+        unzip.on("error", (err) => {
+          console.log(err);
+          sendError("Failed to start the extraction process.");
+        });
+        unzip.on("close", (code) => {
+          if (code === 0) {
+            if (res.writableEnded) return;
+            res.write(
+              JSON.stringify({ msg: "Done", extracted, total, progress: 100 }) +
+                "\n"
+            );
+            res.end();
+          } else {
+            console.log("unzip exited with code " + code + ": " + errBuffer);
+            // unzip uses exit code 50 when it runs out of disk space.
+            const reason =
+              code === 50
+                ? "Ran out of disk space while extracting."
+                : (errBuffer.trim().split("\n").pop() ||
+                    "Extraction failed (code " + code + ").");
+            sendError(reason);
+          }
+        });
+      });
     } else {
-      res.status(400).json({ msg: "Invalid request." });
+      res
+        .status(400)
+        .json({ msg: "Invalid request.", error: "File not found or not a .zip archive." });
     }
   } else {
-    res.status(401).json({ msg: "Invalid credentials." });
+    res
+      .status(401)
+      .json({ msg: "Invalid credentials.", error: "Invalid credentials." });
   }
 });
 

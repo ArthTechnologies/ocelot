@@ -132,34 +132,88 @@
       });
   }
 
-  function extractFile() {
+  let extracting = false;
+  let extractProgress = 0;
+  let extractError = "";
+
+  async function extractFile() {
     let baseurl = apiurl;
     if (usingOcelot) baseurl = getServerNode(id);
     //if url starts with /, remove it
     if (url.startsWith("/")) {
       url = url.substring(1);
     }
-    fetch(`${baseurl}server/${id}/files/extract/${url.split("/").join("*")}`, {
-      method: "POST",
-      headers: {
-        token: localStorage.getItem("token"),
-        username: localStorage.getItem("accountEmail"),
-      },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data);
-        if (data.msg === "Done") {
-          // Close the modal by unchecking the checkbox
-          (
-            document.getElementById(`extract${filename}`) as HTMLInputElement
-          ).checked = false;
-          // Optionally, refresh or dispatch an event
-          const event = new CustomEvent("refresh");
-          document.dispatchEvent(event);
+    extracting = true;
+    extractProgress = 0;
+    extractError = "";
+    let done = false;
+    try {
+      const response = await fetch(
+        `${baseurl}server/${id}/files/extract/${url.split("/").join("*")}`,
+        {
+          method: "POST",
+          headers: {
+            token: localStorage.getItem("token"),
+            username: localStorage.getItem("accountEmail"),
+          },
         }
-      })
-      .catch((err) => console.error("Error extracting file:", err));
+      );
+
+      // The backend streams newline-delimited JSON progress events.
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      // Parse one NDJSON line, updating progress / error / done state.
+      const handleLine = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        try {
+          const data = JSON.parse(trimmed);
+          if (typeof data.progress === "number") extractProgress = data.progress;
+          if (data.error) extractError = data.error;
+          if (data.msg === "Done") done = true;
+        } catch {
+          // Non-JSON body (e.g. an unexpected error page) — show it raw.
+          extractError = trimmed;
+        }
+      };
+
+      while (true) {
+        const { value, done: streamDone } = await reader.read();
+        if (streamDone) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl;
+        while ((nl = buffer.indexOf("\n")) !== -1) {
+          handleLine(buffer.slice(0, nl));
+          buffer = buffer.slice(nl + 1);
+        }
+      }
+      // Flush any trailing content with no final newline. Auth/validation
+      // rejections (400/401) come back as a single JSON object like this.
+      if (buffer.trim()) handleLine(buffer);
+
+      // Network reached the server but it refused the request and sent no
+      // usable error payload — surface a status-based fallback.
+      if (!response.ok && !extractError && !done) {
+        extractError = `Extraction failed (HTTP ${response.status}).`;
+      }
+
+      if (done) {
+        // Close the modal by unchecking the checkbox
+        (
+          document.getElementById(`extract${filename}`) as HTMLInputElement
+        ).checked = false;
+        // Optionally, refresh or dispatch an event
+        const event = new CustomEvent("refresh");
+        document.dispatchEvent(event);
+      }
+    } catch (err) {
+      console.error("Error extracting file:", err);
+      extractError = "Extraction failed.";
+    } finally {
+      extracting = false;
+    }
   }
 
   function rename() {
@@ -403,11 +457,27 @@
           >/{url.split("*").join("/").split(".zip")[0]}</code
         >.
       </p>
-      <div class="flex gap-1">
-        <button on:click={extractFile} class="btn btn-success">
-          Extract
-        </button>
-      </div>
+      {#if extracting}
+        <div class="flex flex-col gap-2">
+          <progress
+            class="progress progress-success w-full"
+            value={extractProgress}
+            max="100"
+          ></progress>
+          <p class="text-sm opacity-70 text-center">
+            Extracting… {extractProgress}%
+          </p>
+        </div>
+      {:else}
+        {#if extractError}
+          <p class="text-error text-sm mb-2">{extractError}</p>
+        {/if}
+        <div class="flex gap-1">
+          <button on:click={extractFile} class="btn btn-success">
+            Extract
+          </button>
+        </div>
+      {/if}
     </div>
   </div>
 {/if}
