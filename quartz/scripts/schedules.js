@@ -194,13 +194,19 @@ function shouldTaskRun(task) {
   if (!task.enabled) return false;
 
   try {
-    const interval = cronParser.parseExpression(task.schedule);
     const now = new Date();
     const nextRun = new Date(task.nextRun);
 
+    // If nextRun is in the past by more than the check window, the task was
+    // missed (e.g. server was down). Advance nextRun to the next future slot
+    // without firing so we don't trigger a backlog of missed runs.
+    if (nextRun < now && now - nextRun >= 60000) {
+      updateTask(task.id, { nextRun: calculateNextRun(task.schedule) });
+      return false;
+    }
+
     // Consider a task ready if we're within 1 minute window
-    const timeDiff = Math.abs(now - nextRun);
-    return timeDiff < 60000;
+    return Math.abs(now - nextRun) < 60000;
   } catch (err) {
     console.error("Error parsing cron:", err);
     return false;
