@@ -1,5 +1,5 @@
 # <img width="30" height="30" alt="New Piskel-1 png(1)" src="https://github.com/user-attachments/assets/c053381c-3c39-439a-95e0-fed56d37cb10" /> Ocelot
-Ocelot is only supported on linux.
+Ocelot is only supported on linux. After many years of open source licensing, we have no choice but to switch to All Rights Reserved since there has been virtually zero contribution from the open source community whilst posing risk to Arth Hosting, our only current source of income as a company.
 
 Self-hosting Minecraft servers can be very useful, but most panels out there are often difficult and can seem like a black box.
 Ocelot was built from the ground up, with simplicity, design, and performance in mind. We're nearing our 1.0 release, and have these features already implemented:
