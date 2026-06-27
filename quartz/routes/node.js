@@ -1,6 +1,7 @@
 const express = require("express");
 const Router = express.Router();
 const fs = require("fs");
+const { execSync } = require("child_process");
 const readJSON = require("../scripts/utils.js").readJSON;
 const data = readJSON("assets/data.json");
 const files = require("../scripts/files.js");
@@ -88,6 +89,33 @@ Router.post("/account", (req, res) => {
   } else {
     res.status(401).json({ msg: "This node does not support forwarding." });
   }
+});
+
+Router.get("/qa", (req, res) => {
+  let zipInstalled = false;
+  try { execSync("which zip", { stdio: "ignore" }); zipInstalled = true; } catch {}
+
+  let unzipInstalled = false;
+  try { execSync("which unzip", { stdio: "ignore" }); unzipInstalled = true; } catch {}
+
+  let latestPaper = null;
+  try {
+    const jars = fs.readdirSync("assets/jars").filter(f => f.startsWith("paper-") && f.endsWith(".jar"));
+    const versions = jars.map(f => {
+      const match = f.match(/^paper-(\d+\.\d+(?:\.\d+)?)/);
+      return match ? { file: f, parts: match[1].split(".").map(Number) } : null;
+    }).filter(Boolean);
+    versions.sort((a, b) => {
+      for (let i = 0; i < Math.max(a.parts.length, b.parts.length); i++) {
+        const diff = (a.parts[i] || 0) - (b.parts[i] || 0);
+        if (diff !== 0) return diff;
+      }
+      return 0;
+    });
+    if (versions.length > 0) latestPaper = versions[versions.length - 1].file;
+  } catch {}
+
+  res.status(200).json({ zip: zipInstalled, unzip: unzipInstalled, latestPaper });
 });
 
 module.exports = Router;
