@@ -1138,10 +1138,14 @@ ls.stderr.on("data", data => {
         try {
           const tag = geyserStampedJar.replace("geyser-spigot-", "").replace(".jar", "");
           const decoded = Buffer.from(tag, "base64").toString("utf8");
-          const [buildNumber, timestamp] = decoded.split(":");
+          const colonIdx = decoded.indexOf(":");
+          const buildNumber = decoded.slice(0, colonIdx);
+          const timestamp = decoded.slice(colonIdx + 1);
           const date = new Date(timestamp);
           const dateStr = date.toLocaleString("en-US", { month: "long", day: "numeric" });
-          terminalOutput[id] += `\n[Arth]: Geyser build ${buildNumber} from ${dateStr} is installed`;
+          setTimeout(() => {
+            terminalOutput[id] += `\n[Arth]: Geyser build ${buildNumber} from ${dateStr} is installed`;
+          }, 2000);
         } catch (_) {}
       }
       //create /plugins/Geyser-Spigot/
