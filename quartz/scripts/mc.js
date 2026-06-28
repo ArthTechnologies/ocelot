@@ -1119,20 +1119,30 @@ ls.stderr.on("data", data => {
 
     text = textByLine.join("\n");
 
+    const geyserStampedJar = fs.readdirSync("assets/jars").find(f => f.startsWith("geyser-spigot-") && f.endsWith(".jar"));
+
     if (software == "paper" || software == "spigot") {
       if (
-        fs.existsSync("assets/jars/geyser-spigot.jar") &&
+        geyserStampedJar &&
         (fs.existsSync(folder + "/plugins/cx_geyser-spigot_Geyser.jar") ||
           isNew)
       ) {
         fs.copyFileSync(
-          "assets/jars/geyser-spigot.jar",
+          "assets/jars/" + geyserStampedJar,
           folder + "/plugins/cx_geyser-spigot_Geyser.jar"
         );
         fs.copyFileSync(
           "assets/jars/floodgate-spigot.jar",
           folder + "/plugins/cx_floodgate-spigot_Floodgate.jar"
         );
+        try {
+          const tag = geyserStampedJar.replace("geyser-spigot-", "").replace(".jar", "");
+          const decoded = Buffer.from(tag, "base64").toString("utf8");
+          const [buildNumber, timestamp] = decoded.split(":");
+          const date = new Date(timestamp);
+          const dateStr = date.toLocaleString("en-US", { month: "long", day: "numeric" });
+          terminalOutput[id] += `\n[Arth]: Geyser build ${buildNumber} from ${dateStr} is installed`;
+        } catch (_) {}
       }
       //create /plugins/Geyser-Spigot/
       if (!fs.existsSync(folder + "/plugins/Geyser-Spigot")) {

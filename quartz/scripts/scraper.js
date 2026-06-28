@@ -335,8 +335,26 @@ async function downloadFabricJars() {
 }
 
 async function downloadGeyserJars() {
+        const metaRes = await fetch("https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest");
+        if (!metaRes.ok) {
+            scraperLog.push({ filename: "geyser-spigot.jar", url: "", success: false, timestamp: new Date().toISOString(), error: `Metadata fetch failed: HTTP ${metaRes.status}` });
+            return;
+        }
+        const meta = await metaRes.json();
+        const buildNumber = meta.build;
+        const timestamp = meta.time ?? new Date().toISOString();
+        const tag = Buffer.from(`${buildNumber}:${timestamp}`).toString("base64");
+        const stamped = `geyser-spigot-${tag}.jar`;
 
-        await downloadAndLogJar("geyser-spigot.jar", "https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/spigot");
+        // Remove old stamped geyser jars
+        const jarsDir = "assets/jars";
+        for (const f of fs.readdirSync(jarsDir)) {
+            if (f.startsWith("geyser-spigot-") && f.endsWith(".jar")) {
+                fs.unlinkSync(path.join(jarsDir, f));
+            }
+        }
+
+        await downloadAndLogJar(stamped, "https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/spigot");
         await downloadAndLogJar("floodgate-spigot.jar", "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot");
 }
 
