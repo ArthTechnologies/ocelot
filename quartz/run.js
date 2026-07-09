@@ -287,125 +287,18 @@ function refreshTempToken() {
 }
 
 function downloadJars(type) {
-  console.log("running downloadJars")
+  console.log("running downloadJars");
   const datajson = readJSON("./assets/data.json");
   datajson.lastUpdate = Date.now();
-  
-
   writeJSON("assets/data.json", datajson);
-  if (type == "full") {
-    console.log("calling scraper.js");	
-  scraper.fullDownload();
-  } else if (type == "partial") {
+
+  if (type === "full") {
+    console.log("calling scraper.js (full download)");
+    scraper.fullDownload();
+  } else if (type === "partial") {
+    console.log("calling scraper.js (partial download)");
     scraper.partialDownload();
   }
-
-  setTimeout(() => {
-    const scraperjson = readJSON("./assets/scraper.json");
-      let downloads = [];
-  for (let i in scraperjson) {
-    if (scraperjson[i].includes("https://")) {
-      downloads.push({filename: i, url: scraperjson[i], status: "downloading"});
-    }
-  }
-
-
-
-      try {
-  
-      let counter = 0;
-      for (let i in scraperjson) {
-
-        counter++;
-        try {
-          //create downloads folder if it doesn't exist
-          if (!fs.existsSync("assets/jars/downloads")) {
-            fs.mkdirSync("assets/jars/downloads");
-          }
-        let filename = i;
-
-
-        let url = scraperjson[i];
-        let software = filename.split("-")[0];
-        let version = filename.split("-")[1];
-        let extension = filename.split(".")[filename.split(".").length - 1];
-        let variant = "release"; // Default to release
-
-        if (filename.split("-").length > 2) {
-          variant = filename.split("-")[2].split("."+extension)[0];
-        } else {
-          version = version.split("."+extension)[0];
-        }
-
-        let newFilename = `${software}-${version}-${variant}.${extension}`;
-  
-        setTimeout(() => {
-       
-        files.downloadAsync("assets/jars/downloads/"+newFilename, url, (data) => {
-          if (data == "error") {
-                    for (let j in downloads) {
-          if (downloads[j].filename == filename) {
-            downloads[j].status = "failed";
-          }
-        }
-          }
-          try {
-                      if (fs.existsSync(`assets/jars/${newFilename}`)) {
-            fs.unlinkSync(`assets/jars/${newFilename}`);
-          }
-          fs.copyFileSync(
-            `assets/jars/downloads/${newFilename}`,
-            `assets/jars/${newFilename}`
-          );
-          fs.unlinkSync(`assets/jars/downloads/${newFilename}`);
-          //change the status of the download to downloaded
-
-          for (let j in downloads) {
-            if (downloads[j].filename == filename) {
-              downloads[j].status = "downloaded";
-            }
-          }
-          } catch (e) {
-            console.log("Error copying file: " + e);
-            //change the status of the download to failed
-            for (let j in downloads) {
-              if (downloads[j].filename == filename) {
-                downloads[j].status = "failed";
-              }
-            }
-          }
-        });
-      }, 200 * counter);
-
-      } catch (e) {
-        console.log("Error downloading file: " + e);
-        //change the status of the download to failed
-        for (let j in downloads) {
-          if (downloads[j].filename == filename) {
-            downloads[j].status = "failed";
-          }
-        }
-      }
-    }
-  } catch (e) {
-    console.log("Error reading jar links: " + e);
-  }
-      setInterval(() => {
-    let amountDownloaded = 0; 
-    for (let i in downloads) {
-      if (downloads[i].status == "downloaded") {
-        amountDownloaded++;
-      }
-    }
-
-    fs.writeFileSync("logs/downloads.json", JSON.stringify(downloads, null, 2));
-  }, 1000);
-  
-  }, 1000 * 15);
-
-
-    
- 
 }
 
 function backup() {
