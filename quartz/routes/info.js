@@ -345,6 +345,148 @@ router.get(`/billing/paymentIntentReason`, function (req, res) {
   }
 });
 
+// ---- Billing actions: plan changes, upcoming invoice, cancellation ----
+
+// Hardcoded Stripe price IDs per plan/interval (matches the checkout links)
+const planPrices = {
+  basic: {
+    monthly: "price_1R2FxgJYPXquzaSzQyzJBmsx",
+    quarterly: "price_1RqfTEJYPXquzaSzw5syXRoh",
+  },
+  plus: {
+    monthly: "price_1R2G3zJYPXquzaSzRRkaQC4J",
+    quarterly: "price_1RqfVEJYPXquzaSzUvlz5wcL",
+  },
+  premium: {
+    monthly: "price_1RrQfbJYPXquzaSzycdO5k05",
+    quarterly: "price_1RqfUeJYPXquzaSzRvqDjfVQ",
+  },
+};
+
+// Retrieves the subscription and confirms it belongs to this account's
+// Stripe customer, so users can't act on other people's subscriptions.
+async function findOwnedSubscription(account, subscriptionId) {
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const customer = await stripe.customers.retrieve(subscription.customer);
+  if (customer.deleted || customer.email !== account.email) return null;
+  return subscription;
+}
+
+router.get(`/billing/upcomingInvoice`, async function (req, res) {
+  let email = req.headers.username;
+  let token = req.headers.token;
+  if (mode === "solo") email = "noemail";
+  let account = readJSON(`accounts/${email}.json`);
+  if (token !== account.token && mode !== "solo") {
+    return res.status(401).json({ msg: `Invalid credentials.` });
+  }
+
+  const subscriptionId = req.query.subscriptionId;
+  if (!subscriptionId) {
+    return res.status(400).json({ msg: "subscriptionId required" });
+  }
+
+  try {
+    const subscription = await findOwnedSubscription(account, subscriptionId);
+    if (!subscription) {
+      return res.status(403).json({ msg: "Subscription does not belong to this account." });
+    }
+
+    const upcoming = await stripe.invoices.retrieveUpcoming({
+      subscription: subscriptionId,
+    });
+    res.status(200).json({
+      invoice: {
+        amount_due: upcoming.amount_due / 100,
+        currency: upcoming.currency,
+        date: upcoming.next_payment_attempt || upcoming.period_end,
+      },
+    });
+  } catch (err) {
+    // Stripe returns this when the subscription won't renew (canceled/ending)
+    if (err.code === "invoice_upcoming_none") {
+      return res.status(200).json({ invoice: null });
+    }
+    console.log("Error fetching upcoming invoice:", err);
+    res.status(500).json({ msg: "Failed to fetch upcoming invoice" });
+  }
+});
+
+router.post(`/billing/changePlan`, async function (req, res) {
+  let email = req.headers.username;
+  let token = req.headers.token;
+  if (mode === "solo") email = "noemail";
+  let account = readJSON(`accounts/${email}.json`);
+  if (token !== account.token && mode !== "solo") {
+    return res.status(401).json({ msg: `Invalid credentials.` });
+  }
+
+  const { subscriptionId, newPlan } = req.body || {};
+  if (!subscriptionId || !planPrices[newPlan]) {
+    return res.status(400).json({ msg: "subscriptionId and a valid newPlan (basic/plus/premium) required" });
+  }
+
+  try {
+    const subscription = await findOwnedSubscription(account, subscriptionId);
+    if (!subscription) {
+      return res.status(403).json({ msg: "Subscription does not belong to this account." });
+    }
+    if (subscription.status !== "active" && subscription.status !== "trialing" && subscription.status !== "past_due") {
+      return res.status(400).json({ msg: "Only active subscriptions can change plans." });
+    }
+
+    const item = subscription.items.data[0];
+    // Quarterly prices bill every 3 months; keep the same interval on the new plan
+    const interval = item.plan.interval_count === 3 ? "quarterly" : "monthly";
+    const newPriceId = planPrices[newPlan][interval];
+
+    if (item.price.id === newPriceId) {
+      return res.status(400).json({ msg: "Subscription is already on that plan." });
+    }
+
+    const updated = await stripe.subscriptions.update(subscriptionId, {
+      items: [{ id: item.id, price: newPriceId }],
+      proration_behavior: "create_prorations",
+    });
+
+    res.status(200).json({ success: true, status: updated.status, plan: newPlan });
+  } catch (err) {
+    console.log("Error changing plan:", err);
+    res.status(500).json({ msg: "Failed to change plan" });
+  }
+});
+
+router.post(`/billing/cancel`, async function (req, res) {
+  let email = req.headers.username;
+  let token = req.headers.token;
+  if (mode === "solo") email = "noemail";
+  let account = readJSON(`accounts/${email}.json`);
+  if (token !== account.token && mode !== "solo") {
+    return res.status(401).json({ msg: `Invalid credentials.` });
+  }
+
+  const { subscriptionId } = req.body || {};
+  if (!subscriptionId) {
+    return res.status(400).json({ msg: "subscriptionId required" });
+  }
+
+  try {
+    const subscription = await findOwnedSubscription(account, subscriptionId);
+    if (!subscription) {
+      return res.status(403).json({ msg: "Subscription does not belong to this account." });
+    }
+    if (subscription.status === "canceled") {
+      return res.status(400).json({ msg: "Subscription is already canceled." });
+    }
+
+    const canceled = await stripe.subscriptions.cancel(subscriptionId);
+    res.status(200).json({ status: canceled.status });
+  } catch (err) {
+    console.log("Error canceling subscription:", err);
+    res.status(500).json({ msg: "Failed to cancel subscription" });
+  }
+});
+
 router.get(`/`, function (req, res) {
   //add cors header
   res.header("Access-Control-Allow-Origin", "*");

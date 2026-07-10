@@ -1,8 +1,17 @@
 <script lang="ts">
   import { TikTok, Youtube, Users, Share2, Check } from "lucide-svelte";
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher, onMount, onDestroy } from "svelte";
 
   const dispatch = createEventDispatcher();
+
+  // Lock page scroll only while the modal is mounted; a :global(body) style
+  // rule would stay active app-wide once this component's CSS is loaded.
+  onMount(() => {
+    document.body.style.overflow = "hidden";
+  });
+  onDestroy(() => {
+    document.body.style.overflow = "";
+  });
 
   let selectedSource: string | null = null;
   let youtuberName: string = "";
@@ -195,9 +204,3 @@
     </button>
   </div>
 </div>
-
-<style>
-  :global(body) {
-    overflow: hidden;
-  }
-</style>
