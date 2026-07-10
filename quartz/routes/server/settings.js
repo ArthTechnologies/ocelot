@@ -217,6 +217,8 @@ try {
       allowedAccounts: allowedAccounts,
       javaVersion: server.javaVersion,
       startupFlags: server.startupFlags || "",
+      autoUpdate: server.autoUpdate === true,
+      software: server.software,
     });
   } else {
     res.status(401).json({ msg: `Invalid credentials.` });
@@ -241,6 +243,33 @@ router.post(`/setStartupFlags`, function (req, res) {
     }
   } else {
     res.status(401).json({ msg: `Invalid credentials.` });
+  }
+});
+
+// Toggle automatic Paper version updates (see scripts/autoupdate.js). Handled by
+// its own endpoint rather than the general POST / above, which rewrites the MOTD
+// and proxy config and so can't take a partial body.
+router.post(`/setAutoUpdate`, function (req, res) {
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON("accounts/" + email + ".json");
+  let server = readJSON("servers/" + req.params.id + "/server.json");
+
+  if (!utils.hasAccess(token, account, req.params.id)) {
+    return res.status(401).json({ msg: `Invalid credentials.` });
+  }
+  if ((server.software || "").toLowerCase() !== "paper") {
+    return res
+      .status(400)
+      .json({ msg: "Automatic updates are only available for Paper servers." });
+  }
+  try {
+    server.autoUpdate = req.body.autoUpdate === true;
+    writeJSON("servers/" + req.params.id + "/server.json", server);
+    res.status(200).json({ msg: "Done", autoUpdate: server.autoUpdate });
+  } catch (err) {
+    console.error("Error setting autoUpdate:", err);
+    res.status(500).json({ msg: "Error: " + err.message });
   }
 });
 

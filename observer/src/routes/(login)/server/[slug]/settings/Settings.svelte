@@ -31,6 +31,8 @@
   let numberIp = "Loading";
   let javaVersion = "0";
   let startupFlags = "";
+  let autoUpdate = false;
+  let savingAutoUpdate = false;
   export let type = "smallBtn";
 
   if (browser) {
@@ -71,6 +73,7 @@
         allowedAccounts = data.allowedAccounts;
         javaVersion = data.javaVersion;
         startupFlags = data.startupFlags || "";
+        autoUpdate = data.autoUpdate === true;
 
         if (document.getElementById("fSecret") != null) {
        
@@ -221,6 +224,43 @@
       })
       .catch((err) => {
         alert("Error: " + err);
+      });
+  }
+
+  // Toggles auto-update and saves immediately. On failure it reverts the
+  // checkbox so the UI never claims a state the server didn't accept.
+  function setAutoUpdate() {
+    let baseurl = apiurl;
+    if (usingOcelot) baseurl = getServerNode(id);
+    const desired = autoUpdate;
+    savingAutoUpdate = true;
+    fetch(baseurl + "server/" + id + "/settings/setAutoUpdate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        username: localStorage.getItem("accountEmail"),
+        token: localStorage.getItem("token"),
+      },
+      body: JSON.stringify({ autoUpdate: desired }),
+    })
+      .then((x) => x.json())
+      .then((x) => {
+        if (x.msg === "Done") {
+          alert(
+            desired ? "Automatic updates enabled." : "Automatic updates disabled.",
+            "success"
+          );
+        } else {
+          autoUpdate = !desired;
+          alert("Error: " + x.msg, "error");
+        }
+      })
+      .catch((err) => {
+        autoUpdate = !desired;
+        alert("Error: " + err, "error");
+      })
+      .finally(() => {
+        savingAutoUpdate = false;
       });
   }
 
@@ -385,6 +425,29 @@
               class="input input-bordered w-full"
               placeholder="Enter forwarding secret..."
             />
+          </div>
+
+          <!-- Automatic Updates (Paper only). Saves immediately on toggle. -->
+          <div class="p-4 rounded-lg hover:bg-base-200 transition">
+            <label class="cursor-pointer flex items-center gap-3">
+              <input
+                id="autoUpdate"
+                type="checkbox"
+                class="toggle toggle-primary"
+                bind:checked={autoUpdate}
+                on:change={setAutoUpdate}
+                disabled={savingAutoUpdate}
+              />
+              <span class="text-sm font-semibold">Automatically update to the latest version</span>
+            </label>
+            <div class="alert alert-warning gap-3 mt-3">
+              <AlertCircle size={20} />
+              <span class="text-sm">
+                This feature might not work properly if you have plugins other than
+                Geyser and Floodgate installed. Your server will restart to apply
+                each update.
+              </span>
+            </div>
           </div>
         </div>
       </div>

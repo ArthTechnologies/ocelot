@@ -40,6 +40,7 @@ const crypto = require("crypto");
 const files = require("./scripts/files.js");
 const scraper = require("./scripts/scraper.js");
 const schedules = require("./scripts/schedules.js");
+const autoupdate = require("./scripts/autoupdate.js");
 
 
 if (!fs.existsSync("config.txt")) {
@@ -1010,6 +1011,11 @@ schedules.registerFunction("runPeriodicTasks", async () => {
   removeUnusedAccounts();
 });
 
+schedules.registerFunction("autoUpdateServers", async () => {
+  console.log("[System Task] Auto-updating Paper servers...");
+  autoupdate.autoUpdatePaperServers(f);
+});
+
 // Create system tasks for maintenance
 (async () => {
   try {
@@ -1019,6 +1025,7 @@ schedules.registerFunction("runPeriodicTasks", async () => {
     const hasPartialJarTask = allSchedules.systemTasks.some((t) => t.command === "downloadPartialJars");
     const hasFullJarTask = allSchedules.systemTasks.some((t) => t.command === "downloadFullJars");
     const hasMaintenanceTask = allSchedules.systemTasks.some((t) => t.command === "runPeriodicTasks");
+    const hasAutoUpdateTask = allSchedules.systemTasks.some((t) => t.command === "autoUpdateServers");
 
     if (!hasPartialJarTask) {
       schedules.createSystemTask(null, "Download Partial Jars", "function", "0 */2 * * *", "downloadPartialJars");
@@ -1033,6 +1040,13 @@ schedules.registerFunction("runPeriodicTasks", async () => {
     if (!hasMaintenanceTask) {
       schedules.createSystemTask(null, "Periodic Maintenance", "function", "0 */12 * * *", "runPeriodicTasks");
       console.log("[Init] Created system task: Periodic Maintenance (every 12h)");
+    }
+
+    if (!hasAutoUpdateTask) {
+      // Runs at :30, half an hour after the partial-jar scrape at :00, so newly
+      // downloaded Paper builds are present when eligible servers are checked.
+      schedules.createSystemTask(null, "Auto-Update Servers", "function", "30 */2 * * *", "autoUpdateServers");
+      console.log("[Init] Created system task: Auto-Update Servers (every 2h)");
     }
   } catch (err) {
     console.error("[Init] Error creating system tasks:", err);
