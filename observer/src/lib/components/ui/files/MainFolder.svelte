@@ -31,13 +31,55 @@
 
   if (browser) {
     id = localStorage.getItem("serverID");
-        let key = localStorage.getItem("fileAccessKey");
-       downloadUrl = apiurl + "server/" + id + "/files/mainfolder?key=" + key;
-       console.log("Download URL: ", downloadUrl);
     if (localStorage.getItem("accountEmail").includes("@")) {
       accountType = "email";
     } else {
       accountType = localStorage.getItem("accountEmail").split(":")[0];
+    }
+  }
+
+  function baseUrl() {
+    return usingOcelot ? getServerNode(id) : apiurl;
+  }
+
+  let preparingDownload = false;
+  let downloadError = "";
+
+  // The key stored at login rotates out every 6 hours, and a stale one used to
+  // make the browser download the 401 response body as a .json file.
+  async function getDownloadUrl() {
+    preparingDownload = true;
+    downloadError = "";
+    downloadUrl = "";
+    try {
+      const response = await fetch(baseUrl() + "server/" + id + "/files/key", {
+        method: "GET",
+        headers: {
+          token: localStorage.getItem("token"),
+          username: localStorage.getItem("accountEmail"),
+        },
+      });
+
+      if (!response.ok) {
+        let msg = "Couldn't create a download link. Refresh the page and try again.";
+        try {
+          const data = await response.json();
+          if (data && data.msg) msg = data.msg;
+        } catch {
+          // non-JSON body
+        }
+        downloadError = msg;
+        return;
+      }
+
+      const data = await response.json();
+      localStorage.setItem("fileAccessKey", data.key);
+      downloadUrl = baseUrl() + "server/" + id + "/files/mainfolder?key=" + data.key;
+    } catch (err) {
+      console.error("Error preparing download:", err);
+      downloadError = "Couldn't create a download link — connection lost.";
+    } finally {
+      preparingDownload = false;
     }
   }
 
@@ -119,6 +161,7 @@
     </label>
     <label
       for="download{foldername}"
+      on:click={() => getDownloadUrl()}
       class="px-1.5 p-1 rounded-lg btn-ghost cursor-pointer gap-1 flex items-center"
     >
       <Download class="w-[.9rem] h-[.9rem] md:w-[1rem] md:h-[1rem]" />
@@ -186,10 +229,19 @@
       class="btn btn-neutral btn-sm btn-circle absolute right-2 top-2">✕</label
     >
     <h3 class="text-lg font-bold mb-5">Download Main Folder</h3>
-    <div class="flex gap-1">
-      <a href={downloadUrl} download id="downloadBtn" class="btn btn-accent btn-sm"
-        >{$t("button.download")}</a
-      >
-    </div>
+    {#if downloadError}
+      <p class="text-error text-sm mb-2">{downloadError}</p>
+      <button on:click={getDownloadUrl} class="btn btn-neutral btn-sm">Retry</button>
+    {:else if preparingDownload}
+      <button class="btn btn-accent btn-sm btn-disabled">
+        <Loader class="w-4 h-4 animate-spin" />
+      </button>
+    {:else}
+      <div class="flex gap-1">
+        <a href={downloadUrl} download id="downloadBtn" class="btn btn-accent btn-sm"
+          >{$t("button.download")}</a
+        >
+      </div>
+    {/if}
   </div>
 </div>

@@ -9,14 +9,21 @@
   export let modal = true;
   let uniqueId = Math.floor(Math.random() * 1000000);
 
-  function uploadFile() {
-    const formData = new FormData();
-    const fileInput = document.getElementById("upload" + foldername + "file");
-    const file = fileInput.files[0];
+  // Bound directly rather than looked up by id: two folders with the same name
+  // (say, two `config` dirs) rendered two inputs with identical ids, so
+  // getElementById always returned the first one.
+  let fileInput;
 
+  function uploadFile() {
+    const file = fileInput?.files?.[0];
+    if (!file) {
+      alert("Choose a file to upload first.", "error");
+      return;
+    }
+
+    const formData = new FormData();
     formData.append("file", file, file.name);
 
-    console.error("uploading");
     if (browser) {
       const uploadBtn = document.getElementById("uploadBtn" + uniqueId);
       //we normally use fetch, but we have to use XMLHttpRequest for this because fetch doesnt give progress of uploads.
@@ -55,14 +62,6 @@
         if (theme == "dark") uploadBtn.classList.remove("bg-[#112100]");
         if (theme == "light") uploadBtn.classList.remove("bg-[#143f04]");
       }
-
-      // Listen for refresh event
-      document.addEventListener("refresh", function () {
-        console.log("ending loading thing");
-        setTimeout(() => {
-          resetButton();
-        }, 100);
-      });
 
       // Track actual upload progress (cap at 99% until backend responds)
       let lastLoaded = 0;
@@ -104,21 +103,51 @@
       });
 
       xhr.addEventListener("load", (e) => {
-        console.log(e.target.response);
         requestFinished = true;
 
-        if (!e.target.response.includes("No Viruses Detected") &&
-          !e.target.response.includes("Upload Complete")
-        ) {
-          alert($t("alert.virusDetected"));
+        // `load` fires for every status, not just 2xx. The old check only looked
+        // for success strings in the body, so a 401 or a 500 stack trace fell
+        // through to the "Virus Detected" branch and told users their file was
+        // infected when their session had simply expired.
+        if (xhr.status >= 200 && xhr.status < 300) {
           resetButton();
-        } else {
           alert($t("alert.fileUploaded"), "success");
-          // Dispatch refresh event
-          const event = new CustomEvent("refresh");
-          document.dispatchEvent(event);
-          console.log("Dispatching refresh event");
+          document.dispatchEvent(new CustomEvent("refresh"));
+          return;
         }
+
+        resetButton();
+
+        if (xhr.status === 422) {
+          alert($t("alert.virusDetected"), "error");
+          return;
+        }
+        if (xhr.status === 503) {
+          alert("Upload blocked: virus scan couldn't run.", "error");
+          return;
+        }
+        if (xhr.status === 401) {
+          alert("Upload failed — your session expired. Log in again.", "error");
+          return;
+        }
+        if (xhr.status === 404) {
+          alert("Upload failed — the destination folder no longer exists.", "error");
+          document.dispatchEvent(new CustomEvent("refresh"));
+          return;
+        }
+        if (xhr.status === 413) {
+          alert("Upload failed — the file is too large.", "error");
+          return;
+        }
+
+        let msg = "Upload failed.";
+        try {
+          const data = JSON.parse(xhr.response);
+          if (data && data.msg) msg = data.msg;
+        } catch {
+          // non-JSON body (an HTML error page, usually)
+        }
+        alert(msg, "error");
       });
 
       xhr.addEventListener("error", (error) => {
@@ -128,15 +157,18 @@
         alert("Upload failed", "error");
       });
 
+      // Uploads have to reach the node that actually holds this server.
+      const baseurl = usingOcelot ? getServerNode(id) : apiurl;
+
       xhr.open(
         "POST",
-        apiurl +
+        baseurl +
           "server/" +
           id +
           "/files/upload/" +
           uploadpath +
           "?filename=" +
-          file.name,
+          encodeURIComponent(file.name),
         true
       );
       xhr.setRequestHeader("token", localStorage.getItem("token"));
@@ -146,10 +178,10 @@
   }
 </script>
 
-{#if modal}
 <div class="flex gap-1 mt-2">
   <input
-    id="upload{foldername}file"
+    bind:this={fileInput}
+    id="upload{uniqueId}file"
     type="file"
     class="file-input file-input-bordered file-input-secondary w-full max-w-xs"
   />
@@ -157,15 +189,3 @@
     {$t("button.upload")}</button
   >
 </div>
-{:else}
-<div class="flex gap-1 mt-2">
-  <input
-    id="upload{foldername}file"
-    type="file"
-    class="file-input file-input-bordered file-input-secondary w-full max-w-xs"
-  />
-  <button id="uploadBtn{uniqueId}" on:click={uploadFile} class="btn btn-neutral">
-    {$t("button.upload")}</button
-  >
-</div>
-{/if}

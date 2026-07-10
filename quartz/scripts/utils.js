@@ -67,6 +67,9 @@ function refreshPermissions() {
 function hasAccess(token, account, id) {
   let server = readJSON(`servers/${id}/server.json`);
   if (mode === "solo") return true;
+  // A request with no token header used to throw on token.includes() below,
+  // producing a 500 HTML page that callers then tried to parse as JSON.
+  if (typeof token !== "string" || account == undefined) return false;
   let accountOwner = token === account.token;
   let serverOwner = server.accountId == account.accountId;
   let allowedAccount = false;

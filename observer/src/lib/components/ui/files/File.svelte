@@ -5,7 +5,7 @@
   export let filename: string;
   export let size: number;
   import { apiurl, usingOcelot, getServerNode } from "$lib/scripts/req";
-  import { downloadProgressShort, fileSizeShort } from "$lib/scripts/utils";
+  import { alert, downloadProgressShort, fileSizeShort } from "$lib/scripts/utils";
   import {
     File,
     FileText,
@@ -24,7 +24,6 @@
     MenuIcon,
     ChevronRight,
   } from "lucide-svelte";
-  import { Warning } from "postcss";
   let id;
   let extension = filename.split(".")[filename.split(".").length - 1];
 
@@ -67,7 +66,33 @@
   }
 
      key = localStorage.getItem("fileAccessKey");
-   
+
+  // Requests for this server have to go to the node that holds it, not the
+  // panel's default API host.
+  function baseUrl() {
+    return usingOcelot ? getServerNode(id) : apiurl;
+  }
+
+  function refresh() {
+    document.dispatchEvent(new CustomEvent("refresh"));
+  }
+
+  function closeModal(prefix: string) {
+    const box = document.getElementById(prefix + uniqueId) as HTMLInputElement;
+    if (box) box.checked = false;
+  }
+
+  // Every handler below used to act only on the success case, so a 401/404/500
+  // left the modal open with no explanation.
+  async function errorFrom(response: Response, fallback: string) {
+    try {
+      const data = await response.json();
+      if (data && data.msg) return data.msg;
+    } catch {
+      // non-JSON body (an HTML error page, usually)
+    }
+    return fallback;
+  }
 
   switch (extension) {
     case "png":
@@ -84,52 +109,72 @@
   if (filename == "server.json") {
     clickable = "none";
   }
-  function getText() {
-    let baseurl = apiurl;
-    if (usingOcelot) baseurl = getServerNode(id);
-    fetch(baseurl + "server/" + id + "/files/read/" + url, {
-      method: "GET",
-      headers: {
-        token: localStorage.getItem("token"),
-        username: localStorage.getItem("accountEmail"),
-      },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data);
-        let content = data.content.replace(/\\n/g, "\n").replace(/\\"/g, '"');
-        //broadcast openTextEditor event
-        const event = new CustomEvent("openTextEditor", {
-          detail: {
-            content: content,
-            filename: filename,
-            path: url.split("*").join("/"),
-          },
-        });
-        document.dispatchEvent(event);
+
+  async function getText() {
+    try {
+      const response = await fetch(baseUrl() + "server/" + id + "/files/read/" + url, {
+        method: "GET",
+        headers: {
+          token: localStorage.getItem("token"),
+          username: localStorage.getItem("accountEmail"),
+        },
       });
+
+      if (!response.ok) {
+        // 404 means the tree is stale; 413/415 mean the file isn't editable.
+        // Either way the editor must not open on the error text.
+        alert(await errorFrom(response, "Couldn't open the file. Try refreshing or logging in again."), "error");
+        if (response.status === 404) refresh();
+        return;
+      }
+
+      const data = await response.json();
+      let content = (data.content ?? "").replace(/\\n/g, "\n").replace(/\\"/g, '"');
+      //broadcast openTextEditor event
+      const event = new CustomEvent("openTextEditor", {
+        detail: {
+          content: content,
+          filename: filename,
+          path: url.split("*").join("/"),
+        },
+      });
+      document.dispatchEvent(event);
+    } catch (err) {
+      console.error("Error reading file:", err);
+      alert("Couldn't open the file — connection lost.", "error");
+    }
   }
 
-  function deleteFile() {
-    let baseurl = apiurl;
-    if (usingOcelot) baseurl = getServerNode(id);
+  let deleting = false;
+  let deleteError = "";
 
-    fetch(baseurl + "server/" + id + "/files/delete/" + url, {
-      method: "POST",
-      headers: {
-        token: localStorage.getItem("token"),
-        username: localStorage.getItem("accountEmail"),
-      },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data);
-        if (data.msg == "Done") {
-          document.getElementById("delete" + filename).checked = false;
-          const event = new CustomEvent("refresh");
-          document.dispatchEvent(event);
-        }
+  async function deleteFile() {
+    deleting = true;
+    deleteError = "";
+    try {
+      const response = await fetch(baseUrl() + "server/" + id + "/files/delete/" + url, {
+        method: "POST",
+        headers: {
+          token: localStorage.getItem("token"),
+          username: localStorage.getItem("accountEmail"),
+        },
       });
+
+      if (!response.ok) {
+        deleteError = await errorFrom(response, "Couldn't delete the file. Try again.");
+        // The tree is out of date either way — pull it fresh.
+        if (response.status === 404) refresh();
+        return;
+      }
+
+      closeModal("delete");
+      refresh();
+    } catch (err) {
+      console.error("Error deleting file:", err);
+      deleteError = "Couldn't delete the file — connection lost.";
+    } finally {
+      deleting = false;
+    }
   }
 
   let extracting = false;
@@ -137,8 +182,6 @@
   let extractError = "";
 
   async function extractFile() {
-    let baseurl = apiurl;
-    if (usingOcelot) baseurl = getServerNode(id);
     //if url starts with /, remove it
     if (url.startsWith("/")) {
       url = url.substring(1);
@@ -149,7 +192,7 @@
     let done = false;
     try {
       const response = await fetch(
-        `${baseurl}server/${id}/files/extract/${url.split("/").join("*")}`,
+        `${baseUrl()}server/${id}/files/extract/${url.split("/").join("*")}`,
         {
           method: "POST",
           headers: {
@@ -200,13 +243,8 @@
       }
 
       if (done) {
-        // Close the modal by unchecking the checkbox
-        (
-          document.getElementById(`extract${filename}`) as HTMLInputElement
-        ).checked = false;
-        // Optionally, refresh or dispatch an event
-        const event = new CustomEvent("refresh");
-        document.dispatchEvent(event);
+        closeModal("extract");
+        refresh();
       }
     } catch (err) {
       console.error("Error extracting file:", err);
@@ -216,21 +254,31 @@
     }
   }
 
-  function rename() {
-    let baseurl = apiurl;
-    if (usingOcelot) baseurl = getServerNode(id);
-    const renameInput = document.getElementById("renameInput"+uniqueId) as HTMLInputElement;
-    const newName = renameInput.value;
+  let renaming = false;
+  let renameError = "";
+  let renameValue = "";
+  // The old handler read the input, appended the missing extension to the DOM
+  // node, then sent the *pre-append* string. Deriving both from one value fixes
+  // that and keeps the button state in sync without touching classList.
+  $: renameValid =
+    renameValue.trim().length > 0 &&
+    renameValue !== filename &&
+    renameValue.includes(".") &&
+    !renameValue.includes("/") &&
+    !renameValue.includes("*");
+
+  async function rename() {
     //if the new name does not include the extension, add it
+    let newName = renameValue;
     if (!newName.includes("." + extension)) {
-      renameInput.value = newName + "." + extension;
+      newName = newName + "." + extension;
+      renameValue = newName;
     }
-    fetch(
-      baseurl +
-        "server/" +
-        id +
-        "/files/rename/",
-      {
+
+    renaming = true;
+    renameError = "";
+    try {
+      const response = await fetch(baseUrl() + "server/" + id + "/files/rename/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -241,18 +289,26 @@
           from: url,
           to: newName,
         }),
+      });
+
+      if (!response.ok) {
+        // 409 duplicate, 404 gone, 400 protected/invalid, 500 fs error — the
+        // backend already distinguishes all of these.
+        renameError = await errorFrom(response, "Rename failed. Try again.");
+        if (response.status === 404) refresh();
+        return;
       }
-    )
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data);
-        if (data.msg == "Rename successful.") {
-          document.getElementById("rename" + filename).checked = false;
-          const event = new CustomEvent("refresh");
-          document.dispatchEvent(event);
-        }
-      }); 
+
+      closeModal("rename");
+      refresh();
+    } catch (err) {
+      console.error("Error renaming file:", err);
+      renameError = "Rename failed — connection lost.";
+    } finally {
+      renaming = false;
+    }
   }
+
   let downloading = false;
   let downloadProgress = "0/0MB";
   let gradientBackground = "#1fb2a5";
@@ -269,28 +325,52 @@
     });
   }
 
-  function checkRenameText() {
-    const renameInput = document.getElementById("renameInput"+uniqueId) as HTMLInputElement;
-    const renameBtn = document.getElementById("renameBtn"+uniqueId) as HTMLButtonElement;
-    if (renameInput.value.length > 0 && renameInput.value !== filename && renameInput.value.includes(".")) {
-      renameBtn.classList.remove("btn-disabled");
-    } else {
-      renameBtn.classList.add("btn-disabled");
-    }
-  }
+  let preparingDownload = false;
+  let downloadError = "";
 
-  function setDownloadUrl() {
+  // File access keys rotate every 6 hours and on restart, so the copy in
+  // localStorage goes stale and the download 401s into a saved .json file.
+  // Mint a fresh one when the modal opens instead.
+  async function setDownloadUrl() {
     if (url.includes("servers/" + id + "/")) {
       url = url.split("servers/" + id + "/")[1];
     }
-    downloadUrl =
-          apiurl +
-          "server/" +
-          localStorage.getItem("serverID") +
-          "/files/download/" +
-          url.split("/").join("*") +
-          "?key=" +
-          localStorage.getItem("fileAccessKey");
+    preparingDownload = true;
+    downloadError = "";
+    downloadUrl = "";
+    try {
+      const response = await fetch(baseUrl() + "server/" + id + "/files/key", {
+        method: "GET",
+        headers: {
+          token: localStorage.getItem("token"),
+          username: localStorage.getItem("accountEmail"),
+        },
+      });
+
+      if (!response.ok) {
+        downloadError = await errorFrom(
+          response,
+          "Couldn't create a download link. Refresh the page and try again."
+        );
+        return;
+      }
+
+      const data = await response.json();
+      localStorage.setItem("fileAccessKey", data.key);
+      downloadUrl =
+        baseUrl() +
+        "server/" +
+        id +
+        "/files/download/" +
+        url.split("/").join("*") +
+        "?key=" +
+        data.key;
+    } catch (err) {
+      console.error("Error preparing download:", err);
+      downloadError = "Couldn't create a download link — connection lost.";
+    } finally {
+      preparingDownload = false;
+    }
   }
 </script>
 
@@ -321,14 +401,14 @@
   <div class="flex gap-1 items-center">
     {#if filename.includes(".zip")}
       <label
-        for="extract{filename}"
+        for="extract{uniqueId}"
         class="px-1.5 p-1 rounded-lg btn-ghost cursor-pointer gap-1 flex items-center"
       >
         <PackageOpen class="w-[.9rem] h-[.9rem] md:w-[1rem] md:h-[1rem]" />
       </label>
     {/if}
     <div
-  
+
     class="px-1.5 h-5 rounded-lg  text-xs outline outline-1 gap-1 flex items-center mr-0.5"
   >
     {fileSizeShort(size)}
@@ -338,24 +418,24 @@
   <summary class="px-1.5 p-1 rounded-lg btn-ghost cursor-pointer gap-1 flex items-center">     <MenuIcon class="w-[.9rem] h-[.9rem] md:w-[1rem] md:h-[1rem]" /></summary>
   <ul class="z-50 menu dropdown-content bg-neutral bg-opacity-75 backdrop-blur rounded-box z-1 w-32 p-1.5 shadow-sm">
     <li>    <label
-      for="delete{filename}"
-      
+      for="delete{uniqueId}"
+
     >
       Delete
     </label></li>
     <li>
       <label
-        for="rename{filename}"
-       
+        for="rename{uniqueId}"
+
       >
         Rename
       </label>
     </li>
         {#if filename.includes(".zip")}
-    <li>  
+    <li>
       <label
-        for="extract{filename}"
-       
+        for="extract{uniqueId}"
+
       >
         Extract
       </label>
@@ -371,7 +451,7 @@
       <Upload class="w-[.9rem] h-[.9rem] md:w-[1rem] md:h-[1rem]" />
     </label>
     <label
-      for="download{filename}"
+      for="download{uniqueId}"
       on:click={() => {
         setDownloadUrl();
       }}
@@ -382,11 +462,11 @@
   </div>
 </div>
 <!-- Put this part before </body> tag -->
-<input type="checkbox" id="delete{filename}" class="modal-toggle" />
+<input type="checkbox" id="delete{uniqueId}" class="modal-toggle" />
 <div class="modal" style="margin:0rem;">
   <div class="modal-box bg-opacity-95 backdrop-blur relative">
     <label
-      for="delete{filename}"
+      for="delete{uniqueId}"
       class="btn btn-neutral btn-sm btn-circle absolute right-2 top-2">✕</label
     >
     <h3 class="text-lg font-bold">{$t("server.delete.title")}</h3>
@@ -399,23 +479,35 @@
         recover <b>{filename}</b>.</span
       >
     </div>
+    {#if deleteError}
+      <p class="text-error text-sm mb-2">{deleteError}</p>
+    {/if}
     <div class="flex gap-1">
-      <button on:click={deleteFile} id="delButton" class="btn btn-error">
-        {$t("button.delete")}</button
+      <button
+        on:click={deleteFile}
+        id="delButton"
+        class="btn btn-error"
+        class:btn-disabled={deleting}
       >
+        {#if deleting}
+          <Loader class="w-4 h-4 animate-spin" />
+        {:else}
+          {$t("button.delete")}
+        {/if}
+      </button>
     </div>
   </div>
 </div>
 
 <input
   type="checkbox"
-  id="rename{filename}"
+  id="rename{uniqueId}"
   class="modal-toggle"
 />
 <div class="modal" style="margin:0rem;">
   <div class="modal-box bg-opacity-95 backdrop-blur relative">
     <label
-      for="rename{filename}"
+      for="rename{uniqueId}"
       class="btn btn-neutral btn-sm btn-circle absolute right-2 top-2">✕</label
     >
     <h3 class="text-lg font-bold mb-2">Rename File</h3>
@@ -425,28 +517,40 @@
   </div>
   <ChevronRight size=32 />
       <input
-      on:input={checkRenameText}
+      bind:value={renameValue}
       type="text"
       id="renameInput{uniqueId}"
       placeholder="newname.{extension}"
       class="input input-bordered input-sm w-full"
     />
 </div>
+    {#if renameError}
+      <p class="text-error text-sm mb-2">{renameError}</p>
+    {/if}
     <div class="flex gap-1">
-      <button on:click={rename} id="renameBtn{uniqueId}" class="btn btn-success btn-disabled">
-        Rename</button
+      <button
+        on:click={rename}
+        id="renameBtn{uniqueId}"
+        class="btn btn-success"
+        class:btn-disabled={!renameValid || renaming}
       >
+        {#if renaming}
+          <Loader class="w-4 h-4 animate-spin" />
+        {:else}
+          Rename
+        {/if}
+      </button>
     </div>
   </div>
 </div>
 
 {#if filename.includes(".zip")}
   <!-- Extract Modal -->
-  <input type="checkbox" id="extract{filename}" class="modal-toggle" />
+  <input type="checkbox" id="extract{uniqueId}" class="modal-toggle" />
   <div class="modal" style="margin:0rem;">
     <div class="modal-box bg-opacity-95 backdrop-blur relative">
       <label
-        for="extract{filename}"
+        for="extract{uniqueId}"
         class="btn btn-neutral btn-sm btn-circle absolute right-2 top-2"
         >✕</label
       >
@@ -512,19 +616,28 @@
 </div>
 
 <!-- Put this part before </body> tag -->
-<input type="checkbox" id="download{filename}" class="modal-toggle" />
+<input type="checkbox" id="download{uniqueId}" class="modal-toggle" />
 <div class="modal" style="margin:0rem;">
   <div class="modal-box bg-opacity-95 backdrop-blur relative">
     <label
-      for="download{filename}"
+      for="download{uniqueId}"
       class="btn btn-neutral btn-sm btn-circle absolute right-2 top-2">✕</label
     >
     <h3 class="text-lg font-bold mb-5">Download {filename}</h3>
 
-    <div class="flex gap-1">
-      <a href={downloadUrl} download id="downloadBtn" class="btn btn-accent btn-sm"
-        >{$t("button.download")}</a
-      >
-    </div>
+    {#if downloadError}
+      <p class="text-error text-sm mb-2">{downloadError}</p>
+      <button on:click={setDownloadUrl} class="btn btn-neutral btn-sm">Retry</button>
+    {:else if preparingDownload}
+      <button class="btn btn-accent btn-sm btn-disabled">
+        <Loader class="w-4 h-4 animate-spin" />
+      </button>
+    {:else}
+      <div class="flex gap-1">
+        <a href={downloadUrl} download id="downloadBtn" class="btn btn-accent btn-sm"
+          >{$t("button.download")}</a
+        >
+      </div>
+    {/if}
   </div>
 </div>

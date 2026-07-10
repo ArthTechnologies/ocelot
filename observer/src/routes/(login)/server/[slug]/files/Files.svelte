@@ -25,6 +25,8 @@
   let showFtpPassword = false;
   let username;
   let isLoading = true; // Add loading state
+  let loadError = "";
+  let saving = false;
 
   if (browser) {
     let accountId = localStorage.getItem("accountId");
@@ -70,29 +72,64 @@
     });
   }
 
-  function getFiles() {
+  async function getFiles() {
     isLoading = true; // Set loading to true when fetching
+    loadError = "";
     let baseurl = apiurl;
     if (usingOcelot) baseurl = getServerNode(id);
     const url = baseurl + "server/" + id + "/files";
-    fetch(url, {
-      method: "GET",
-      headers: {
-        token: localStorage.getItem("token"),
-        username: localStorage.getItem("accountEmail"),
-      },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        files = data;
-        filteredFiles = data;
-        isLoading = false; // Set loading to false when done
-        console.log(data);
-      })
-      .catch((error) => {
-        console.error("Error fetching files:", error);
-        isLoading = false; // Also set to false on error
+
+    // The tree endpoint used to answer nothing at all when access was denied,
+    // so this spinner ran until the socket timed out. Bound it client-side too.
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 20000);
+
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          token: localStorage.getItem("token"),
+          username: localStorage.getItem("accountEmail"),
+        },
+        signal: abort.signal,
       });
+
+      if (!response.ok) {
+        // 404 + code 101 means the server isn't provisioned on this node —
+        // distinct from an empty file list, which is what we used to render.
+        if (response.status === 404) {
+          loadError = "This server hasn't been created yet.";
+        } else if (response.status === 401) {
+          loadError = "Couldn't load files. Log in again and retry.";
+        } else {
+          loadError = "Couldn't load files. Try again.";
+        }
+        files = [];
+        filteredFiles = [];
+        return;
+      }
+
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        loadError = "Couldn't load files. Try again.";
+        files = [];
+        filteredFiles = [];
+        return;
+      }
+      files = data;
+      filteredFiles = data;
+    } catch (error) {
+      console.error("Error fetching files:", error);
+      loadError =
+        error.name === "AbortError"
+          ? "Couldn't load files — the server didn't respond."
+          : "Couldn't load files. Check your connection.";
+      files = [];
+      filteredFiles = [];
+    } finally {
+      clearTimeout(timeout);
+      isLoading = false;
+    }
   }
 
   function filterFiles(query) {
@@ -142,34 +179,62 @@
     filteredFiles = files;
   }
 
-  function save() {
+  async function save() {
+    if (tab !== "editor" || saving) return;
+
+    const editor = document.getElementById("textEditor");
+    if (!editor) return;
+
+    let baseurl = apiurl;
+    if (usingOcelot) baseurl = getServerNode(id);
+
+    saving = true;
     document.dispatchEvent(new Event("updatedTextEditor"));
-    document.getElementById("filepath").innerHTML = document
-      .getElementById("filepath")
-      .innerHTML.replace("*", "");
-    fetch(
-      apiurl +
-        "server/" +
-        id +
-        "/files/write/" +
-        filepath.split("/").join("*"),
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          token: localStorage.getItem("token"),
-          username: localStorage.getItem("accountEmail"),
-        },
-        body: JSON.stringify({
-          content: document.getElementById("textEditor").value,
-        }),
+
+    try {
+      const response = await fetch(
+        baseurl + "server/" + id + "/files/write/" + filepath.split("/").join("*"),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            token: localStorage.getItem("token"),
+            username: localStorage.getItem("accountEmail"),
+          },
+          body: JSON.stringify({ content: editor.value }),
+        }
+      );
+
+      // Previously the response was logged and the save button disabled no
+      // matter what came back, so a rejected write looked exactly like a
+      // successful one and the user lost their edits on reload.
+      if (!response.ok) {
+        let msg = "Couldn't save. Copy your changes before reloading.";
+        if (response.status === 401) {
+          msg = "Couldn't save — your session may have expired. Copy your changes before reloading.";
+        } else {
+          try {
+            const data = await response.json();
+            if (data && data.msg) msg = data.msg;
+          } catch {
+            // non-JSON body
+          }
+        }
+        alert(msg, "error");
+        return;
       }
-    )
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data);
-        document.getElementById("saveButton").classList.add("btn-disabled");
-      });
+
+      // Only now is it safe to mark the buffer clean.
+      const filepathEl = document.getElementById("filepath");
+      if (filepathEl) filepathEl.innerHTML = filepathEl.innerHTML.replace("*", "");
+      document.getElementById("saveButton")?.classList.add("btn-disabled");
+      alert("Saved.", "success");
+    } catch (err) {
+      console.error("Error saving file:", err);
+      alert("Couldn't save — connection lost. Your changes are still in the editor.", "error");
+    } finally {
+      saving = false;
+    }
   }
 
   function toggleFtpPassword() {
@@ -195,7 +260,8 @@
             detail: { content: event.detail.content, fileType: configFileType }
           }));
         }
-        document.getElementById("textEditor").value = event.detail.content;
+        const editor = document.getElementById("textEditor");
+        if (editor) editor.value = event.detail.content;
       }, 100);
     });
   }
@@ -283,6 +349,11 @@
               
      
             {/each}
+          </div>
+        {:else if loadError}
+          <div class="flex flex-col items-start gap-2 p-4">
+            <p class="text-error text-sm">{loadError}</p>
+            <button class="btn btn-neutral btn-sm" on:click={getFiles}>Retry</button>
           </div>
         {:else}
           <!-- Actual content -->
