@@ -25,12 +25,16 @@
     serverVersion = localStorage.getItem("serverVersion");
     serverSoftware = localStorage.getItem("serverSoftware");
     if (localStorage.getItem("serverAddons") != null) {
-      serverAddons = localStorage.getItem("serverAddons").split(",");
+      // serverAddons is stored as `addons.toString()`, so a server with none is
+      // saved as "" — and "".split(",") is [""], a length-1 array holding one
+      // empty string, not []. Drop those blanks so "no addons" really is empty.
+      serverAddons = localStorage
+        .getItem("serverAddons")
+        .split(",")
+        .filter((addon) => addon !== "");
     }
 
-    if (serverAddons[0] == "") {
-      areWorldgenMods = false;
-    }
+    areWorldgenMods = serverAddons.length > 0;
 
     console.log(serverAddons);
 
@@ -83,7 +87,11 @@
           }
         }
         console.log(worldgenModsAvailable + " " + serverAddons.length);
-        updateReady = serverAddons.length == worldgenModsAvailable;
+        // With no worldgen addons there's nothing to gate on, so the update is
+        // ready. Previously the phantom [""] entry made this `1 == 0`, which
+        // blocked every addon-free server from ever updating.
+        updateReady =
+          !areWorldgenMods || serverAddons.length == worldgenModsAvailable;
 
         console.log(x);
         if (
