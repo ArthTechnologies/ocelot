@@ -414,21 +414,37 @@ router.get('/bug-resolver/:id', async function (req, res) {
     return res.status(400).json({ msg: 'Server is not in a conflict state.' });
   }
 
+  function worldSize(dir) {
+    const worldPath = `${dir}/world`;
+    return fs.existsSync(worldPath) ? files.folderSizeRecursiveAsync(worldPath) : Promise.resolve(0);
+  }
+
+  function countFolder(dir, folder) {
+    const p = `${dir}/${folder}`;
+    if (!fs.existsSync(p)) return 0;
+    try { return fs.readdirSync(p).filter(f => !f.startsWith('.')).length; } catch (e) { return 0; }
+  }
+
   try {
-    const [liveSize, trashSize] = await Promise.all([
-      files.folderSizeRecursiveAsync(livePath),
-      files.folderSizeRecursiveAsync(trashPath)
-    ]);
+    const [liveSize, trashSize] = await Promise.all([worldSize(livePath), worldSize(trashPath)]);
     let liveServer = { name: `Server ${rawId}`, software: 'unknown', version: 'unknown' };
     let trashServer = { name: `Server ${rawId}`, software: 'unknown', version: 'unknown' };
     try { liveServer = readJSON(`${livePath}/server.json`); } catch (e) {}
     try { trashServer = readJSON(`${trashPath}/server.json`); } catch (e) {}
+
+    const liveMods = countFolder(livePath, 'mods');
+    const livePlugins = countFolder(livePath, 'plugins');
+    const trashMods = countFolder(trashPath, 'mods');
+    const trashPlugins = countFolder(trashPath, 'plugins');
+
     res.status(200).json({
       live: {
         name: liveServer.name || `Server ${rawId}`,
         software: liveServer.software || 'unknown',
         version: liveServer.version || 'unknown',
-        size: formatBytes(liveSize),
+        worldSize: formatBytes(liveSize),
+        mods: liveMods,
+        plugins: livePlugins,
         lastModified: getLastModified(livePath),
         playerCount: getPlayerCount(livePath),
         warnings: getWarnings(livePath)
@@ -437,7 +453,9 @@ router.get('/bug-resolver/:id', async function (req, res) {
         name: trashServer.name || `Server ${rawId}`,
         software: trashServer.software || 'unknown',
         version: trashServer.version || 'unknown',
-        size: formatBytes(trashSize),
+        worldSize: formatBytes(trashSize),
+        mods: trashMods,
+        plugins: trashPlugins,
         lastModified: getLastModified(trashPath),
         playerCount: getPlayerCount(trashPath),
         warnings: getWarnings(trashPath)

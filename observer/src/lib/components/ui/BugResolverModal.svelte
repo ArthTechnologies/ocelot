@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import { browser } from "$app/environment";
   import { apiurl } from "$lib/scripts/req";
-  import { Loader, AlertTriangle, HardDrive, Calendar, Users, X } from "lucide-svelte";
+  import { Loader, AlertTriangle, HardDrive, Calendar, Users, X, Package } from "lucide-svelte";
 
   export let serverId: number;
 
@@ -12,7 +12,7 @@
   let submitting = false;
   let error = "";
   let choice: "live" | "trashbin" | null = null;
-  type WorldInfo = { name: string; software: string; version: string; size: string; lastModified: string | null; playerCount: number; warnings: string[] };
+  type WorldInfo = { name: string; software: string; version: string; worldSize: string; mods: number; plugins: number; lastModified: string | null; playerCount: number; warnings: string[] };
   let data: { live: WorldInfo; trashbin: WorldInfo } | null = null;
 
   onMount(async () => {
@@ -153,8 +153,20 @@
                 <div class="resolver-stats grid grid-cols-1 gap-1 mt-1">
                   <div class="flex items-center gap-1.5 text-xs resolver-muted">
                     <HardDrive size={12} />
-                    <span>{option.world.size}</span>
+                    <span>{option.world.worldSize} world</span>
                   </div>
+                  {#if option.world.mods > 0}
+                    <div class="flex items-center gap-1.5 text-xs resolver-muted">
+                      <Package size={12} />
+                      <span>{option.world.mods} mods</span>
+                    </div>
+                  {/if}
+                  {#if option.world.plugins > 0}
+                    <div class="flex items-center gap-1.5 text-xs resolver-muted">
+                      <Package size={12} />
+                      <span>{option.world.plugins} plugins</span>
+                    </div>
+                  {/if}
                   <div class="flex items-center gap-1.5 text-xs resolver-muted">
                     <Calendar size={12} />
                     <span>Last modified {formatDate(option.world.lastModified)}</span>
