@@ -351,15 +351,35 @@ function formatBytes(bytes) {
   return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB';
 }
 
-function getLastLogDate(dir) {
+function getLastModified(dir) {
   const logsDir = `${dir}/logs`;
-  if (!fs.existsSync(logsDir)) return null;
-  const logs = fs.readdirSync(logsDir)
-    .filter(f => f !== 'latest.log' && /^\d{4}-\d{2}-\d{2}/.test(f))
-    .sort();
-  if (!logs.length) return null;
-  const match = logs[logs.length - 1].match(/^(\d{4}-\d{2}-\d{2})/);
-  return match ? match[1] : null;
+  if (fs.existsSync(logsDir)) {
+    const logs = fs.readdirSync(logsDir)
+      .filter(f => f !== 'latest.log' && /^\d{4}-\d{2}-\d{2}/.test(f))
+      .sort();
+    if (logs.length) {
+      const match = logs[logs.length - 1].match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match) return match[1];
+    }
+  }
+  const worldPath = `${dir}/world`;
+  if (fs.existsSync(worldPath)) {
+    try {
+      return fs.statSync(worldPath).mtime.toISOString().split('T')[0];
+    } catch (e) {}
+  }
+  return null;
+}
+
+function getWarnings(dir) {
+  const warnings = [];
+  if (!fs.existsSync(`${dir}/world`)) warnings.push('missing_world');
+  try {
+    const hasJar = fs.existsSync(dir) && fs.readdirSync(dir).some(f => f.endsWith('.jar'));
+    if (!hasJar) warnings.push('missing_jar');
+  } catch (e) {}
+  if (!fs.existsSync(`${dir}/server.json`)) warnings.push('missing_server_json');
+  return warnings;
 }
 
 function getPlayerCount(dir) {
@@ -399,24 +419,28 @@ router.get('/bug-resolver/:id', async function (req, res) {
       files.folderSizeRecursiveAsync(livePath),
       files.folderSizeRecursiveAsync(trashPath)
     ]);
-    const liveServer = readJSON(`${livePath}/server.json`);
-    const trashServer = readJSON(`${trashPath}/server.json`);
+    let liveServer = { name: `Server ${rawId}`, software: 'unknown', version: 'unknown' };
+    let trashServer = { name: `Server ${rawId}`, software: 'unknown', version: 'unknown' };
+    try { liveServer = readJSON(`${livePath}/server.json`); } catch (e) {}
+    try { trashServer = readJSON(`${trashPath}/server.json`); } catch (e) {}
     res.status(200).json({
       live: {
         name: liveServer.name || `Server ${rawId}`,
         software: liveServer.software || 'unknown',
         version: liveServer.version || 'unknown',
         size: formatBytes(liveSize),
-        lastRunDate: getLastLogDate(livePath),
-        playerCount: getPlayerCount(livePath)
+        lastModified: getLastModified(livePath),
+        playerCount: getPlayerCount(livePath),
+        warnings: getWarnings(livePath)
       },
       trashbin: {
         name: trashServer.name || `Server ${rawId}`,
         software: trashServer.software || 'unknown',
         version: trashServer.version || 'unknown',
         size: formatBytes(trashSize),
-        lastRunDate: getLastLogDate(trashPath),
-        playerCount: getPlayerCount(trashPath)
+        lastModified: getLastModified(trashPath),
+        playerCount: getPlayerCount(trashPath),
+        warnings: getWarnings(trashPath)
       }
     });
   } catch (e) {

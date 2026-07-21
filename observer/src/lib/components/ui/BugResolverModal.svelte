@@ -12,10 +12,8 @@
   let submitting = false;
   let error = "";
   let choice: "live" | "trashbin" | null = null;
-  let data: {
-    live: { name: string; software: string; version: string; size: string; lastRunDate: string | null; playerCount: number };
-    trashbin: { name: string; software: string; version: string; size: string; lastRunDate: string | null; playerCount: number };
-  } | null = null;
+  type WorldInfo = { name: string; software: string; version: string; size: string; lastModified: string | null; playerCount: number; warnings: string[] };
+  let data: { live: WorldInfo; trashbin: WorldInfo } | null = null;
 
   onMount(async () => {
     document.body.style.overflow = "hidden";
@@ -65,12 +63,18 @@
   }
 
   function formatDate(d: string | null) {
-    if (!d) return "No logs found";
+    if (!d) return "Unknown";
     const [y, m, day] = d.split("-");
     return new Date(parseInt(y), parseInt(m) - 1, parseInt(day)).toLocaleDateString(undefined, {
       year: "numeric", month: "short", day: "numeric"
     });
   }
+
+  const warningLabels: Record<string, string> = {
+    missing_world: "World folder missing",
+    missing_jar: "Server jar missing",
+    missing_server_json: "No server config — may be corrupted"
+  };
 </script>
 
 <!-- Backdrop -->
@@ -153,12 +157,18 @@
                   </div>
                   <div class="flex items-center gap-1.5 text-xs resolver-muted">
                     <Calendar size={12} />
-                    <span>Last ran {formatDate(option.world.lastRunDate)}</span>
+                    <span>Last modified {formatDate(option.world.lastModified)}</span>
                   </div>
                   <div class="flex items-center gap-1.5 text-xs resolver-muted">
                     <Users size={12} />
                     <span>{option.world.playerCount} player{option.world.playerCount !== 1 ? "s" : ""} joined</span>
                   </div>
+                  {#each option.world.warnings as w}
+                    <div class="flex items-center gap-1.5 text-xs resolver-warning">
+                      <AlertTriangle size={11} />
+                      <span>{warningLabels[w] ?? w}</span>
+                    </div>
+                  {/each}
                 </div>
               </div>
             </label>
@@ -272,6 +282,8 @@
     color: rgba(255,255,255,0.55);
     border: 1px solid rgba(255,255,255,0.08);
   }
+
+  .resolver-warning { color: #f59e0b; }
 
   .resolver-error {
     background: rgba(239,68,68,0.1);
