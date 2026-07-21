@@ -42,6 +42,23 @@ function detectJavaVersion(version, software) {
   return javaVer;
 }
 
+// Loader-specific runtime caches that must not survive a software/version
+// switch — leaving them in place makes mc.js think the new loader is
+// already installed (or resolves the wrong loader version) and the
+// install step gets skipped, producing a bogus "failed to install" error.
+const MODDED_SOFTWARE = ["forge", "neoforge", "quilt", "fabric"];
+function clearLoaderInstallArtifacts(id) {
+  const bases = [`servers/${id}`, `servers/${id}/server`];
+  for (const base of bases) {
+    for (const dir of ["libraries", ".fabric", "versions"]) {
+      const target = `${base}/${dir}`;
+      if (fs.existsSync(target)) {
+        fs.rmSync(target, { recursive: true, force: true });
+      }
+    }
+  }
+}
+
 function writeServer(
   id,
   owner,
@@ -473,11 +490,16 @@ router.post(`/:id/version/`, function (req, res) {
     let id = req.params.id;
     version = req.query.version;
 
+    let versionChanged = version !== server.version;
+    let versionChangedSoftware = server.software;
     server.version = version;
     server.javaVersion = detectJavaVersion(version, server.software);
     writeJSON("servers/" + id + "/server.json", server);
 
     f.stopAsync(id, () => {
+      if (versionChanged && MODDED_SOFTWARE.includes(versionChangedSoftware)) {
+        clearLoaderInstallArtifacts(id);
+      }
       f.run(id, undefined, undefined, undefined, undefined, email, false);
     });
     res.status(202).json({ msg: `Success. Server updated.` });
@@ -501,12 +523,22 @@ router.post(`/:id/software/`, function (req, res) {
       return;
     }
 
+    let loaderChanged =
+      newSoftware !== server.software || newVersion !== server.version;
+    let oldSoftware = server.software;
     server.software = newSoftware;
     server.version = newVersion;
     server.javaVersion = detectJavaVersion(newVersion, newSoftware);
     writeJSON("servers/" + id + "/server.json", server);
 
     f.stopAsync(id, () => {
+      if (
+        loaderChanged &&
+        (MODDED_SOFTWARE.includes(oldSoftware) ||
+          MODDED_SOFTWARE.includes(newSoftware))
+      ) {
+        clearLoaderInstallArtifacts(id);
+      }
       f.run(id, undefined, undefined, undefined, undefined, email, false);
     });
     res.status(202).json({ msg: `Success. Server software updated.` });

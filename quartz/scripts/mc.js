@@ -783,7 +783,11 @@ function run(
       }
     }
     if (installer) {
-      if (isNew) {
+      // Run the installer whenever it's a brand-new server OR the expected
+      // loader libraries aren't on disk yet (e.g. after a software/version
+      // switch) — isNew alone isn't a reliable signal that libraries exist.
+      let librariesAlreadyInstalled = fs.existsSync(folder + libraryline);
+      if (isNew || !librariesAlreadyInstalled) {
         interval = 500;
         states[id] = "installing";
         //previous terminals should be cleared
@@ -848,14 +852,9 @@ function run(
             }
           );
         }
-      } else if (
-        fs.existsSync(folder +libraryline)
-      ) {
-        doneInstallingServer = true;
       } else {
-        console.log("exists: "+folder  +libraryline);
-        states[id] = "false";
-        terminalOutput[id] = "[Error]: Forge failed to install.";
+        // librariesAlreadyInstalled is guaranteed true here (see condition above)
+        doneInstallingServer = true;
       }
       let timeToLoad = true;
 
