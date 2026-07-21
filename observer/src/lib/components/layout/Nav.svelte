@@ -109,8 +109,8 @@
         .then((blob) => {
           if (blob.size > 0) {
             let icon = URL.createObjectURL(blob);
-            document.getElementById("navIcon" + id).src = icon;
-
+            const el = document.getElementById("navIcon" + id);
+            if (el) el.src = icon;
           } else {
             icon = "/images/placeholder.webp";
           }

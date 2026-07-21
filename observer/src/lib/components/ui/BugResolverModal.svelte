@@ -175,7 +175,7 @@
                     <Users size={12} />
                     <span>{option.world.playerCount} player{option.world.playerCount !== 1 ? "s" : ""} joined</span>
                   </div>
-                  {#each option.world.warnings as w}
+                  {#each (option.world.warnings ?? []) as w}
                     <div class="flex items-center gap-1.5 text-xs resolver-warning">
                       <AlertTriangle size={11} />
                       <span>{warningLabels[w] ?? w}</span>
