@@ -342,4 +342,137 @@ function handleServerRecovery(res, email, targetServerId, verified) {
   }
 }
 
+const files = require('../scripts/files');
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+}
+
+function getLastLogDate(dir) {
+  const logsDir = `${dir}/logs`;
+  if (!fs.existsSync(logsDir)) return null;
+  const logs = fs.readdirSync(logsDir)
+    .filter(f => f !== 'latest.log' && /^\d{4}-\d{2}-\d{2}/.test(f))
+    .sort();
+  if (!logs.length) return null;
+  const match = logs[logs.length - 1].match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
+function getPlayerCount(dir) {
+  const usercachePath = `${dir}/usercache.json`;
+  if (fs.existsSync(usercachePath)) {
+    try {
+      const cache = readJSON(usercachePath);
+      return Array.isArray(cache) ? cache.length : 0;
+    } catch (e) {}
+  }
+  const playerdataPath = `${dir}/world/playerdata`;
+  if (fs.existsSync(playerdataPath)) {
+    return fs.readdirSync(playerdataPath).filter(f => f.endsWith('.dat') && !f.endsWith('.dat_old')).length;
+  }
+  return 0;
+}
+
+router.get('/bug-resolver/:id', async function (req, res) {
+  const email = req.headers.username;
+  const token = req.headers.token;
+  if (!email || !fs.existsSync(`accounts/${email}.json`)) {
+    return res.status(401).json({ msg: 'Unauthorized' });
+  }
+  const account = readJSON(`accounts/${email}.json`);
+  if (token !== account.token) return res.status(401).json({ msg: 'Unauthorized' });
+
+  const rawId = req.params.id;
+  const livePath = `servers/${rawId}`;
+  const trashPath = `trashbin/${rawId}-${email}`;
+
+  if (!fs.existsSync(`${livePath}/server.json`) || !fs.existsSync(trashPath)) {
+    return res.status(400).json({ msg: 'Server is not in a conflict state.' });
+  }
+
+  try {
+    const [liveSize, trashSize] = await Promise.all([
+      files.folderSizeRecursiveAsync(livePath),
+      files.folderSizeRecursiveAsync(trashPath)
+    ]);
+    const liveServer = readJSON(`${livePath}/server.json`);
+    const trashServer = readJSON(`${trashPath}/server.json`);
+    res.status(200).json({
+      live: {
+        name: liveServer.name || `Server ${rawId}`,
+        software: liveServer.software || 'unknown',
+        version: liveServer.version || 'unknown',
+        size: formatBytes(liveSize),
+        lastRunDate: getLastLogDate(livePath),
+        playerCount: getPlayerCount(livePath)
+      },
+      trashbin: {
+        name: trashServer.name || `Server ${rawId}`,
+        software: trashServer.software || 'unknown',
+        version: trashServer.version || 'unknown',
+        size: formatBytes(trashSize),
+        lastRunDate: getLastLogDate(trashPath),
+        playerCount: getPlayerCount(trashPath)
+      }
+    });
+  } catch (e) {
+    console.error('Bug resolver error:', e);
+    res.status(500).json({ msg: 'Error gathering server data.' });
+  }
+});
+
+router.post('/bug-resolver/:id/resolve', function (req, res) {
+  const email = req.headers.username;
+  const token = req.headers.token;
+  if (!email || !fs.existsSync(`accounts/${email}.json`)) {
+    return res.status(401).json({ msg: 'Unauthorized' });
+  }
+  const account = readJSON(`accounts/${email}.json`);
+  if (token !== account.token) return res.status(401).json({ msg: 'Unauthorized' });
+
+  const rawId = req.params.id;
+  const { choice } = req.body;
+  if (choice !== 'live' && choice !== 'trashbin') {
+    return res.status(400).json({ msg: 'Invalid choice.' });
+  }
+
+  const livePath = `servers/${rawId}`;
+  const trashPath = `trashbin/${rawId}-${email}`;
+  const freedEntry = `${rawId}:freed`;
+
+  if (!account.servers.includes(freedEntry)) {
+    return res.status(400).json({ msg: 'Server not in conflict state.' });
+  }
+
+  if (choice === 'trashbin') {
+    if (!fs.existsSync(trashPath)) {
+      return res.status(400).json({ msg: 'Archived version no longer exists.' });
+    }
+    if (!fs.existsSync(livePath)) {
+      return res.status(400).json({ msg: 'Live server folder not found.' });
+    }
+  }
+
+  try {
+    if (choice === 'live') {
+      account.servers = account.servers.map(s => s === freedEntry ? rawId : s);
+      writeJSON(`accounts/${email}.json`, account);
+    } else {
+      const displacedPath = `trashbin/${rawId}-${email}-displaced-${Date.now()}`;
+      fs.renameSync(livePath, displacedPath);
+      fs.renameSync(trashPath, livePath);
+      account.servers = account.servers.map(s => s === freedEntry ? rawId : s);
+      writeJSON(`accounts/${email}.json`, account);
+    }
+    res.status(200).json({ success: true });
+  } catch (e) {
+    console.error('Bug resolver resolve error:', e);
+    res.status(500).json({ msg: 'Error resolving conflict.' });
+  }
+});
+
 module.exports = router;

@@ -28,6 +28,9 @@
     import SupportModal from "../buttons/SupportModal.svelte";
     import LanguageSwitcherModal from "../buttons/LanguageSwitcherModal.svelte";
     import ExpiredServerCard from "../ui/ExpiredServerCard.svelte";
+    import BugResolverModal from "../ui/BugResolverModal.svelte";
+
+  let bugResolverServerId: number | null = null;
 
   // NOTE: the element that is using one of the theme attributes must be in the DOM on mount
   let servers: any[] = [];
@@ -335,13 +338,21 @@
     <UncreatedServerCard id={parseInt(server.id)}/>
     </a>
     {/if}
-  {:else if server.error.code === 100}
+  {:else if server.error.code === 103}
+    <button
+      on:click={() => bugResolverServerId = parseInt(server.id)}
+      id="serverCard{parseInt(server.id)}"
+      class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-lg bg-base-200 cursor-pointer text-left"
+    >
+    <ExpiredServerCard id={parseInt(server.id)} timestamp={-1} cause="freed" errorCode={103}/>
+    </button>
+  {:else if server.error.code === 100 || server.error.code === 104 || server.error.code === 105 || server.error.code === 106}
     <a
       href="/billing"
       id="serverCard{parseInt(server.id)}"
       class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-lg bg-base-200 cursor-pointer"
     >
-    <ExpiredServerCard id={parseInt(server.id)} timestamp={server.error.resetDate || -1} cause={server.error.subscriptionCause || "unknown"} errorCode={100}/>
+    <ExpiredServerCard id={parseInt(server.id)} timestamp={server.error.resetDate || -1} cause={server.error.subscriptionCause || "unknown"} errorCode={server.error.code}/>
     </a>
   {:else}
     <a
@@ -440,6 +451,13 @@
 </div>
 <LanguageSwitcherModal/>
 <SupportModal/>
+{#if bugResolverServerId !== null}
+  <BugResolverModal
+    serverId={bugResolverServerId}
+    on:close={() => bugResolverServerId = null}
+    on:resolved={() => bugResolverServerId = null}
+  />
+{/if}
 <style>
   .primaryGradientStroke {
     position: relative;

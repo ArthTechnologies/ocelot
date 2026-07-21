@@ -110,19 +110,74 @@ router.get(`/servers`, function (req, res) {
         }
       }
 
-      if (fs.existsSync(`servers/${serverId}/server.json`)) {
-        let serverData = readJSON(`servers/${serverId}/server.json`);
+      if (serverId.includes(":freed")) {
+        const rawId = serverId.split(":")[0];
+        const inTrashbin = fs.existsSync(`trashbin/${rawId}-${req.headers.username}`);
+        const livePath = `servers/${rawId}/server.json`;
+        const liveServerExists = fs.existsSync(livePath);
+        let ownedByThisAccount = false;
+        if (liveServerExists) {
+          try { ownedByThisAccount = readJSON(livePath).accountId === actualAccountId; } catch (e) {}
+        }
+        const conditionA = inTrashbin;
+        const conditionB = !ownedByThisAccount;
 
-        if (serverId.includes(":freed")) {
-          serverObject.isStandard = false;
-          serverObject.error = {
-            code: 100,
-            resetDate: -1,
-            subscriptionCause: "freed"
-          };
-          account.servers[i] = serverObject;
+        if (!conditionB) {
+          // 103: trashbin + live server — support must decide which to keep, do not auto-heal
+          if (conditionA) {
+            serverObject = { id: rawId };
+            serverObject.isStandard = false;
+            serverObject.error = {
+              code: 103,
+              resetDate: -1,
+              subscriptionCause: "freed"
+            };
+            account.servers[i] = serverObject;
+            continue;
+          }
+
+          // 105: no trashbin, live server owned by account — stale marker, safe to auto-heal
+          const freshAccount = readJSON(`accounts/${req.headers.username}.json`);
+          const freedIdx = freshAccount.servers.indexOf(serverId);
+          if (freedIdx !== -1) freshAccount.servers[freedIdx] = rawId;
+          writeJSON(`accounts/${req.headers.username}.json`, freshAccount);
+
+          if (hasValidSubscription || mode !== "provider" || !parsedSuccesfully) {
+            let serverData = readJSON(livePath);
+            account.servers[i] = serverData;
+            account.servers[i].state = f.getState(rawId);
+            try {
+              account.servers[i].fileAccessKey = security.getFileAccessKey(rawId);
+            } catch (e) {
+              account.servers[i].fileAccessKey = "error";
+            }
+            account.servers[i].isStandard = true;
+          } else {
+            serverObject = { id: rawId };
+            serverObject.isStandard = false;
+            serverObject.error = {
+              code: 105,
+              resetDate: resetDate,
+              subscriptionCause: subscriptionCause
+            };
+            account.servers[i] = serverObject;
+          }
           continue;
         }
+
+        // conditionB true — no live server owned by this account (100 or 104)
+        serverObject.isStandard = false;
+        serverObject.error = {
+          code: conditionA ? 100 : 104,
+          resetDate: -1,
+          subscriptionCause: "freed"
+        };
+        account.servers[i] = serverObject;
+        continue;
+      }
+
+      if (fs.existsSync(`servers/${serverId}/server.json`)) {
+        let serverData = readJSON(`servers/${serverId}/server.json`);
 
         if (serverData.accountId && serverData.accountId !== actualAccountId) {
           serverObject.isStandard = false;
@@ -136,7 +191,7 @@ router.get(`/servers`, function (req, res) {
         if (!hasValidSubscription && parsedSuccesfully) {
           serverObject.isStandard = false;
           serverObject.error = {
-            code: 100,
+            code: 106,
             resetDate: resetDate,
             subscriptionCause: subscriptionCause
           };

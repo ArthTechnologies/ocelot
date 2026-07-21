@@ -54,11 +54,11 @@
   class="bg-base-300 w-[3.75rem] h-[3.75rem] rounded-lg max-lg:hidden flex justify-center items-center"
 ><AlertOctagon size=32/></div>
 <div class="-mt-1">
-  <p class="font-poppins-bold text-gray-200 text-sm md:text-lg truncate max-md:hidden">
-    {#if errorCode === 100}
+  <p class="font-poppins-bold text-gray-200 text-sm truncate max-md:hidden">
+    {#if errorCode === 100 || errorCode === 103 || errorCode === 104 || errorCode === 105 || errorCode === 106}
       Expired Server
     {:else}
-      Error
+      Error code {errorCode}
     {/if}
   </p>
   <div class="md:hidden flex items-center justify-center"><PlusIcon size=20/></div>
@@ -66,23 +66,27 @@
   <div class="max-md:hidden">
     {#if errorCode === 100}
       <p class="font-poppins text-xs mb-0.5 -mt-1">
-        {#if timestamp != -1}
-          Slot {parseInt(id)} will be reset in {daysUntil(timestamp)} days.
-        {:else}
-          Slot {parseInt(id)} has been freed up due to expired subscription.
-        {/if}
+        Your subscription has expired. Your data is still there but may be deleted soon.
       </p>
-      {#if causeText(cause)}
-      <p class="font-poppins text-xs mb-0.5 -mt-1 opacity-75">
-        Cause: {causeText(cause)}
-      </p>
-      {/if}
+    {:else if errorCode === 103}
       <p class="font-poppins text-xs mb-0.5 -mt-1">
-        Contact support to renew.
+        This is a complicated error stemming from a possible expired subscription that is no longer expired. Please contact support.
+      </p>
+    {:else if errorCode === 104}
+      <p class="font-poppins text-xs mb-0.5 -mt-1">
+        Your subscription has expired. It looks like your data has been deleted, but you can contact support to double-check.
+      </p>
+    {:else if errorCode === 105}
+      <p class="font-poppins text-xs mb-0.5 -mt-1">
+        This is a complicated error stemming from a possible expired subscription that is no longer expired. Please contact support.
+      </p>
+    {:else if errorCode === 106}
+      <p class="font-poppins text-xs mb-0.5 -mt-1">
+        Your subscription has expired. Your server data is still intact — renew to restore access.
       </p>
     {:else}
       <p class="font-poppins text-xs mb-0.5 -mt-1">
-        Error code {errorCode}
+        Unknown error.
       </p>
     {/if}
   </div>
