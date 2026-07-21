@@ -1350,7 +1350,8 @@ function downloadModpack(id, modpackURL, modpackID, versionID) {
                     );
 
                     //for each file in modpack.files, download it
-for (let i in modpack.files) {
+                    const modDownloads = [];
+                    for (let i in modpack.files) {
                       //if the prefixhas a backslash, convert it to slash, as backslashes are ignored in linux
                       if (modpack.files[i].path.includes("\\")) {
                         modpack.files[i].prefix = modpack.files[i].path.replace(
@@ -1358,20 +1359,28 @@ for (let i in modpack.files) {
                           "/"
                         );
                       }
-                    
-                 
+
+
                       if (modpack.files[i].path.includes("mods/")) {
-                        files.downloadAsync(
-                                folder +
-                                    "/mods/lr_" +
-                                    modpack.files[i].downloads[0].split("data/")[1].split("/versions")[0] + "_" +
-                                    modpack.files[i].path.split("mods/")[1].split(".jar")[0].replace("_", "-").replace(" ", "-")+".jar",
-                        modpack.files[i].downloads[0],
-                        () => {}
-                      );
+                        modDownloads.push(
+                          new Promise((resolve) => {
+                            files.downloadAsync(
+                                    folder +
+                                        "/mods/lr_" +
+                                        modpack.files[i].downloads[0].split("data/")[1].split("/versions")[0] + "_" +
+                                        modpack.files[i].path.split("mods/")[1].split(".jar")[0].replace("_", "-").replace(" ", "-")+".jar",
+                            modpack.files[i].downloads[0],
+                            () => resolve()
+                          );
+                          })
+                        );
                     }
-            
+
                     }
+                    //don't scan/filter mods or hand back control until every mod
+                    //download above has actually finished writing to disk
+                    //(allSettled so one bad/malformed entry can't skip this step)
+                    Promise.allSettled(modDownloads).then(() => {
                     //copy override mods over one again since sometimes it doesnt work
                     execSync(
                       "cp -r " + folder + "/overrides/* " + folder + "/"
@@ -1384,7 +1393,7 @@ for (let i in modpack.files) {
                     writeJSON(folder + "/modrinth.index.json", modpack);
                     deleteClientSideMods(id);
                     return utils.refreshPermissions();
-                   
+                    });
                   });
                 }
               }
@@ -1461,34 +1470,45 @@ for (let i in modpack.files) {
                     modpack = JSON.parse(
                       fs.readFileSync(folder + "/curseforge.index.json")
                     );
+                    const modDownloads = [];
                     for (let i in modpack.files) {
                       let projectID = modpack.files[i].projectID;
                       let fileID = modpack.files[i].fileID;
                       console.log(projectID + " " + fileID);
-                      exec(
-                        `curl -X GET "https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}/download-url" -H 'x-api-key: ${apiKey}'`,
-                        (error, stdout, stderr) => {
-                          if (stdout != undefined) {
-                            try {
-                              files
-                                .downloadAsync(
-                                  folder +
-                                    "/mods/cf_" +
-                                    projectID +
-                                    "_CFMod.jar",
-                                  JSON.parse(stdout).data
-                                )
-                                .then(() => {});
-                            } catch {
-                              console.log(
-                                "error parsing json for " + projectID
-                              );
+                      modDownloads.push(
+                        new Promise((resolve) => {
+                          exec(
+                            `curl -X GET "https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}/download-url" -H 'x-api-key: ${apiKey}'`,
+                            (error, stdout, stderr) => {
+                              if (stdout != undefined) {
+                                try {
+                                  files.downloadAsync(
+                                    folder +
+                                      "/mods/cf_" +
+                                      projectID +
+                                      "_CFMod.jar",
+                                    JSON.parse(stdout).data,
+                                    () => resolve()
+                                  );
+                                } catch {
+                                  console.log(
+                                    "error parsing json for " + projectID
+                                  );
+                                  resolve();
+                                }
+                              } else {
+                                resolve();
+                              }
                             }
-                          }
-                        }
+                          );
+                        })
                       );
                     }
                     console.log("modpackID:" + modpackID);
+                    //don't scan/filter mods or clean up until every mod
+                    //download above has actually finished writing to disk
+                    //(allSettled so one bad/malformed entry can't skip this step)
+                    Promise.allSettled(modDownloads).then(() => {
                     //add in modpackID so that it frontends can check for updates later
                     modpack.projectID = modpackID;
                     modpack.platform = "cf";
@@ -1498,7 +1518,7 @@ for (let i in modpack.files) {
                     deleteClientSideMods(id);
                     //remove temp folder
                     exec("rm -r " + folder + "/temp");
-                    return;
+                    });
                   });
                 }
               }
@@ -1537,18 +1557,29 @@ function getPlayerList(id) {
 }
 
 function deleteClientSideMods(id) {
-  const folder = fs.readdirSync("servers/" + (idOffset + parseInt(id)) + "/mods");
+  // NOTE: `id` here is already the full server folder name (e.g. "128"),
+  // same as everywhere else in this file (see `folder = "servers/" + id` in
+  // run()/downloadModpack()) - do NOT add idOffset again here, that pointed
+  // at a folder that doesn't exist (servers/228 instead of servers/128) and
+  // made every call throw ENOENT, silently swallowed by the global
+  // uncaughtException handler, so this never actually deleted anything.
+  const modsFolder = "servers/" + id + "/mods";
+  const folder = fs.readdirSync(modsFolder);
   const list = fs.readFileSync("assets/clientsidemods.txt", "utf8").split("\n");
   for (let i = 0; i < folder.length; i++) {
     for (let j = 0; j < list.length; j++) {
-      const modName = folder[i].toLowerCase().replace(/-/g, "");
-const matchAgainst = list[j].toLowerCase().replace(/-/g, "").trim();
+      const modName = folder[i].toLowerCase().replace(/[-_]/g, "");
+      const matchAgainst = list[j].toLowerCase().replace(/[-_]/g, "").trim();
 
-if (modName.includes(matchAgainst)) {
-
-
+      if (matchAgainst && modName.includes(matchAgainst)) {
+        const modPath = modsFolder + "/" + folder[i];
+        //skip directories (e.g. the Sinytra Connector's ".connector" cache
+        //folder) - fs.unlinkSync throws EISDIR on those
+        if (!fs.statSync(modPath).isFile()) {
+          continue;
+        }
         console.log("deleting client side mod: " + folder[i]);
-        fs.unlinkSync("servers/" + (idOffset + parseInt(id)) + "/mods/" + folder[i]);
+        fs.unlinkSync(modPath);
       }
     }
   }

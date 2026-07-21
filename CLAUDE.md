@@ -16,8 +16,8 @@ This monorepo structure keeps both projects in sync and allows coordinated devel
 ## Git Workflow Standards
 
 **File Changes Only**
-- Never commit files - only modify them
-- User handles all commits
+- Never commit files - only modify them, unless the user explicitly asks for a commit in that request
+- Outside of an explicit request, user handles all commits
 - Focus exclusively on code changes
 
 **Remote Operations**

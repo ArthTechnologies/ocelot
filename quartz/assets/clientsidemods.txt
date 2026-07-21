@@ -13,3 +13,9 @@ fancymenu
 complementary
 enhancedvisuals
 controllable
+zume
+hidekeybinding
+citresewn
+jecharacters
+justenoughcharacters
+imblocker
