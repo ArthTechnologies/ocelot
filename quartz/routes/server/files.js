@@ -110,6 +110,28 @@ function resolveInServer(serverId, rawPath, { allowRoot = false } = {}) {
   return { relPath, serverRoot, fullPath };
 }
 
+// rm's stderr and Node's fs error messages embed the full absolute host path
+// (serverRoot included) - swap that prefix for the server-relative path before
+// it goes back to the client so we don't leak host filesystem layout.
+function scrubServerRoot(text, serverRoot) {
+  return (text || "")
+    .split(serverRoot + path.sep)
+    .join("")
+    .split(serverRoot)
+    .join(".")
+    .trim();
+}
+
+// `rm -rf` recurses, so a permission problem can print one "cannot remove"
+// line per file in the tree - collapse that down to the first line so the
+// modal shows one sentence instead of a dump of every failed path.
+function summarizeError(text) {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return "";
+  if (lines.length === 1) return lines[0];
+  return `${lines[0]} (+${lines.length - 1} more)`;
+}
+
 router.post("/delete/:path", function (req, res) {
   const email = req.headers.username;
   const folder = req.query.folder === "true"; // check if this is a folder deletion
@@ -120,7 +142,7 @@ router.post("/delete/:path", function (req, res) {
   if (resolved === null) {
     return res.status(400).json({ msg: "Invalid path." });
   }
-  const { relPath, fullPath } = resolved;
+  const { relPath, fullPath, serverRoot } = resolved;
   console.log("DELETING " + fullPath + " " + email);
 
   if (!fs.existsSync(fullPath)) {
@@ -134,11 +156,12 @@ router.post("/delete/:path", function (req, res) {
     if (!isDirectory) {
       return res.status(400).json({ msg: "That path isn't a folder." });
     }
-    exec(`rm -rf "${fullPath}"`, (err) => {
+    exec(`rm -rf "${fullPath}"`, (err, stdout, stderr) => {
       if (err) {
-        console.error(err);
+        const reason = summarizeError(scrubServerRoot(stderr || err.message, serverRoot));
+        console.error("Folder delete failed:", reason || err);
         return res.status(500).json({
-          msg: "Couldn't delete the folder. Stop the server and try again.",
+          msg: `Couldn't delete the folder${reason ? `: ${reason}` : ""}.`,
         });
       }
       return res.status(200).json({ msg: "Done" });
@@ -156,10 +179,10 @@ router.post("/delete/:path", function (req, res) {
     try {
       fs.unlinkSync(fullPath);
     } catch (err) {
-      // EPERM/EBUSY when a running server holds the file open.
+      const reason = summarizeError(scrubServerRoot(err.message, serverRoot));
       console.error("Delete error:", err);
       return res.status(500).json({
-        msg: "Couldn't delete the file. Stop the server and try again.",
+        msg: `Couldn't delete the file${reason ? `: ${reason}` : ""}.`,
       });
     }
     return res.status(200).json({ msg: "Done" });
