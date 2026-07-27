@@ -110,7 +110,10 @@ quartz/
 │   ├── checkout.js     # Stripe payment processing
 │   ├── curseforge.js   # CurseForge integration
 │   ├── referrals.js    # Referral system
-│   └── translate.js    # Translation API
+│   ├── translate.js    # Translation API
+│   ├── admin.js        # Admin dashboard/lookup endpoints
+│   ├── support.js      # Support tooling endpoints
+│   └── agent.js        # Localhost-only endpoints for AI agents (e.g. Claude Code)
 ├── scripts/
 │   ├── mc.js           # Minecraft server control (start, stop, install)
 │   ├── files.js        # File system operations
@@ -154,6 +157,14 @@ quartz/
 - Distribute servers across multiple backend instances
 - Node registry and routing
 - Load balancing
+
+#### Agent Routes (`/agent`)
+- Endpoints in `routes/agent.js`, mounted at `/agent`, meant to be called locally by AI coding agents (e.g. Claude Code) working on this repo — not by Observer or any other client
+- Locked down by a `localOnly` middleware that rejects any request whose socket isn't `127.0.0.1`/`::1`; since `run.js` never sets `trust proxy`, `req.socket.remoteAddress` can't be spoofed via `X-Forwarded-For`
+- Endpoints are read-only by convention — they exist to give an agent visibility into live data (Stripe, accounts, servers) without it needing DB/API credentials of its own
+- Current endpoints:
+  - `GET /agent/stripe/subscriptions?email=|accountId=|customerId=` — read-only Stripe subscription lookup for a customer
+- When adding a new agent endpoint: add it to `routes/agent.js` (inherits `localOnly` automatically), keep it read-only unless there's a specific reason not to, and document it in this list
 
 #### Configuration
 
