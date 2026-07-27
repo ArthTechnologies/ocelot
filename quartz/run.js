@@ -171,6 +171,10 @@ if (!migrationsStatus.stringServerList) {
   console.log("[Migration] Running stringServerList migration...");
   migrations.stringServerList();
 }
+if (!migrationsStatus.mergeDuplicateEmailAccounts) {
+  console.log("[Migration] Running mergeDuplicateEmailAccounts migration...");
+  migrations.mergeDuplicateEmailAccounts();
+}
 
 exec = require("child_process").exec;
 
@@ -1006,7 +1010,7 @@ schedules.registerFunction("downloadFullJars", async () => {
 
 schedules.registerFunction("runPeriodicTasks", async () => {
   console.log("[System Task] Running periodic maintenance...");
-  utils.runPeriodicTasks();
+  await utils.runPeriodicTasks();
   refreshTempToken();
   refreshFileAccess();
   removeUnusedAccounts();

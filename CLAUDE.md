@@ -123,6 +123,7 @@ quartz/
 │   ├── scraper.js      # Mod/plugin scraping (CurseForge, Modrinth)
 │   ├── security.js     # Security utilities
 │   ├── utils.js        # General utilities
+│   ├── accountLinking.js # Cross-login-method account lookup/linking helpers
 │   └── migrations.js   # Database migrations
 ├── config.txt          # Configuration file (API keys, settings)
 └── servers/            # Running server instances
@@ -141,6 +142,19 @@ quartz/
 - Discord OAuth integration
 - Token-based API authentication
 - Account management
+
+**One email = one account.** Accounts live in `accounts/{type}:{identifier}.json` (`email:`, `google:`, `discord:` — Discord keys by username, not email), but every account stores its billing email in the `email` field, which is what links them.
+- All three signup paths in `routes/accounts.js` call `findConflictingAccount()` before creating an account. If the email already exists under a *different* login method, signup is refused with `{ token: -1, duplicateAccount: true, existingLoginMethod, reason }` and the frontend tells the user which method to sign in with. Sign-in paths are never blocked.
+- `scripts/accountLinking.js` holds the shared helpers (`findAccountsByEmail`, `groupAccountsByEmail`, `parseAllowedAccounts`, `isAllowedAccount`) used by both the signup guards and the migration.
+- Accounts that were already duplicated before this rule are linked by the `mergeDuplicateEmailAccounts` migration, which grants every account in an email group access to every live server the group owns. Access requires *both* the server id in `account.servers` and the account id in the server's `allowedAccounts` string — same contract as `/server/:id/allowAccount` and `utils.hasAccess`.
+- The migration also credits `freeServers` by the number of servers it adds to each account. Server creation is gated on `subs + freeServers > servers.length` ([server/index.js](quartz/routes/server/index.js)), so growing `servers.length` without this would strip slots from users who had already paid. This deliberately leaves some merged users slightly ahead — the trade was chosen over the support load of under-crediting.
+- A `{id}:freed` entry means the server was moved to `trashbin/` and its numeric id released for reuse, so folder existence alone never proves ownership — always check `server.accountId` before sharing a server.
+
+**Subscription state resolves per email, not per account file.** `logs/subscriptions.json` records subscriptions against the account file that *owns* each server, so a linked account would otherwise see a different answer than its sibling. Anything answering "is this paid for?" must widen to the email group via a `getLinkedAccountFiles(accountName, accountData)` lookup — `routes/info.js` keeps a local copy so the request path carries no dependency on the linking module; `scripts/utils.js` uses the shared one:
+- `routes/info.js` matches `sub.owner` against the whole group, so the expired-server card (code 106) shows on both logins instead of only the owner's.
+- The same list resolves `trashbin/{id}-{owner}` lookups, since those folders are named after the owning account — without it a linked account reports 104 ("data deleted") for data sitting safely in trashbin.
+- `utils.js` writes the `{id}:freed` marker to every linked account holding the id, so both logins land on code 100 rather than one falling through to a bare 101.
+- `utils.js` requires `accountLinking` **lazily inside the function** — `accountLinking` imports `readJSON` from `utils.js`, so a top-level import there would create a cycle.
 
 #### Payments (Provider Mode)
 - Stripe integration for server subscriptions

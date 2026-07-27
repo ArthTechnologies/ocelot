@@ -6,6 +6,7 @@ const base62 = require("base62/lib/ascii");
 
 const { v4: uuidv4 } = require("uuid");
 const files = require("../scripts/files.js");
+const accountLinking = require("../scripts/accountLinking.js");
 
 const writeJSON = require("../scripts/utils.js").writeJSON;
 const config = require("../scripts/utils.js").getConfig();
@@ -14,6 +15,29 @@ const enableCloudflareVerify = JSON.parse(config.enableCloudflareVerify);
 const mode = config.mode;
 
 const nodeName = config.nodeName || "quartz";  
+
+// One email = one account. Signing up a second time under a different login
+// method would split a user's servers across two accounts, so signup is
+// refused and the caller is told which method the existing account uses.
+// `currentName` is the account file this signup would create (e.g.
+// "google:a@b.com"), which must not count as a conflict with itself.
+function findConflictingAccount(email, currentName) {
+  if (!email) return null;
+  const existing = accountLinking.findAccountsByEmail(email, { excludeName: currentName });
+  if (existing.length === 0) return null;
+
+  const match = existing[0];
+  const label = accountLinking.loginMethodLabel(match.type);
+  return {
+    token: -1,
+    duplicateAccount: true,
+    existingLoginMethod: match.type,
+    existingLoginMethodLabel: label,
+    reason:
+      `An account for ${email} already exists using ${label}. ` +
+      `Sign in with ${label} instead, or use a different email address.`,
+  };
+}
 
 function writeAccount(id, username, billingEmail, servers, stripeServers, freeServers, lastSignin, token, salt, password, resetAttempts) {
   let tsv = fs.readFileSync("accounts.tsv", "utf8").split("\n");
@@ -76,6 +100,11 @@ Router.post("/email/signup/", (req, res) => {
       if (password == confirmPassword) {
         if (password.length >= 7) {
           if (!emailExists) {
+            const conflict = findConflictingAccount(email, "email:" + email);
+            if (conflict) {
+              return res.status(400).send(conflict);
+            }
+
             let accountId = "acc_"+Buffer.from(nodeName + (nodeName.includes("*email:") ? "" : "*email:") + email.substring(0, 7)).toString('base64url');
             [salt, password] = files.hash(password).split(":");
 
@@ -343,6 +372,12 @@ Router.post("/discord/", async (req, res) => {
       }
       email = email.toLowerCase();
       if (email.includes("email:")) email = email.replace("email:", "");
+
+      const conflict = findConflictingAccount(email, "discord:" + username.toLowerCase());
+      if (conflict) {
+        return res.status(400).send(conflict);
+      }
+
       let accountId = "acc_"+Buffer.from(nodeName + (nodeName.includes("*email:") ? "" : "*discord:") + username.substring(0, 7)).toString('base64url');
 
       account.accountId = accountId;
@@ -526,6 +561,11 @@ Router.post("/google/", (req, res) => {
             res.status(200).send(response);
           } else {
             // Sign-up: Create new account
+            const conflict = findConflictingAccount(email, "google:" + email);
+            if (conflict) {
+              return res.status(400).send(conflict);
+            }
+
             let accountId = "acc_" + Buffer.from(
               nodeName + (nodeName.includes("*email:") ? "" : "*google:") + email.substring(0, 7)
             ).toString('base64url');

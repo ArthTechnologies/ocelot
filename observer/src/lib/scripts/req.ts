@@ -509,14 +509,20 @@ export function signupEmail(em: string, pwd: string, cloudflareVerifyToken:strin
     .then((input: string) => {
       console.log(input);
 
+      const data = JSON.parse(input);
+      // Only persist login state once the signup actually succeeded, otherwise
+      // a rejected signup leaves the app looking logged in with a -1 token.
+      if (data.token == -1) {
+        localStorage.removeItem("accountEmail");
+        localStorage.removeItem("email");
+        return data.reason;
+      }
+
       localStorage.setItem("loggedIn", "true");
-      localStorage.setItem("token", JSON.parse(input).token);
-      localStorage.setItem("accountId", JSON.parse(input).accountId);
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("accountId", data.accountId);
       localStorage.setItem("avatar", "");
       updateReqTemplates();
-      if (JSON.parse(input).token == -1) {
-        return JSON.parse(input).reason;
-      }
       // Report signup conversion back to the marketing site analytics
       fetch(`${SITE_URL}/api/analytics/signup`, {
         method: "POST",

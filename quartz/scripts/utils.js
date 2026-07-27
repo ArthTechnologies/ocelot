@@ -113,431 +113,310 @@ function sanitizePath(userInput) {
   return sanitized;
 }
 
-async function checkSubscriptions() {
-      let servers = fs.readdirSync("servers");
-      //sort the folder alphanumerically for debugging purposes
-      servers.sort((a, b) => {
-        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+// Pull every subscription Stripe knows about for a billing email.
+// Returns null when the email has no customer record at all — callers treat
+// that as "we don't know" and leave the server alone, which is deliberately
+// different from a customer that exists with zero subscriptions (expired).
+async function fetchSubscriptionsForEmail(email) {
+  const customers = await stripe.customers.list({ limit: 100, email: email });
+  if (customers.data.length === 0) {
+    console.log("No customer found for " + email);
+    return null;
+  }
+
+  console.log("Customer found for " + email);
+  const subscriptions = [];
+  for (const customer of customers.data) {
+    if (!customer.id) continue;
+    console.log("Getting subscriptions for customer " + customer.id);
+    const list = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: "all",
+      limit: 100,
+    });
+    for (const sub of list.data) {
+      const price = sub.items?.data[0]?.price;
+      subscriptions.push({
+        status: sub.status,
+        ended_at: sub.ended_at,
+        current_period_end: sub.current_period_end,
+        start_date: sub.start_date,
+        productID: price?.product,
+        unitAmount: price?.unit_amount,
+        interval: price?.recurring?.interval,
+        intervalCount: price?.recurring?.interval_count,
       });
-            console.log("[STAGE0] " + servers);
-      let data = [];
-
-      // Calculate all storage sizes in parallel
-      const storageSizes = await Promise.all(
-        servers.map(serverId =>
-          files.folderSizeRecursiveAsync("servers/" + serverId)
-            .catch(e => {
-              console.log("Error calculating storage for " + serverId + ":", e);
-              return 0;
-            })
-        )
-      );
-
-      for (let i in servers) {
-
-          const serverId = servers[i];
-      console.log("[STAGE1] " + serverId);
-        try {
-
-          const storage = storageSizes[i];
-             console.log("[STAGE2] " + `servers/${serverId}/server.json`);
-          if (fs.existsSync(`servers/${serverId}/server.json`)) {
-try {
-  
-              let json = readJSON(`servers/${serverId}/server.json`);
-              console.log("[STAGE3] " + JSON.stringify(json));
-            if (json.adminServer == undefined || json.adminServer == false) {
-              const accountId = json.accountId;
-       
-           
-              fs.readdirSync("accounts").forEach((file) => 
-              
-                {
-                    try {
-                let owner = null;
-                        let email = null;
-                        let account;
-                if (!file.includes(".swp")) account = readJSON(`accounts/${file}`);
-                else account.servers = [];
-                if (file.includes(".swp")) console.log("[STAGE2.7] " + JSON.stringify(account));  
-                if (account.accountId == accountId && file != "noemail.json") {
-                  owner = file;
-                  if (!file.includes("email:")) email = account.email;
-                  else email = file.split("email:")[1].split(".json")[0];
-                  data.push({
-                    serverId: serverId,
-                    owner: owner,
-                    email: email,
-                    storage: storage,
-                    accountId: account.accountId,
-                  });
-                      try {
-                        console.log("Getting customer for " + email);
-                        if (email != null && email != undefined) {
-                          stripe.customers.list(
-                            {
-                              limit: 100,
-                              email: email,
-                            },
-                            function (err, customers) {
-                              if (err) {
-                                console.log("err", err);
-                              } else {
-                                if (customers.data.length == 0) {
-                                  console.log(
-                                    "No customer found for " + email
-                                  );
-                                } else {
-                                  console.log(
-                                    "Customer found for " + email
-                                  );
-                                  //find item in data array
-                                  //find item in data array
-                                  for (let j in data) {
-                                    if (data[j].email == email) {
-                                      let subscriptionsA = [];
-
-                                      for (let k in customers.data) {
-                                        if (customers.data[k].id) {
-                                          let customerSubscriptions;
-                                          //get from stripe
-                                          console.log("Getting subscriptions for customer " + customers.data[k].id);
-                                          stripe.subscriptions.list(
-                                            {
-                                              customer: customers.data[k].id,
-                                              status: "all",
-                                            },
-                                            function (err, subscriptions) {
-                                          
-                                              if (err) {
-                                                console.log("Error getting subscriptions for customer " + customers.data[k].id);
-                                                console.log(err);
-                                              } else {
-                                                 customerSubscriptions = subscriptions.data;
-                                                for (let i in customerSubscriptions) {
-                                                                                                   subItem = {};
-                                                 subItem.status = customerSubscriptions[i].status;
-                                                 subItem.ended_at = customerSubscriptions[i].ended_at;
-                                                 subItem.current_period_end = customerSubscriptions[i].current_period_end;
-                                                 subItem.start_date = customerSubscriptions[i].start_date;
-                                                 subItem.productID = customerSubscriptions[i].items?.data[0]?.price?.product;
-                                                 subItem.unitAmount = customerSubscriptions[i].items?.data[0]?.price?.unit_amount;
-                                                 subItem.interval = customerSubscriptions[i].items?.data[0]?.price?.recurring?.interval;
-                                                 subItem.intervalCount = customerSubscriptions[i].items?.data[0]?.price?.recurring?.interval_count;
-                                                 console.log(customers.data[k].id + " Server Slot " + data[j].serverId + " subscription: ");
-                                                  console.log(JSON.stringify(subItem));
-
-
-                                                  subscriptionsA.push(subItem);
-
-                                                }
-                                              }
-                                            }
-                                          );
-                                        }
-                                      }
-                                      setTimeout(() => {
-                                        data[j].subscriptions = subscriptionsA;
-                                        
-                                      }, 1000 * 10);
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          );
-                        }
-                    } catch (e) {
-                      console.log("Error getting customer for " + email);
-                      console.log(e);
-                    }
-                }
-              } catch(e) {
-                console.log("Caught Error: " + e);
-              }
-              });
-            }
-} catch (e) {
-              console.log("Error getting server owner for " + serverId);
-              console.log(e);
-            }
-          } else {
-            fs.readdirSync("accounts").forEach((file) => {
-            
-                let account;
-                try {
-             account = readJSON(`accounts/${file}`);
-                } catch (e) {
-                
-                 account.servers = [];
-                }
-
-                if (file.includes(".swp")) console.log("[STAGE2.7] " + JSON.stringify(account));
-                //console.log("Checking account " + file);
-                if (
-                  account.servers.includes(serverId) ||
-                  account.servers.includes(parseInt(serverId))
-                  && file != "noemail.json"
-                ) {
-                   console.log("[STAGE3] " + JSON.stringify(account));
-                  owner = file;
-                  if (!file.includes("email:")) email = account.email;
-                  else email = file.split("email:")[1].split(".json")[0];
-  
-                  data.push({
-                    serverId: serverId,
-                    owner: owner,
-                    email: email,
-                    storage: storage,
-                    accountId: account.accountId,
-                  });
-                      try {
-                        console.log("Getting customer for " + email);
-                        if (email != null && email != undefined) {
-                          stripe.customers.list(
-                            {
-                              limit: 100,
-                              email: email,
-                            },
-                            function (err, customers) {
-                              if (err) {
-                                console.log("err", err);
-                              } else {
-                                if (customers.data.length == 0) {
-                                  console.log(
-                                    "No customer found for " + email
-                                  );
-                                } else {
-                                  console.log(
-                                    "Customer found for " + email
-                                  );
-                                  //find item in data array
-                                  //find item in data array
-                                  for (let j in data) {
-                                    if (data[j].email == email) {
-                                      let subscriptionsA = [];
-
-                                      for (let k in customers.data) {
-                                        if (customers.data[k].id) {
-                                          let customerSubscriptions;
-                                        
-                                          stripe.subscriptions.list(
-                                            {
-                                              customer: customers.data[k].id,
-                                              status: "all",
-                                            },
-                                            function (err, subscriptions) {
-                                             
-                                              if (err) {
-                                                console.log("Error getting subscriptions for customer " + customers.data[k].id);
-                                                console.log(err);
-                                              } else {
-                                                 customerSubscriptions = subscriptions.data;
-                                                for (let i in customerSubscriptions) {
-                                                                                                   subItem = {};
-                                                 subItem.status = customerSubscriptions[i].status;
-                                                 subItem.ended_at = customerSubscriptions[i].ended_at;
-                                                 subItem.current_period_end = customerSubscriptions[i].current_period_end;
-                                                 subItem.start_date = customerSubscriptions[i].start_date;
-                                                 subItem.productID = customerSubscriptions[i].items?.data[0]?.price?.product;
-                                                 subItem.unitAmount = customerSubscriptions[i].items?.data[0]?.price?.unit_amount;
-                                                 subItem.interval = customerSubscriptions[i].items?.data[0]?.price?.recurring?.interval;
-                                                 subItem.intervalCount = customerSubscriptions[i].items?.data[0]?.price?.recurring?.interval_count;
-                                                                                                  console.log(customers.data[k].id + "Server Slot " + data[j].serverId + " subscription: ");
-                                                 console.log(subItem);
-
-                                                  subscriptionsA.push(subItem);
-
-                                                }
-                                              }
-                                            }
-                                          );
-                                        }
-                                      }
-                                      setTimeout(() => {
-                                        data[j].subscriptions = subscriptionsA;
-                                        
-                                      }, 1000 * 10);
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          );
-                        }
-                    } catch (e) {
-                      console.log("Error getting customer for " + email);
-                      console.log(e);
-                    }
-                }
-         
-            });
-          }
-        } catch {
-          console.log("error getting server owner");
-        }
-      }
-      setTimeout(() => {
-        console.log("Subscriptions 50% done checking.");
-      }
-      , 1000 * 30);  
-      setTimeout(() => {
-        fs.writeFileSync(
-          "logs/subscriptions.json",
-          JSON.stringify(data, null, 2)
-        );
-        console.log("Subscriptions checked and logged.");
-        //stop any servers with no active subscriptions
-        for (let i in data) {
-
-          if (data[i].subscriptions == undefined) {
-            console.log("No subscriptions found for " + data[i].serverId);
-            continue;
-          }
-          let adminServer = false;
-          try {
-            let serverJson = readJSON(`servers/${data[i].serverId}/server.json`);
-            if (serverJson.adminServer == true) {
-              console.log("Skipping admin server " + data[i].serverId);
-              adminServer = true;
-              continue;
-            }
-          } catch (e) {
-            console.log("Error reading server.json for " + data[i].serverId);
-            console.log(e);
-          }
-          console.log("Checking server " + data[i].serverId);
-          let isActiveSubscription = false;
-          let latestEndDate = 0;
-          let latestStartDate = 0;
-          if (data[i].subscriptions != undefined) {
-            for (let j in data[i].subscriptions) {
-              if (
-                data[i].subscriptions[j].status == "active" ||
-                data[i].subscriptions[j].status == "trialing"
-              ) {
-                isActiveSubscription = true;
-                break;
-              } else {
-                if (data[i].subscriptions[j].ended_at > latestEndDate) {
-                  latestEndDate = data[i].subscriptions[j].ended_at;
-                }
-                if (data[i].subscriptions[j].start_date > latestStartDate) {
-                  latestStartDate = data[i].subscriptions[j].start_date;
-                }
-              }
-            }
-          }
-          //if latestStart date was within the past 24 hours, then well mark it as an active subscription
-          //this is because the subscriptions.json file may not have been refreshed yet
-          if (latestStartDate > Date.now() - 1000 * 60 * 60 * 24) {
-            isActiveSubscription = true;
-          }
-          if (!isActiveSubscription) {
-            console.log("Stopping server " + data[i].serverId + " due to no active subscriptions.");
-            const f = require("./mc.js");
-            f.stopAsync(data[i].serverId, () => {
-              console.log("Server " + data[i].serverId + " stopped.");
-            });
-            let timeToTrash = Date.now() - latestEndDate > 1000 * 60 * 60 * 24 * 7;
-            let newOwner = false;
-            if (fs.existsSync(`servers/${data[i].serverId}/server.json`))
-             newOwner = !(readJSON(`servers/${data[i].serverId}/server.json`).accountId == data[i].accountId);
-            console.log("New Owner? " + newOwner);
-            console.log("Time to trash? " + timeToTrash);
-            if (timeToTrash && !adminServer && !newOwner) {
-            //if it has been 7 days since the latest cancellation date, move to trashbin
-if (Date.now() - latestEndDate > 1000 * 60 * 60 * 24 * 7) {
-  console.log("Checking Stripe subscriptions for " + data[i].email + " before moving server " + data[i].serverId);
-  
-  // Search for customer by email
-  stripe.customers.list({
-    email: data[i].email,
-    limit: 1
-  })
-  .then(customers => {
-    let hasActiveSubscription = false;
-
-    if (customers.data.length > 0) {
-      const customerId = customers.data[0].id;
-      
-      // Get all subscriptions for this customer (active or trialing both protect the server)
-      return stripe.subscriptions.list({
-        customer: customerId,
-        status: 'all',
-        limit: 100
-      }).then(all => ({
-        data: all.data.filter(s => s.status === 'active' || s.status === 'trialing')
-      }));
-    } else {
-      // No customer found, return empty result
-      return { data: [] };
     }
-  })
-  .then(subscriptions => {
-    // Check if any active or trialing subscriptions exist
-    if (subscriptions.data.length > 0) {
-      console.log("Found active subscription(s) for " + data[i].email + ", skipping server " + data[i].serverId);
-      return; // Exit early if subscriptions found
-    }
-
-    // Only proceed with moving to trashbin if no active subscriptions found
-    console.log("No active subscriptions found. Moving server " + data[i].serverId + " to trashbin.");
-    let logLine = "server " + data[i].serverId + " moved to trashbin. Subscription data: \n" + JSON.stringify(data[i], null, 2) + "\n";
-    
-    if (!fs.existsSync("logs/trashbin.log")) {
-      fs.writeFileSync("logs/trashbin.log", "");
-    }
-    fs.appendFileSync("logs/trashbin.log", logLine);
-    
-    if (!fs.existsSync("trashbin")) {
-      fs.mkdirSync("trashbin");
-    }
-
-    try {
-      if (fs.existsSync(`servers/${data[i].serverId}`) && !fs.existsSync(`trashbin/${data[i].serverId}-${data[i].owner.split(".json")[0]}`)) {
-        fs.renameSync(
-          `servers/${data[i].serverId}`,
-          `trashbin/${data[i].serverId}-${data[i].owner.split(".json")[0]}`
-        );
-        
-        // Sometimes an empty folder is left behind, so we delete it
-        if (fs.existsSync(`servers/${data[i].serverId}`)) {
-          fs.rmSync(`servers/${data[i].serverId}`, { recursive: true, force: true });
-        }
-        
-        // In the account file, add :freed to the serverId
-        let account = readJSON(`accounts/${data[i].owner}`);
-        if (account.servers.includes(data[i].serverId)) {
-          account.servers = account.servers.filter(
-            (server) => server !== data[i].serverId
-          );
-          account.servers.push(data[i].serverId + ":freed");
-          writeJSON(`accounts/${data[i].owner}`, account);
-        }
-      } else if (fs.existsSync(`servers/${data[i].serverId}`)) {
-        console.log("Deleting empty server folder " + data[i].serverId);
-        fs.rmSync(`servers/${data[i].serverId}`, { recursive: true, force: true });
-      }
-    } catch (e) {
-      console.log("Error moving server to trashbin " + data[i].serverId);
-      console.log(e);
-    }
-  })
-  .catch(stripeError => {
-    console.log("Error checking Stripe subscriptions for " + data[i].email);
-    console.log(stripeError);
-    // Optionally: you can decide whether to proceed with deletion or skip on Stripe errors
-  });
+  }
+  return subscriptions;
 }
 
-          } else {
-            console.log("Server " + data[i].serverId + " has an active subscription.");
-          }
-          
-        }
+// Live second opinion, asked immediately before anything destructive.
+async function hasActiveStripeSubscription(email) {
+  const customers = await stripe.customers.list({ email: email, limit: 1 });
+  if (customers.data.length === 0) return false;
+
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customers.data[0].id,
+    status: "all",
+    limit: 100,
+  });
+  return subscriptions.data.some(
+    (s) => s.status === "active" || s.status === "trialing"
+  );
+}
+
+// Billing email for an account: email logins carry it in the filename, OAuth
+// logins carry it in the account body.
+function billingEmailFor(file, account) {
+  if (file.includes("email:")) return file.split("email:")[1].split(".json")[0];
+  return account.email;
+}
+
+// Map each server folder to the account that owns it. At most one entry per
+// server: linked accounts (same person, two login methods) both list a server
+// in `servers`, and a duplicate here would process the same server twice.
+function resolveServerOwners(servers, storageSizes) {
+  const accounts = [];
+  for (const file of fs.readdirSync("accounts")) {
+    // Skips editor swapfiles, and the solo-mode account which never owns a
+    // billable server.
+    if (!file.endsWith(".json") || file === "noemail.json") continue;
+    try {
+      accounts.push({ file: file, data: readJSON(`accounts/${file}`) });
+    } catch (e) {
+      console.log("Error reading accounts/" + file + ": " + e);
+    }
+  }
+
+  const data = [];
+  for (let i = 0; i < servers.length; i++) {
+    const serverId = servers[i];
+    const storage = storageSizes[i];
+    try {
+      let owner;
+      if (fs.existsSync(`servers/${serverId}/server.json`)) {
+        const json = readJSON(`servers/${serverId}/server.json`);
+        if (json.adminServer) continue;
+        owner = accounts.find((a) => a.data.accountId === json.accountId);
+      } else {
+        // No server.json to name an owner, so fall back to whoever claims it.
+        owner = accounts.find(
+          (a) =>
+            Array.isArray(a.data.servers) &&
+            (a.data.servers.includes(serverId) ||
+              a.data.servers.includes(parseInt(serverId)))
+        );
       }
-      }, 1000 * 60);
+
+      if (!owner) continue;
+      data.push({
+        serverId: serverId,
+        owner: owner.file,
+        email: billingEmailFor(owner.file, owner.data),
+        storage: storage,
+        accountId: owner.data.accountId,
+      });
+    } catch (e) {
+      console.log("Error resolving owner for server " + serverId + ": " + e);
+    }
+  }
+  return data;
+}
+
+// Mark the server ":freed" on the owner and on any linked account (same person,
+// second login method) that also lists it. Leaving a linked entry unmarked
+// points it at a folder that no longer exists, which surfaces as a bare
+// "error 101" card instead of the expired-server card the owner gets.
+function markServerFreed(entry) {
+  // Required lazily to avoid a circular import (accountLinking pulls readJSON
+  // from this module).
+  const accountLinking = require("./accountLinking.js");
+  const ownerName = entry.owner.replace(/\.json$/, "");
+  const ownerAccount = readJSON(`accounts/${entry.owner}`);
+
+  for (const file of accountLinking.getLinkedAccountFiles(ownerName, ownerAccount)) {
+    const linkedAccount = readJSON(`accounts/${file}`);
+    if (!Array.isArray(linkedAccount.servers)) continue;
+    if (!linkedAccount.servers.includes(entry.serverId)) continue;
+
+    linkedAccount.servers = linkedAccount.servers.filter(
+      (server) => server !== entry.serverId
+    );
+    linkedAccount.servers.push(entry.serverId + ":freed");
+    writeJSON(`accounts/${file}`, linkedAccount);
+  }
+}
+
+function moveServerToTrashbin(entry) {
+  const logLine =
+    "server " + entry.serverId + " moved to trashbin. Subscription data: \n" +
+    JSON.stringify(entry, null, 2) + "\n";
+
+  if (!fs.existsSync("logs/trashbin.log")) fs.writeFileSync("logs/trashbin.log", "");
+  fs.appendFileSync("logs/trashbin.log", logLine);
+  if (!fs.existsSync("trashbin")) fs.mkdirSync("trashbin");
+
+  const target = `trashbin/${entry.serverId}-${entry.owner.split(".json")[0]}`;
+  try {
+    if (fs.existsSync(`servers/${entry.serverId}`) && !fs.existsSync(target)) {
+      fs.renameSync(`servers/${entry.serverId}`, target);
+
+      // Sometimes an empty folder is left behind, so we delete it
+      if (fs.existsSync(`servers/${entry.serverId}`)) {
+        fs.rmSync(`servers/${entry.serverId}`, { recursive: true, force: true });
+      }
+
+      markServerFreed(entry);
+    } else if (fs.existsSync(`servers/${entry.serverId}`)) {
+      console.log("Deleting empty server folder " + entry.serverId);
+      fs.rmSync(`servers/${entry.serverId}`, { recursive: true, force: true });
+    }
+  } catch (e) {
+    console.log("Error moving server to trashbin " + entry.serverId);
+    console.log(e);
+  }
+}
+
+// Stop, and eventually bin, a server whose subscription has lapsed.
+async function enforceSubscription(entry) {
+  // undefined means Stripe never gave a usable answer (no customer record, or
+  // the lookup failed). Never act on that — only on a confirmed empty list.
+  if (entry.subscriptions == undefined) {
+    console.log("No subscriptions found for " + entry.serverId);
+    return;
+  }
+
+  try {
+    if (readJSON(`servers/${entry.serverId}/server.json`).adminServer) {
+      console.log("Skipping admin server " + entry.serverId);
+      return;
+    }
+  } catch (e) {
+    console.log("Error reading server.json for " + entry.serverId);
+    console.log(e);
+  }
+
+  console.log("Checking server " + entry.serverId);
+  let isActiveSubscription = false;
+  let latestEndDate = 0;
+  let latestStartDate = 0;
+  for (const sub of entry.subscriptions) {
+    if (sub.status == "active" || sub.status == "trialing") {
+      isActiveSubscription = true;
+      break;
+    }
+    if (sub.ended_at > latestEndDate) latestEndDate = sub.ended_at;
+    if (sub.start_date > latestStartDate) latestStartDate = sub.start_date;
+  }
+
+  // If the latest start date was within the past 24 hours, treat it as active:
+  // subscriptions.json may simply not have caught up yet.
+  if (latestStartDate > Date.now() - 1000 * 60 * 60 * 24) {
+    isActiveSubscription = true;
+  }
+
+  if (isActiveSubscription) {
+    console.log("Server " + entry.serverId + " has an active subscription.");
+    return;
+  }
+
+  console.log(
+    "Stopping server " + entry.serverId + " due to no active subscriptions."
+  );
+  const f = require("./mc.js");
+  f.stopAsync(entry.serverId, () => {
+    console.log("Server " + entry.serverId + " stopped.");
+  });
+
+  const timeToTrash = Date.now() - latestEndDate > 1000 * 60 * 60 * 24 * 7;
+  let newOwner = false;
+  if (fs.existsSync(`servers/${entry.serverId}/server.json`)) {
+    newOwner =
+      readJSON(`servers/${entry.serverId}/server.json`).accountId !== entry.accountId;
+  }
+  console.log("New Owner? " + newOwner);
+  console.log("Time to trash? " + timeToTrash);
+  if (!timeToTrash || newOwner) return;
+
+  console.log(
+    "Checking Stripe subscriptions for " + entry.email +
+    " before moving server " + entry.serverId
+  );
+  try {
+    if (await hasActiveStripeSubscription(entry.email)) {
+      console.log(
+        "Found active subscription(s) for " + entry.email +
+        ", skipping server " + entry.serverId
+      );
+      return;
+    }
+  } catch (e) {
+    // Stripe unreachable — leave the server alone rather than binning it on
+    // the strength of a failed call.
+    console.log("Error checking Stripe subscriptions for " + entry.email);
+    console.log(e);
+    return;
+  }
+
+  console.log(
+    "No active subscriptions found. Moving server " + entry.serverId + " to trashbin."
+  );
+  moveServerToTrashbin(entry);
+}
+
+async function checkSubscriptions() {
+  try {
+    const servers = fs.readdirSync("servers");
+    //sort the folder alphanumerically for debugging purposes
+    servers.sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+    );
+
+    // Calculate all storage sizes in parallel
+    const storageSizes = await Promise.all(
+      servers.map((serverId) =>
+        files.folderSizeRecursiveAsync("servers/" + serverId).catch((e) => {
+          console.log("Error calculating storage for " + serverId + ":", e);
+          return 0;
+        })
+      )
+    );
+
+    const data = resolveServerOwners(servers, storageSizes);
+
+    // One Stripe round-trip per billing email rather than per server — linked
+    // accounts and multi-server customers collapse into a single lookup.
+    const byEmail = new Map();
+    for (const entry of data) {
+      if (!entry.email || byEmail.has(entry.email)) continue;
+      console.log("Getting customer for " + entry.email);
+      try {
+        byEmail.set(entry.email, await fetchSubscriptionsForEmail(entry.email));
+      } catch (e) {
+        console.log("Error getting customer for " + entry.email);
+        console.log(e);
+        // null, not [] — an API failure must never read as "no subscriptions".
+        byEmail.set(entry.email, null);
+      }
+    }
+    for (const entry of data) {
+      const subscriptions = byEmail.get(entry.email);
+      if (subscriptions != null) entry.subscriptions = subscriptions;
+    }
+
+    fs.writeFileSync("logs/subscriptions.json", JSON.stringify(data, null, 2));
+    console.log("Subscriptions checked and logged.");
+
+    //stop any servers with no active subscriptions
+    for (const entry of data) {
+      await enforceSubscription(entry);
+    }
+    console.log("Subscription check complete.");
+  } catch (e) {
+    console.log("Error running subscription check:");
+    console.log(e);
+  }
 }
 
 const subdomainCleanup = require('./subdomainCleanup');
@@ -545,24 +424,22 @@ const subdomainCleanup = require('./subdomainCleanup');
 /**
  * Run periodic tasks including subscription checks and subdomain cleanup
  */
-function runPeriodicTasks() {
+async function runPeriodicTasks() {
   console.log('Running periodic tasks...');
-  
-  // Check subscriptions
-  checkSubscriptions();
-  
-  // Schedule subdomain cleanup to run after subscription check completes
-  setTimeout(() => {
-    try {
-      // Run subdomain cleanup
-      subdomainCleanup.cleanupInactiveSubdomains();
-    } catch (error) {
-      console.error('Error running subdomain cleanup:', error);
-    }
-  }, 1000 * 90); // Run 90 seconds after subscription check starts (30 seconds after it should complete)
-  
-  // Schedule next run (every 24 hours)
-  setTimeout(runPeriodicTasks, 1000 * 60 * 60 * 24);
+
+  try {
+    // Awaited, so cleanup runs when the check has actually finished rather
+    // than after a fixed delay that assumed how long it would take.
+    await checkSubscriptions();
+
+    // Run subdomain cleanup
+    subdomainCleanup.cleanupInactiveSubdomains();
+  } catch (error) {
+    console.error('Error running periodic tasks:', error);
+  } finally {
+    // Schedule next run (every 24 hours)
+    setTimeout(runPeriodicTasks, 1000 * 60 * 60 * 24);
+  }
 }
 
 module.exports = { 

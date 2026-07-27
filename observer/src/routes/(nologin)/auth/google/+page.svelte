@@ -33,7 +33,14 @@
           console.log("Google OAuth response:", data);
 
           if (data.token === -1) {
-            alert("Authentication failed: " + (data.reason || "Unknown error"));
+            // duplicateAccount means the email already has an account on another
+            // login method — the reason already reads as a full explanation, so
+            // don't bury it behind "Authentication failed".
+            if (data.duplicateAccount) {
+              alert(data.reason);
+            } else {
+              alert("Authentication failed: " + (data.reason || "Unknown error"));
+            }
             goto("/login");
             return;
           }

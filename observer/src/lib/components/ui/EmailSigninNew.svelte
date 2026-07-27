@@ -6,7 +6,7 @@
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { fade } from "svelte/transition";
-  import { Eye, EyeOff, ArrowRight } from "lucide-svelte";
+  import { Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-svelte";
 
   import { alert } from "$lib/scripts/utils";
   import { Turnstile } from "svelte-turnstile";
@@ -15,6 +15,7 @@
 
   let goodPwd = true;
   let matchPwd = true;
+  let signupError = "";
   let cloudflareVerified = false;
   let cloudflareVerifyToken = "";
   let cloudflareVerify = true;
@@ -83,6 +84,7 @@
 
   function submit() {
     if (sign == "up") {
+      signupError = "";
       checkPwd();
       if (goodPwd && matchPwd) {
                     //this tells the navbar to update the icon that is highligted
@@ -115,12 +117,18 @@
               //this tells the navbar to update the icon that is highligted
               window.dispatchEvent(new Event("redrict"));
             }
+          } else if (typeof x !== "string") {
+            alert("Something went wrong. Please try again.");
+          } else if (x.includes("Email already exists")) {
+            alert($t("alert.emailAlreadyExists"));
+          } else if (x.includes("Password is too short")) {
+            alert($t("alert.passwordIsTooShort"));
           } else {
-            if (x.includes("Email already exists"))
-              alert($t("alert.emailAlreadyExists"));
-            else if (x.includes("Password is too short"))
-              alert($t("alert.passwordIsTooShort"));
-            else alert(x);
+            // Anything else — notably "an account for this email already
+            // exists using Google/Discord" — stays on screen, since the
+            // message tells the user which login method to use instead.
+            signupError = x;
+            alert(x);
           }
         });
       }
@@ -252,6 +260,16 @@
               placeholder={$t("auth.confirmPassword")}
               class="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white placeholder-slate-400 text-sm focus:outline-none focus:border-orange-500/50 focus:bg-slate-700 transition-all"
             />
+
+            {#if signupError}
+              <div
+                role="alert"
+                class="w-full flex gap-2 items-start px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/40 text-red-200 text-xs text-left"
+              >
+                <span class="shrink-0 mt-0.5"><AlertCircle size={16} /></span>
+                <span>{signupError}</span>
+              </div>
+            {/if}
 
             <div class="space-y-2 flex flex-col md:items-start md:w-full">
               <div class="w-[100%] h-[65px] flex justify-start origin-top-left scale-90">

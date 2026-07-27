@@ -13,6 +13,38 @@ const stripeKey = config.stripeKey;
 const stripe = require("stripe")(stripeKey);
 const security = require("../scripts/security.js");
 
+// server.allowedAccounts is a comma-separated string of accountIds
+// (see /server/:id/allowAccount).
+function isAllowedAccount(server, accountId) {
+  if (!accountId || typeof server.allowedAccounts !== "string") return false;
+  return server.allowedAccounts.split(",").includes(accountId);
+}
+
+// Account files sharing this account's billing email, including itself.
+// Subscriptions are logged against the account file that owns each server, so
+// a user with both an email and a Google/Discord login needs the whole group
+// resolved or each login reports a different answer for the same server.
+// scripts/utils.js keeps its own copy for the trashbin job.
+function getLinkedAccountFiles(accountName, accountData) {
+  const self = `${accountName}.json`;
+  if (!accountData || !accountData.email) return [self];
+
+  const target = String(accountData.email).toLowerCase();
+  const linked = [];
+  try {
+    for (const file of fs.readdirSync("accounts")) {
+      if (!file.endsWith(".json")) continue;
+      const data = readJSON(`accounts/${file}`);
+      if (!data || !data.accountId || !data.email) continue;
+      if (String(data.email).toLowerCase() === target) linked.push(file);
+    }
+  } catch (e) {
+    console.log("Error scanning accounts for linked logins: " + e);
+  }
+  if (!linked.includes(self)) linked.push(self);
+  return linked;
+}
+
 router.get(`/servers`, function (req, res) {
   email = req.headers.username;
   token = req.headers.token;
@@ -57,6 +89,18 @@ router.get(`/servers`, function (req, res) {
 
     const actualAccountId = account.accountId;
 
+    // Subscriptions are logged against the account file that owns the server.
+    // A user with both an email and a Google/Discord login has their servers
+    // split across two files, so resolve subscription state across every
+    // account sharing this billing email — otherwise one login shows an
+    // expired server and the other shows it as fine.
+    // Only provider mode reads subscriptions, so skip the accounts scan
+    // entirely elsewhere.
+    const linkedOwners =
+      mode === "provider"
+        ? getLinkedAccountFiles(email, account)
+        : [`${email}.json`];
+
     for (let i in account.servers) {
                 const serverId = account.servers[i];
 
@@ -78,7 +122,7 @@ router.get(`/servers`, function (req, res) {
 
         try {
           for (let sub of subscriptionsJson) {
-            if (sub.owner == req.headers.username + ".json" && sub.subscriptions != undefined) {
+            if (linkedOwners.includes(sub.owner) && sub.subscriptions != undefined) {
               parsedSuccesfully = true;
 
               for (let item of sub.subscriptions) {
@@ -112,12 +156,22 @@ router.get(`/servers`, function (req, res) {
 
       if (serverId.includes(":freed")) {
         const rawId = serverId.split(":")[0];
-        const inTrashbin = fs.existsSync(`trashbin/${rawId}-${req.headers.username}`);
+        // Trashbin folders are named after the account that owned the server,
+        // so a linked account has to look under its sibling's name too — else
+        // it reports 104 ("data deleted") for data that is sitting in trashbin.
+        const inTrashbin = linkedOwners.some((file) =>
+          fs.existsSync(`trashbin/${rawId}-${file.replace(/\.json$/, "")}`)
+        );
         const livePath = `servers/${rawId}/server.json`;
         const liveServerExists = fs.existsSync(livePath);
         let ownedByThisAccount = false;
         if (liveServerExists) {
-          try { ownedByThisAccount = readJSON(livePath).accountId === actualAccountId; } catch (e) {}
+          try {
+            const liveServer = readJSON(livePath);
+            ownedByThisAccount =
+              liveServer.accountId === actualAccountId ||
+              isAllowedAccount(liveServer, actualAccountId);
+          } catch (e) {}
         }
         const conditionA = inTrashbin;
         const conditionB = !ownedByThisAccount;
@@ -179,7 +233,14 @@ router.get(`/servers`, function (req, res) {
       if (fs.existsSync(`servers/${serverId}/server.json`)) {
         let serverData = readJSON(`servers/${serverId}/server.json`);
 
-        if (serverData.accountId && serverData.accountId !== actualAccountId) {
+        // Not the owner is only a mismatch if the account was never granted
+        // access — linked accounts (same person, different login method) and
+        // sub-users are listed in the server's allowedAccounts.
+        if (
+          serverData.accountId &&
+          serverData.accountId !== actualAccountId &&
+          !isAllowedAccount(serverData, actualAccountId)
+        ) {
           serverObject.isStandard = false;
           serverObject.error = {
             code: 102

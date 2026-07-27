@@ -6,7 +6,7 @@
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { fade } from "svelte/transition";
-  import { Eye, EyeOff } from "lucide-svelte";
+  import { Eye, EyeOff, AlertCircle } from "lucide-svelte";
 
   import { alert } from "$lib/scripts/utils";
   import { Turnstile } from "svelte-turnstile";
@@ -15,6 +15,7 @@
 
   let goodPwd = true;
   let matchPwd = true;
+  let signupError = "";
   let cloudflareVerified = false;
   let cloudflareVerifyToken = "";
   let cloudflareVerify = true;
@@ -98,6 +99,7 @@
 
   function submit() {
     if (sign == "up") {
+      signupError = "";
       checkPwd();
       if (goodPwd && matchPwd) {
         const res = signupEmail(
@@ -119,12 +121,18 @@
               //this tells the navbar to update the icon that is highligted
               window.dispatchEvent(new Event("redrict"));
             }
+          } else if (typeof x !== "string") {
+            alert("Something went wrong. Please try again.");
+          } else if (x.includes("Email already exists")) {
+            alert($t("alert.emailAlreadyExists"));
+          } else if (x.includes("Password is too short")) {
+            alert($t("alert.passwordIsTooShort"));
           } else {
-            if (x.includes("Email already exists"))
-              alert($t("alert.emailAlreadyExists"));
-            else if (x.includes("Password is too short"))
-              alert($t("alert.passwordIsTooShort"));
-            else alert(x);
+            // Anything else — notably "an account for this email already
+            // exists using Google/Discord" — stays on screen, since the
+            // message tells the user which login method to use instead.
+            signupError = x;
+            alert(x);
           }
         });
       }
@@ -287,6 +295,16 @@
                 placeholder={$t("signin.l.cpwd")}
                 class="input w-full max-w-xs"
               />
+
+              {#if signupError}
+                <div
+                  role="alert"
+                  class="alert alert-error w-full max-w-xs flex gap-2 items-start text-sm text-left"
+                >
+                  <span class="shrink-0 mt-0.5"><AlertCircle size={18} /></span>
+                  <span>{signupError}</span>
+                </div>
+              {/if}
 
               <button on:click={submit} class="btn btn-primary"
                 >{$t("signup.continue")}</button

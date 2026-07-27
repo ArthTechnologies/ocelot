@@ -29,6 +29,16 @@
       .then((response) => response.json())
       .then((data) => {
         console.log(data);
+
+        // Signup can be refused — most often because this email already has an
+        // account under a different login method. Show why and send them back
+        // to the login page rather than crashing on the missing fields below.
+        if (data.token === -1) {
+          alert(data.reason || "Discord authentication failed.");
+          goto("/login");
+          return;
+        }
+
         localStorage.setItem("avatar", data.avatar);
         localStorage.setItem("bannerColor", data.bannerColor);
         localStorage.setItem("token", data.token);
