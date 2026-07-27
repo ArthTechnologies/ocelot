@@ -56,7 +56,7 @@
 <div class="-mt-1">
   <p class="font-poppins-bold text-gray-200 text-sm truncate max-md:hidden">
     {#if errorCode === 100 || errorCode === 103 || errorCode === 104 || errorCode === 105 || errorCode === 106}
-      Expired Server
+      Expired (Code {errorCode})
     {:else}
       Error code {errorCode}
     {/if}
