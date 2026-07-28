@@ -125,6 +125,7 @@ quartz/
 │   ├── utils.js        # General utilities
 │   ├── accountLinking.js # Cross-login-method account lookup/linking helpers
 │   ├── modpackChecker.js # Automated boot-check of popular modpacks
+│   ├── logPrefix.js    # Derives the [script] tag on every console line
 │   └── migrations.js   # Database migrations
 ├── config.txt          # Configuration file (API keys, settings)
 └── servers/            # Running server instances
@@ -172,6 +173,13 @@ quartz/
 - Distribute servers across multiple backend instances
 - Node registry and routing
 - Load balancing
+
+#### Panel Console Logging
+The console wrapper at the top of `run.js` prints `[timestamp] [tag] message`, where the tag is derived from the **call site** by `scripts/logPrefix.js` — `[mc]`, `[info]`, `[server/files]`, `[quartz]` for run.js, package name for node_modules. Nothing needs to opt in, so new scripts and routes are tagged automatically.
+- Do **not** add a second console wrapper. Dedup keys on the raw message; a wrapper that prepends to the message would make every line from a file look like a repeat of the last. Tagging is folded into the existing wrapper for this reason.
+- `console.warn`/`console.error` are tagged but never deduped.
+- **Never echo a server's console into the panel's.** Server output already goes to `terminalOutput[id]` (which the frontend reads) and, on a crash, to `logs/crash.txt`. Log the *fact* of a failure with the server id, not its output.
+- Account objects must never be logged — they carry `password`, `salt` and `token`.
 
 #### Automated Modpack Checks
 `scripts/modpackChecker.js` boots the 10 most popular Forge (CurseForge) and Fabric (Modrinth) 1.18.2 modpacks one at a time and records whether each reaches an online state. Runs every 12h as the `checkModpacks` system task, or on demand via the `checkModpacks` console command. Results land in `logs/modpackChecks.json`.

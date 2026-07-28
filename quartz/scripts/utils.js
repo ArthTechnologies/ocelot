@@ -35,8 +35,9 @@ function readJSON(file) {
 
 function writeJSON(file, json) {
   if (file.includes("accounts/")) {
-    console.log("WRITING TO " + file);
-    console.log(json);
+    // Deliberately only the filename: this used to print the whole account
+    // object, which put password hashes, salts and tokens in the console.
+    console.log("Writing " + file);
   }
   try {
     fs.writeFileSync(file, JSON.stringify(json, null, 2));

@@ -9,6 +9,10 @@ const servers = [];
 // Backup progress tracking
 const backupProgress = {};
 
+// Whole-cycle state, so `backupsProgress` in the console can report where the
+// run is up to and not just the server currently being zipped.
+let cycleState = { running: false, startedAt: null, index: 0, total: 0, current: null };
+
 (async () => {
   try {
     await fs.access("./backups");
@@ -166,10 +170,22 @@ async function runZip(serverId, timestamp) {
 }
 
 async function cycle() {
+  cycleState = { running: true, startedAt: Date.now(), index: 0, total: 0, current: null };
+  try {
+    await runCycle();
+  } finally {
+    cycleState.running = false;
+    cycleState.current = null;
+  }
+}
+
+async function runCycle() {
   const serverIds = await getServerIds();
   const serverWorldsTotalSize = await getWorldsTotalSize();
   const spaceAvailableOnSystem = await getSpaceAvailable();
   const backupsFolderSize = await getBackupsFolderSize();
+
+  cycleState.total = serverIds.length;
 
   if (serverWorldsTotalSize === 0) {
     console.log("No server worlds found to back up.");
@@ -187,6 +203,8 @@ async function cycle() {
   for (let i = 0; i < serverIds.length; i++) {
     console.log(`Attempting to backup server ${serverIds[i]}...`);
     const serverId = serverIds[i];
+    cycleState.index = i + 1;
+    cycleState.current = serverId;
     await fs.mkdir(`./backups/${serverId}`, { recursive: true });
 
     const backupFolder = await fs.readdir(`./backups/${serverId}`);
@@ -337,4 +355,18 @@ function getBackupProgress(serverId) {
   return backupProgress[serverId] || null;
 }
 
-module.exports = { getBackupSlots, triggerBackupCycle, getBackupProgress, backupSingleServer };
+// Everything currently backing up, plus where the cycle is up to.
+function getProgressSummary() {
+  return {
+    cycle: { ...cycleState },
+    servers: Object.entries(backupProgress).map(([serverId, p]) => ({ serverId, ...p })),
+  };
+}
+
+module.exports = {
+  getBackupSlots,
+  triggerBackupCycle,
+  getBackupProgress,
+  getProgressSummary,
+  backupSingleServer,
+};

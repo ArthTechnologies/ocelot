@@ -53,10 +53,8 @@ router.get(`/servers`, function (req, res) {
   //prevents a crash that has occurred
   if (email != undefined) {
     account = readJSON(`accounts/${email}.json`);
-    console.log(account);
-    console.log("../accounts/" + email + ".json");
   }
-  console.log(token + " " + account.token);
+  // Printing both tokens here leaked a working session token per request.
   if (token === account.token || mode === "solo") {
     //if req.body.email is "noemail" return 404
     if (req.query.username == ("noemail" | "undefined")) {

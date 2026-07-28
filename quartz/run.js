@@ -1,30 +1,54 @@
-// Override console.log to consolidate duplicate logs and append timestamps
+// Override the console to consolidate duplicate logs, append timestamps, and
+// tag each line with the script or route it came from. The tag is worked out
+// from the call site (see scripts/logPrefix.js), so it covers every module
+// without each one having to opt in.
 (function () {
+  const { callerTag } = require("./scripts/logPrefix.js");
   const originalLog = console.log;
+  const originalWarn = console.warn;
+  const originalError = console.error;
   const logCache = { lastMessage: null, count: 0 };
 
   function getTimestamp() {
     return new Date().toISOString().replace("T", " ").split(".")[0];
   }
 
-  console.log = function (message, ...optionalParams) {
+  function flushRepeats() {
+    if (logCache.count > 0) {
+      // Message passed through rather than interpolated, so an object logged
+      // repeatedly still reports as itself and not "[object Object]".
+      originalLog(`[${getTimestamp()}]`, logCache.lastMessage, `(repeated ${logCache.count} times)`);
+      logCache.count = 0;
+    }
+  }
+
+  function log(message, ...optionalParams) {
+    // Dedup still keys on the message alone — folding the tag in would make
+    // every line from a given file look like a repeat of the last.
     if (logCache.lastMessage === message) {
       logCache.count++;
-    } else {
-      if (logCache.count > 0) {
-        originalLog(`[${getTimestamp()}] ${logCache.lastMessage} (repeated ${logCache.count} times)`);
-      }
-      logCache.lastMessage = message;
-      logCache.count = 0;
-      originalLog(`[${getTimestamp()}] ${message}`, ...optionalParams);
+      return;
     }
-  };
+    flushRepeats();
+    logCache.lastMessage = message;
+    originalLog(`[${getTimestamp()}] [${callerTag(log)}]`, message, ...optionalParams);
+  }
+  console.log = log;
 
-  process.on("exit", () => {
-    if (logCache.count > 0) {
-      originalLog(`[${getTimestamp()}] ${logCache.lastMessage} (repeated ${logCache.count} times)`);
-    }
-  });
+  // Warnings and errors are tagged but never deduped or swallowed.
+  function warn(...args) {
+    flushRepeats();
+    originalWarn(`[${getTimestamp()}] [${callerTag(warn)}]`, ...args);
+  }
+  console.warn = warn;
+
+  function error(...args) {
+    flushRepeats();
+    originalError(`[${getTimestamp()}] [${callerTag(error)}]`, ...args);
+  }
+  console.error = error;
+
+  process.on("exit", flushRepeats);
 })();
 
 
@@ -462,6 +486,16 @@ process.on("uncaughtException", (error) => {
 //This handles commands from the terminal
 process.stdin.setEncoding("utf8");
 
+// "3m 12s" / "1h 4m" — for the progress commands.
+function elapsedSince(timestamp) {
+  if (!timestamp) return "unknown";
+  const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
 process.stdout.write(
   'Welcome to the terminal!\nType "help" for a list of commands.\n'
 );
@@ -480,6 +514,7 @@ process.stdin.on("data", (data) => {
   clear                       - Clear the terminal output.
 
   backup                      - Trigger the backup cycle.
+  backupsProgress             - Show progress of the running backup cycle, if any.
   runMigrations               - W.I.P
 
   debugScraper                - Debug: force a full jar download (calls downloadJars("full")).
@@ -488,6 +523,7 @@ process.stdin.on("data", (data) => {
   refreshFileAccess           - Refresh file access keys and restart the FTP server (if needed).
   checkSubscriptions          - Verify Stripe subscriptions for accounts.
   checkModpacks               - Boot the top 10 Forge and Fabric 1.18.2 modpacks in a scratch server and record pass/fail (also runs automatically every 12h).
+  modpackCheckerProgress      - Show progress of the running modpack check, or the last result.
 
   numServersOnline            - Print number of servers currently online and percentage.
   getServerOwner              - Prompt for a server id and print the owning account.
@@ -664,6 +700,57 @@ Type a command and press Enter. For commands that prompt (e.g. getServerOwner, b
       console.log("Verifying subscriptions...");
       checkSubscriptions();
       break;
+    case "backupsProgress": {
+      const summary = backups.getProgressSummary();
+      if (!summary.cycle.running && summary.servers.length === 0) {
+        console.log("No backup is running.");
+        break;
+      }
+      if (summary.cycle.running) {
+        console.log(
+          `Backup cycle: server ${summary.cycle.index}/${summary.cycle.total}` +
+            (summary.cycle.current != null ? ` (id ${summary.cycle.current})` : "") +
+            ` — running for ${elapsedSince(summary.cycle.startedAt)}`
+        );
+      } else {
+        // A one-off backup outside the cycle (e.g. a scheduled per-server task).
+        console.log("No backup cycle running, but these servers are backing up:");
+      }
+      for (const server of summary.servers) {
+        console.log(
+          `  server ${server.serverId}: ${server.progress}% ` +
+            `(${server.filesProcessed}/${server.totalFiles} files, ${server.status}) ` +
+            `— ${elapsedSince(server.startTime)}`
+        );
+      }
+      break;
+    }
+    case "modpackCheckerProgress": {
+      const p = modpackChecker.getProgress();
+      if (!p.running) {
+        const last = modpackChecker.readLog();
+        if (last.lastRun) {
+          console.log(
+            `No modpack check running. Last finished ${new Date(last.lastRun).toLocaleString()}: ` +
+              `${last.passed || 0} passed, ${last.failed || 0} failed, ${last.skipped || 0} skipped.`
+          );
+        } else {
+          console.log("No modpack check running, and none has completed yet.");
+        }
+        break;
+      }
+      console.log(
+        `Modpack check: ${p.phase}` +
+          (p.total ? ` — pack ${p.index}/${p.total}` : "") +
+          (p.current ? ` (${p.current})` : "")
+      );
+      console.log(
+        `  ${p.passed} passed, ${p.failed} failed, ${p.skipped} skipped` +
+          ` — running for ${elapsedSince(p.startedAt)}` +
+          (p.currentStartedAt ? `, this pack ${elapsedSince(p.currentStartedAt)}` : "")
+      );
+      break;
+    }
     case "checkModpacks":
       if (modpackChecker.isRunning()) {
         console.log("A modpack check is already running.");

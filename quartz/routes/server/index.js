@@ -1522,7 +1522,6 @@ router.post("/:id/claimSubdomain", function (req, res) {
                     .json({ msg: "Error claiming subdomain. (1)" });
                 } else {
                   let res2 = JSON.parse(stdout);
-                  console.log(res2);
                   if (res2.success == false) {
                     if (res2.errors[0].code == 81058) {
                       res.status(400).json({ msg: "Subdomain already taken." });
@@ -1579,7 +1578,6 @@ router.post("/:id/deleteSubdomain", function (req, res) {
             res.status(500).json({ msg: "Error deleting subdomain. (1)" });
           } else {
             let res2 = JSON.parse(stdout);
-            console.log(res2);
             if (res2.success == false) {
               res.status(500).json({ msg: "Error deleting subdomain. (2)" });
             } else {

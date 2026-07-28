@@ -809,7 +809,8 @@ function run(
             if (terminalOutput[id].length < 100 * 1024 * 1024) {
               terminalOutput[id] += "\n[Forge Installer] " + data.toString();
             }
-            console.log("[Forge " + id + "] " + data.toString());
+            // Installer output belongs in the server's own console, not the
+            // panel's — it's already captured in terminalOutput above.
           });
 
           forgeInstaller.stderr.on("data", (data) => {
@@ -817,7 +818,6 @@ function run(
             if (terminalOutput[id].length < 100 * 1024 * 1024) {
               terminalOutput[id] += "\n[Forge Error] " + data.toString();
             }
-            console.log("[Forge Error " + id + "] " + data.toString());
           });
 
           forgeInstaller.on("exit", (code) => {
@@ -845,9 +845,9 @@ function run(
             prefix + " " + args,
             { cwd: "servers/" + id, stdio: "inherit" },
             (error, stdout, stderr) => {
-              console.log(error);
-              console.log(stdout);
-              console.log(stderr);
+              // Only the fact of a failure reaches the panel; the installer's
+              // own output stays in the server console.
+              if (error) console.log("Quilt installer failed for " + id + ": " + error.message);
               doneInstallingServer = true;
             }
           );
@@ -971,7 +971,7 @@ function run(
               )
             ) {
               states[id] = "false";
-              console.log("setting status of " + id + " to false on line #4");
+              console.log("Server " + id + " failed to start.");
 
               killObstructingProcess(parseInt(id));
               ls.kill();
@@ -988,13 +988,11 @@ function run(
       terminalOutput[id] = "[Crash]: Docker is not properly setup. Contact an admin.";
       states[id] = "false";
     }
-          console.log(id + " exit, line #10");
-        console.log(terminalOutput[id].substring(terminalOutput[id].length-500, terminalOutput[id].length));
 });
           let count2 = 0;
           let intervalID = setInterval(() => {
             if (states[id] == "stopping") {
-              console.log("stopping " + count2);
+              // Fires every 200ms while stopping — logging here floods the panel.
               if (count2 < 5 * 24) {
                 ls.stdin.write("stop\n");
                 count2++;
@@ -1028,8 +1026,7 @@ function run(
         (error, stdout, stderr) => {
           if (states[id] != "false") terminalOutput[id] = stdout;
           states[id] = "false";
-          console.log(error, stderr);
-          console.log("setting status of " + id + " to false on line #8");
+          if (error) console.log("Server " + id + " exited: " + error.message);
         }
       );
       ls.stdout.on("data", (data) => {
@@ -1047,7 +1044,7 @@ function run(
           terminalOutput[id].includes("Failed to start the minecraft server")
         ) {
           states[id] = "false";
-          console.log("setting status of " + id + " to false on line #9");
+          console.log("Server " + id + " failed to start.");
 
           killObstructingProcess(parseInt(id));
           ls.kill();
@@ -1062,16 +1059,15 @@ ls.stderr.on("data", data => {
     if (terminalOutput[id].includes("to the Docker daemon")) {
       terminalOutput[id] = "[Crash]: Docker is not properly setup. Contact an admin.";
       states[id] = "false";
+      console.log("Server " + id + " could not start: Docker is not set up correctly.");
     }
-
-
-  console.log("setting status of " + id + " to false on line #10");
+  // This handler fires per stderr chunk, so nothing unconditional goes here.
 });
 
       let count2 = 0;
       let intervalID = setInterval(() => {
         if (states[id] == "stopping") {
-          console.log(count2);
+          // Fires every 200ms while stopping — logging here floods the panel.
           if (count2 < 5 * 24) {
             ls.stdin.write("stop\n");
             count2++;
@@ -1084,8 +1080,9 @@ ls.stderr.on("data", data => {
       ls.on("exit", (code) => {
                   // terminalOutput[id] already up to date via stdout append
         states[id] = "false";
-        console.log(id + " exit, line #11, code " + code);
-        console.log(terminalOutput[id].substring(terminalOutput[id].length-500, terminalOutput[id].length));
+        console.log("Server " + id + " stopped (exit code " + code + ")");
+        // The last 2000 chars go to logs/crash.txt below when this wasn't a
+        // clean stop — no need to mirror server output into the panel console.
 
         if (!fs.existsSync("logs/crash.txt")) {
           fs.writeFileSync("logs/crash.txt", "");
@@ -1464,8 +1461,8 @@ function downloadModpack(id, modpackURL, modpackID, versionID) {
               console.log(overridesFolder);
             }
 
-            console.log("unzipping modpack...");
-            console.log(error + " " + stderr);
+            console.log("Unzipping modpack for server " + id + "...");
+            if (error) console.log("Modpack unzip error for " + id + ": " + error.message);
             exec(
               "cp -r " + folder + overridesFolder + "/* " + folder + "/",
               (error, stdout, stderr) => {
@@ -1561,7 +1558,6 @@ function getPlayerList(id) {
   if (players[id] == undefined) {
     players[id] = [];
   }
-  console.log(players[1])
   return players[id];
 }
 

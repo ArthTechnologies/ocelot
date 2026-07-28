@@ -330,7 +330,6 @@ Router.post("/discord/", async (req, res) => {
       .send({ token: -1, reason: "Could not reach Discord" });
   }
 
-  console.log(res2);
   let username = res2 && res2.username;
   if (!username) {
     return res

@@ -34,6 +34,40 @@ const POLL_MS = 2000;
 
 let running = false;
 
+// Live state for the `modpackCheckerProgress` console command. A single run can
+// take an hour, so "is it stuck or just slow?" needs an answer.
+let progress = {
+  running: false,
+  phase: "idle",
+  startedAt: null,
+  index: 0,
+  total: 0,
+  current: null,
+  currentStartedAt: null,
+  passed: 0,
+  failed: 0,
+  skipped: 0,
+};
+
+function resetProgress() {
+  progress = {
+    running: false,
+    phase: "idle",
+    startedAt: null,
+    index: 0,
+    total: 0,
+    current: null,
+    currentStartedAt: null,
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+  };
+}
+
+function getProgress() {
+  return { ...progress };
+}
+
 // mc.js is required lazily: it starts timers and reads state on load, and this
 // module is pulled in by run.js before that is wanted.
 function mc() {
@@ -362,12 +396,14 @@ async function checkOne(pack, id) {
 
     // Install first, boot second — see waitForModpackInstall for why these
     // can't be left to overlap the way run() would do it.
+    progress.phase = "downloading";
     mc().downloadModpack(id, pack.downloadUrl, pack.projectId, pack.versionId);
     const installed = await waitForModpackInstall(id, pack.platform);
 
     if (!installed.ok) {
       outcome = { status: "failed", reason: installed.reason };
     } else {
+      progress.phase = "booting";
       // modpackURL is deliberately undefined: the pack is already on disk and
       // passing it would make run() download it a second time.
       mc().run(id, pack.software, GAME_VERSION, [], [], undefined, true, undefined);
@@ -387,6 +423,7 @@ async function checkOne(pack, id) {
     }
   }
 
+  progress.phase = "cleaning up";
   try {
     mc().kill(id);
   } catch (e) {
@@ -417,6 +454,10 @@ async function checkModpacks() {
 
   running = true;
   const startedAt = Date.now();
+  resetProgress();
+  progress.running = true;
+  progress.phase = "discovering";
+  progress.startedAt = startedAt;
   log(`Starting check of the top ${TOP_N} Forge and Fabric ${GAME_VERSION} modpacks…`);
 
   try {
@@ -431,11 +472,26 @@ async function checkModpacks() {
       }),
     ]);
 
+    const packs = [...forge, ...fabric];
+    progress.total = packs.length;
+
     const results = [];
     // Strictly one at a time: they share the slot, and a real pack needs the
     // whole box to install.
-    for (const pack of [...forge, ...fabric]) {
-      results.push(await checkOne(pack, id));
+    for (const pack of packs) {
+      progress.index = results.length + 1;
+      progress.current = pack.name;
+      progress.currentStartedAt = Date.now();
+      // Reset here so a pack that gets skipped doesn't leave the previous
+      // pack's phase showing.
+      progress.phase = "checking";
+
+      const result = await checkOne(pack, id);
+      results.push(result);
+
+      if (result.status === "passed") progress.passed++;
+      else if (result.status === "failed") progress.failed++;
+      else progress.skipped++;
     }
 
     const data = {
@@ -458,6 +514,7 @@ async function checkModpacks() {
     return readLog();
   } finally {
     running = false;
+    resetProgress();
   }
 }
 
@@ -465,4 +522,4 @@ function isRunning() {
   return running;
 }
 
-module.exports = { checkModpacks, readLog, isRunning, LOG_PATH, GAME_VERSION };
+module.exports = { checkModpacks, readLog, isRunning, getProgress, LOG_PATH, GAME_VERSION };
