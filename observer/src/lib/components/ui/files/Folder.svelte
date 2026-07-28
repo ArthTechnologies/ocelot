@@ -17,10 +17,14 @@
     Loader,
     MenuIcon,
   } from "lucide-svelte";
+  import { canDrop, draggedEntry, entryPath, moveTarget } from "$lib/scripts/fileMoves";
   export let foldername;
   export let files;
   export let path;
   export let size: number;
+  // Untouched tree path. `path`/`uploadpath` get rewritten for the file
+  // endpoints, so moves need the original.
+  export let fullPath: string = "";
   let uniqueId = Math.floor(Math.random() * 1000000000);
   let uploadpath;
   let open = false;
@@ -82,19 +86,106 @@
     return fallback;
   }
 
+  // Null-safe so it can be driven programmatically (drag-hover auto-expand)
+  // even when the indicator isn't rendered, which it isn't for empty folders.
+  function setOpen(next: boolean) {
+    open = next;
+    const indicator = document.getElementById("toggleIndicator" + folderId);
+    if (!indicator) return;
+    indicator.innerHTML = "";
+    if (open) new ChevronRight({ target: indicator });
+    else new ChevronDown({ target: indicator });
+  }
+
   function toggleOpen() {
-    open = !open;
-    if (open) {
-      document.getElementById("toggleIndicator" + folderId).innerHTML = "";
-      new ChevronRight({
-        target: document.getElementById("toggleIndicator" + folderId),
-      });
-    } else {
-      document.getElementById("toggleIndicator" + folderId).innerHTML = "";
-      new ChevronDown({
-        target: document.getElementById("toggleIndicator" + folderId),
-      });
+    setOpen(!open);
+  }
+
+  let dragging = false;
+  let dropActive = false;
+  // dragenter/dragleave also fire for child elements, so track depth rather
+  // than clearing the highlight on the first leave.
+  let dragDepth = 0;
+  let expandTimer: ReturnType<typeof setTimeout> | null = null;
+
+  $: dropAllowed = $draggedEntry ? canDrop($draggedEntry, fullPath) : false;
+
+  function handleDragStart(event: DragEvent) {
+    if (!fullPath) return;
+    dragging = true;
+    draggedEntry.set({ path: fullPath, name: foldername, isFolder: true });
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", fullPath);
     }
+  }
+
+  function handleDragEnd() {
+    dragging = false;
+    draggedEntry.set(null);
+  }
+
+  function openMovePicker() {
+    // The dropdown is a <details>; without this it stays open behind the modal.
+    document.getElementById("dropdown" + uniqueId)?.removeAttribute("open");
+    moveTarget.set({ path: fullPath, name: foldername, isFolder: true });
+  }
+
+  function clearHover() {
+    dropActive = false;
+    if (expandTimer) {
+      clearTimeout(expandTimer);
+      expandTimer = null;
+    }
+  }
+
+  // A drag cancelled with Esc fires dragend on the source, never dragleave on
+  // the target, so clear the highlight when the drag itself ends.
+  $: if (!$draggedEntry) {
+    dragDepth = 0;
+    clearHover();
+  }
+
+  function handleDragEnter() {
+    if (!$draggedEntry || !fullPath) return;
+    dragDepth++;
+    if (!dropAllowed) return;
+    dropActive = true;
+    // Hovering a closed folder opens it, so a nested destination can be
+    // reached without dropping and picking the item back up.
+    if (!open && files.length >= 1 && !expandTimer) {
+      expandTimer = setTimeout(() => {
+        expandTimer = null;
+        if (!open) setOpen(true);
+      }, 600);
+    }
+  }
+
+  function handleDragOver(event: DragEvent) {
+    if (!dropAllowed) return;
+    // Without preventDefault the browser refuses the drop outright.
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  }
+
+  function handleDragLeave() {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) clearHover();
+  }
+
+  function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    // Nested folders are stacked drop targets; only the innermost one acts.
+    event.stopPropagation();
+    dragDepth = 0;
+    const source = $draggedEntry;
+    clearHover();
+    if (!source || !canDrop(source, fullPath)) return;
+
+    document.dispatchEvent(
+      new CustomEvent("moveEntry", { detail: { from: source.path, to: fullPath } })
+    );
+    draggedEntry.set(null);
   }
 
   let deleting = false;
@@ -253,7 +344,21 @@
   }
 </script>
 
-<div class="flex gap-1 justify-between">
+<div
+  class="flex gap-1 justify-between rounded-lg transition-all"
+  class:opacity-40={dragging}
+  class:ring-2={dropActive}
+  class:ring-primary={dropActive}
+  class:bg-primary={dropActive}
+  class:bg-opacity-10={dropActive}
+  draggable={fullPath ? "true" : "false"}
+  on:dragstart={handleDragStart}
+  on:dragend={handleDragEnd}
+  on:dragenter={handleDragEnter}
+  on:dragover={handleDragOver}
+  on:dragleave={handleDragLeave}
+  on:drop={handleDrop}
+>
   <a
     class="w-[75%] px-1.5 p-1 rounded-lg btn-ghost gap-1 flex items-center cursor-pointer"
     on:click={toggleOpen}
@@ -292,6 +397,11 @@
         Rename
       </label>
     </li>
+    {#if fullPath}
+      <li>
+        <button on:click={openMovePicker}>Move to…</button>
+      </li>
+    {/if}
   </ul>
 </details>
     <label
@@ -315,6 +425,7 @@
     {#each files as file}
       {#if typeof file == "string"}
         <File filename={file.split(":")[0]} url={file.split(":")[1]} size={file.split(":")[2]}
+          fullPath={entryPath(file)}
          />
       {:else}
         <Folder
@@ -322,6 +433,7 @@
           files={file[1]}
           path={file[0].split(":")[1]}
           size={file[0].split(":")[2]}
+          fullPath={entryPath(file)}
         />
       {/if}
     {/each}

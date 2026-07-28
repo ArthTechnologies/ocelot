@@ -8,8 +8,20 @@
   import { ArrowLeft, ArrowLeftIcon, FlaskConical, HardDriveDownload, Hash, KeyIcon, LinkIcon, UserIcon, Search, X, FileText, Folder as FolderIcon, FolderClosed } from "lucide-svelte";
   import { t } from "$lib/scripts/i18n";
   import HistoryButton from "$lib/components/buttons/HistoryButton.svelte";
+  import { onDestroy } from "svelte";
   import MainFolder from "$lib/components/ui/files/MainFolder.svelte";
+  import MovePicker from "$lib/components/ui/files/MovePicker.svelte";
+  import MoveToast from "$lib/components/ui/files/MoveToast.svelte";
   import { alert } from "$lib/scripts/utils";
+  import {
+    applyMove,
+    displayPath,
+    entryPath,
+    fileTree,
+    parentOf,
+    relativeTo,
+    treeRoot,
+  } from "$lib/scripts/fileMoves";
 
   let files = [];
   let filteredFiles = [];
@@ -46,6 +58,10 @@
       getFiles();
     });
 
+    // Cleaned up on destroy — remounting the page would otherwise stack
+    // listeners and apply a single move once per mount.
+    document.addEventListener("moveEntry", onMoveEntry);
+
     fetch(
       apiurl + "server/" + id + "/getFtpToken",
       {
@@ -72,9 +88,14 @@
     });
   }
 
-  async function getFiles() {
-    isLoading = true; // Set loading to true when fetching
-    loadError = "";
+  // `silent` refetches in the background, leaving the current tree on screen.
+  // Used after a move, where the optimistic tree is already correct but the
+  // cached folder sizes aren't — a skeleton flash there would be noise.
+  async function getFiles({ silent = false } = {}) {
+    if (!silent) {
+      isLoading = true; // Set loading to true when fetching
+      loadError = "";
+    }
     let baseurl = apiurl;
     if (usingOcelot) baseurl = getServerNode(id);
     const url = baseurl + "server/" + id + "/files";
@@ -95,6 +116,8 @@
       });
 
       if (!response.ok) {
+        // A background refresh must never replace a good tree with an error.
+        if (silent) return;
         // 404 + code 101 means the server isn't provisioned on this node —
         // distinct from an empty file list, which is what we used to render.
         if (response.status === 404) {
@@ -111,6 +134,7 @@
 
       const data = await response.json();
       if (!Array.isArray(data)) {
+        if (silent) return;
         loadError = "Couldn't load files. Try again.";
         files = [];
         filteredFiles = [];
@@ -120,6 +144,7 @@
       filteredFiles = data;
     } catch (error) {
       console.error("Error fetching files:", error);
+      if (silent) return;
       loadError =
         error.name === "AbortError"
           ? "Couldn't load files — the server didn't respond."
@@ -128,55 +153,134 @@
       filteredFiles = [];
     } finally {
       clearTimeout(timeout);
-      isLoading = false;
+      if (!silent) isLoading = false;
     }
   }
 
-  function filterFiles(query) {
-    if (!query.trim()) {
-      filteredFiles = files;
-      return;
-    }
+  // Everything in the tree is rooted here, e.g. "servers/12".
+  function rootPath() {
+    return "servers/" + id;
+  }
 
-    const searchLower = query.toLowerCase();
-    
-    function searchInFiles(fileList) {
-      const results = [];
-      
-      for (const file of fileList) {
-        if (typeof file === "string") {
-          const filename = file.split(":")[0].toLowerCase();
-          if (filename.includes(searchLower)) {
-            results.push(file);
-          }
-        } else {
-          const foldername = file[0].split(":")[0].toLowerCase();
-          const folderContents = searchInFiles(file[1]);
-          
-          if (foldername.includes(searchLower) || folderContents.length > 0) {
-            if (folderContents.length > 0) {
-              results.push([file[0], folderContents]);
-            } else {
-              results.push([file[0], []]);
-            }
-          }
+  function baseUrl() {
+    return usingOcelot ? getServerNode(id) : apiurl;
+  }
+
+  async function errorFrom(response, fallback) {
+    try {
+      const data = await response.json();
+      if (data && data.msg) return data.msg;
+    } catch {
+      // non-JSON body (an HTML error page, usually)
+    }
+    return fallback;
+  }
+
+  let lastMove = null;
+  // One move at a time: the revert snapshot below would be stale if a second
+  // move started before the first resolved.
+  let moving = false;
+
+  function onMoveEntry(event) {
+    handleMove(event.detail.from, event.detail.to);
+  }
+
+  onDestroy(() => {
+    if (browser) document.removeEventListener("moveEntry", onMoveEntry);
+  });
+
+  async function handleMove(from, to) {
+    if (moving) return;
+
+    const root = rootPath();
+    const result = applyMove(files, from, to, root);
+    if (!result.movedPath) return;
+
+    // Apply straight away, then put it back if the server disagrees — a move
+    // shouldn't feel like it's waiting on a round trip.
+    const previous = files;
+    files = result.tree;
+    lastMove = {
+      name: from.slice(from.lastIndexOf("/") + 1),
+      origin: parentOf(from),
+      movedPath: result.movedPath,
+      destination: displayPath(to, root) || "/",
+    };
+
+    moving = true;
+    try {
+      const response = await fetch(baseUrl() + "server/" + id + "/files/move", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          token: localStorage.getItem("token"),
+          username: localStorage.getItem("accountEmail"),
+        },
+        body: JSON.stringify({
+          from: relativeTo(from, root),
+          to: relativeTo(to, root),
+        }),
+      });
+
+      if (!response.ok) {
+        files = previous;
+        lastMove = null;
+        alert(await errorFrom(response, "Couldn't move that item. Try again."), "error");
+        // 404 means our tree is stale — pull a fresh one rather than guessing.
+        if (response.status === 404) getFiles();
+        return;
+      }
+
+      // The optimistic tree has the entry in the right place, but the folder
+      // sizes it inherited are now wrong. Reconcile without a visible reload.
+      getFiles({ silent: true });
+    } catch (err) {
+      console.error("Error moving item:", err);
+      files = previous;
+      lastMove = null;
+      alert("Couldn't move that item — connection lost.", "error");
+    } finally {
+      moving = false;
+    }
+  }
+
+  // Undo is a real move back, so it goes through the same path as any other.
+  function undoMove() {
+    if (!lastMove || moving) return;
+    const { movedPath, origin } = lastMove;
+    lastMove = null;
+    handleMove(movedPath, origin);
+  }
+
+  // Pure, so the visible list can be derived reactively below. A move rewrites
+  // `files`, and the filtered view has to follow it without being re-run by hand.
+  function searchTree(fileList, needle) {
+    const results = [];
+
+    for (const file of fileList) {
+      if (typeof file === "string") {
+        if (file.split(":")[0].toLowerCase().includes(needle)) {
+          results.push(file);
+        }
+      } else {
+        const foldername = file[0].split(":")[0].toLowerCase();
+        const folderContents = searchTree(file[1], needle);
+
+        if (foldername.includes(needle) || folderContents.length > 0) {
+          results.push([file[0], folderContents]);
         }
       }
-      
-      return results;
     }
-    
-    filteredFiles = searchInFiles(files);
+
+    return results;
   }
 
   function handleSearchInput(event) {
     searchQuery = event.target.value;
-    filterFiles(searchQuery);
   }
 
   function clearSearch() {
     searchQuery = "";
-    filteredFiles = files;
   }
 
   async function save() {
@@ -277,7 +381,14 @@
     alert("Password copied to clipboard", "success");
   }
 
-  $: filteredFiles = files;
+  $: filteredFiles = searchQuery.trim()
+    ? searchTree(files, searchQuery.trim().toLowerCase())
+    : files;
+
+  // Published so nested rows can build a "Move to…" picker without the whole
+  // tree being threaded down through props.
+  $: fileTree.set(files);
+  $: treeRoot.set(rootPath());
 </script>
 
 <div class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradientStroke">
@@ -360,13 +471,15 @@
           <MainFolder />
           {#each filteredFiles as file}
             {#if typeof file == "string"}
-              <File filename={file.split(":")[0]} url={file.split(":")[1]} size={file.split(":")[2]}/>
+              <File filename={file.split(":")[0]} url={file.split(":")[1]} size={file.split(":")[2]}
+                fullPath={entryPath(file)}/>
             {:else}
               <Folder
                 foldername={file[0].split(":")[0]}
                 files={file[1]}
                 path={file[0].split(":")[1]}
                 size={file[0].split(":")[2]}
+                fullPath={entryPath(file)}
               />
             {/if}
           {/each}
@@ -458,3 +571,16 @@
     </div>
   </div>
   </div>
+
+<MovePicker />
+
+{#if lastMove}
+  {#key lastMove.movedPath}
+    <MoveToast
+      name={lastMove.name}
+      destination={lastMove.destination}
+      on:undo={undoMove}
+      on:dismiss={() => (lastMove = null)}
+    />
+  {/key}
+{/if}

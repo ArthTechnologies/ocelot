@@ -418,6 +418,104 @@ router.post("/rename", function (req, res) {
   }
 });
 
+// Move a file or folder into another folder within the same server.
+// Body: { from: "plugins/config.yml", to: "backups" } — both relative to the
+// server root, "*" or "/" separated, with "*" alone meaning the root itself.
+router.post("/move", function (req, res) {
+  if (!guard(req, res)) return;
+
+  if (typeof req.body.from !== "string" || typeof req.body.to !== "string") {
+    return res.status(400).json({ msg: "Invalid move request." });
+  }
+
+  const source = resolveInServer(req.params.id, req.body.from);
+  // The server root is a legitimate destination (moving something back out),
+  // but never a legitimate source.
+  const dest = resolveInServer(req.params.id, req.body.to, { allowRoot: true });
+  if (source === null || dest === null) {
+    return res.status(400).json({ msg: "Invalid path." });
+  }
+
+  const { relPath: srcRel, fullPath: srcPath, serverRoot } = source;
+  const destDir = dest.fullPath;
+
+  // Relocating these breaks the server exactly as renaming them would.
+  const forbidden = [
+    "server.json",
+    "server.jar",
+    "modrinth.index.json",
+    "curseforge.index.json",
+  ];
+  if (forbidden.includes(path.basename(srcRel))) {
+    return res.status(400).json({ msg: "System files can't be moved." });
+  }
+
+  if (!fs.existsSync(srcPath)) {
+    return res.status(404).json({ msg: "This item no longer exists." });
+  }
+  if (!fs.existsSync(destDir)) {
+    return res.status(404).json({ msg: "That folder no longer exists." });
+  }
+  if (!fs.lstatSync(destDir).isDirectory()) {
+    return res.status(400).json({ msg: "The destination isn't a folder." });
+  }
+
+  // resolveInServer's containment check is textual, so a symlinked folder can
+  // still point outside the server root. Confirm the real destination before
+  // writing anything into it.
+  try {
+    const realRoot = fs.realpathSync(serverRoot);
+    const realDest = fs.realpathSync(destDir);
+    if (realDest !== realRoot && !realDest.startsWith(realRoot + path.sep)) {
+      return res.status(400).json({ msg: "Invalid destination." });
+    }
+  } catch (err) {
+    console.error("Move destination check failed:", err);
+    return res.status(400).json({ msg: "Invalid destination." });
+  }
+
+  const isDirectory = fs.lstatSync(srcPath).isDirectory();
+
+  if (destDir === srcPath) {
+    return res.status(400).json({ msg: "A folder can't be moved into itself." });
+  }
+  // Moving a folder beneath itself would detach that whole subtree.
+  if (isDirectory && destDir.startsWith(srcPath + path.sep)) {
+    return res.status(400).json({ msg: "A folder can't be moved inside itself." });
+  }
+  if (path.dirname(srcPath) === destDir) {
+    return res.status(400).json({ msg: "It's already in that folder." });
+  }
+
+  const destPath = path.resolve(destDir, path.basename(srcPath));
+  if (!destPath.startsWith(serverRoot + path.sep)) {
+    return res.status(400).json({ msg: "Invalid path." });
+  }
+  if (fs.existsSync(destPath)) {
+    return res
+      .status(409)
+      .json({ msg: "A file or folder with that name already exists there." });
+  }
+
+  try {
+    fs.renameSync(srcPath, destPath);
+    return res.status(200).json({ msg: "Done" });
+  } catch (err) {
+    console.error("Move error:", err);
+    // EBUSY/EACCES when a running server holds the file open; EXDEV if the
+    // server directory ever spans mount points.
+    if (err.code === "EXDEV") {
+      return res
+        .status(500)
+        .json({ msg: "Couldn't move this across storage volumes." });
+    }
+    const reason = summarizeError(scrubServerRoot(err.message, serverRoot));
+    return res
+      .status(500)
+      .json({ msg: `Couldn't move the item${reason ? `: ${reason}` : ""}.` });
+  }
+});
+
 // Lets the client mint a fresh download URL. Access keys rotate every 6 hours
 // (and on restart), so the copy in localStorage goes stale and every download
 // link built from it 401s.

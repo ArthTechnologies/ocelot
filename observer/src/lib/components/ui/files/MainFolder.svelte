@@ -16,7 +16,8 @@
     Download,
     Loader,
   } from "lucide-svelte";
-  
+  import { canDrop, draggedEntry, treeRoot } from "$lib/scripts/fileMoves";
+
   // Fixed values for main folder
   export let foldername = "Main Folder";
   export let files = [];
@@ -85,6 +86,49 @@
 
   folderId = Math.floor(Math.random() * 1000000000);
 
+  // Root drop target: dropping here moves an entry back out to the top level.
+  let dropActive = false;
+  let dragDepth = 0;
+
+  $: dropAllowed = $draggedEntry ? canDrop($draggedEntry, $treeRoot) : false;
+
+  // A drag cancelled with Esc never fires dragleave here, so clear on drag end.
+  $: if (!$draggedEntry) {
+    dragDepth = 0;
+    dropActive = false;
+  }
+
+  function handleDragEnter() {
+    if (!$draggedEntry) return;
+    dragDepth++;
+    if (dropAllowed) dropActive = true;
+  }
+
+  function handleDragOver(event: DragEvent) {
+    if (!dropAllowed) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  }
+
+  function handleDragLeave() {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) dropActive = false;
+  }
+
+  function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth = 0;
+    const source = $draggedEntry;
+    dropActive = false;
+    if (!source || !canDrop(source, $treeRoot)) return;
+
+    document.dispatchEvent(
+      new CustomEvent("moveEntry", { detail: { from: source.path, to: $treeRoot } })
+    );
+    draggedEntry.set(null);
+  }
+
   function toggleOpen() {
     open = !open;
     if (open) {
@@ -134,10 +178,20 @@
 
 </script>
 
-<div class="flex gap-1 justify-between">
+<div
+  class="flex gap-1 justify-between rounded-lg transition-all"
+  class:ring-2={dropActive}
+  class:ring-primary={dropActive}
+  class:bg-primary={dropActive}
+  class:bg-opacity-10={dropActive}
+  on:dragenter={handleDragEnter}
+  on:dragover={handleDragOver}
+  on:dragleave={handleDragLeave}
+  on:drop={handleDrop}
+>
   <b
     class="w-[78%] px-1.5 p-1 rounded-lg btn-ghost gap-1 flex items-center pointer-events-none"
-   
+
   >
     <FolderClosed
       class="shrink-0 w-[.9rem] h-[.9rem] md:w-[1rem] md:h-[1rem]"

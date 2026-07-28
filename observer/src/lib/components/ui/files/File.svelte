@@ -4,6 +4,9 @@
   export let url: string;
   export let filename: string;
   export let size: number;
+  // Untouched tree path ("servers/<id>/rel/path"). `url` below gets rewritten
+  // into the `*`-separated form the file endpoints want, so moves need this.
+  export let fullPath: string = "";
   import { apiurl, usingOcelot, getServerNode } from "$lib/scripts/req";
   import { alert, downloadProgressShort, fileSizeShort } from "$lib/scripts/utils";
   import {
@@ -24,6 +27,7 @@
     MenuIcon,
     ChevronRight,
   } from "lucide-svelte";
+  import { draggedEntry, moveTarget } from "$lib/scripts/fileMoves";
   let id;
   let extension = filename.split(".")[filename.split(".").length - 1];
 
@@ -75,6 +79,29 @@
 
   function refresh() {
     document.dispatchEvent(new CustomEvent("refresh"));
+  }
+
+  let dragging = false;
+
+  function handleDragStart(event: DragEvent) {
+    if (!fullPath) return;
+    dragging = true;
+    draggedEntry.set({ path: fullPath, name: filename, isFolder: false });
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", fullPath);
+    }
+  }
+
+  function handleDragEnd() {
+    dragging = false;
+    draggedEntry.set(null);
+  }
+
+  function openMovePicker() {
+    // The dropdown is a <details>; without this it stays open behind the modal.
+    document.getElementById("dropdown" + uniqueId)?.removeAttribute("open");
+    moveTarget.set({ path: fullPath, name: filename, isFolder: false });
   }
 
   function closeModal(prefix: string) {
@@ -374,7 +401,13 @@
   }
 </script>
 
-<div class="flex gap-1 justify-between">
+<div
+  class="flex gap-1 justify-between rounded-lg transition-opacity"
+  class:opacity-40={dragging}
+  draggable={fullPath ? "true" : "false"}
+  on:dragstart={handleDragStart}
+  on:dragend={handleDragEnd}
+>
   <button
     on:click={getText}
     class="w-[65%] px-1.5 p-1 rounded-lg btn-ghost pointer-events-{clickable} gap-1 flex items-center"
@@ -431,6 +464,11 @@
         Rename
       </label>
     </li>
+    {#if fullPath}
+      <li>
+        <button on:click={openMovePicker}>Move to…</button>
+      </li>
+    {/if}
         {#if filename.includes(".zip")}
     <li>
       <label
