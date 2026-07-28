@@ -1337,6 +1337,16 @@ function writeTerminal(id, cmd) {
 function downloadModpack(id, modpackURL, modpackID, versionID) {
   const folder = "servers/" + id;
 
+  // Every mod below is fetched with `curl -o <folder>/mods/<name>.jar`, and
+  // curl won't create the directory — it just fails, silently, for every mod.
+  // run() happens to make this folder before it calls us, so callers that
+  // download first (the modpack checker) would otherwise install nothing.
+  try {
+    fs.mkdirSync(folder + "/mods", { recursive: true });
+  } catch (e) {
+    console.log("Could not create mods folder for server " + id + ": " + e.message);
+  }
+
   if (modpackURL.includes("modrinth.com")) {
     files.downloadAsync(
       folder + "/modpack.mrpack",
