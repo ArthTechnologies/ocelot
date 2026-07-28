@@ -451,6 +451,23 @@ export function getSettings() {
 }
 }
 
+// Results of the automated modpack boot check. Admin-only on the backend, so a
+// non-admin simply gets null and no badges are rendered.
+export function getModpackChecks() {
+  if (!browser) return Promise.resolve(null);
+
+  return fetch(apiurl + "admin/modpack-checks", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      token: localStorage.getItem("token") || "",
+      username: localStorage.getItem("accountEmail") || "",
+    },
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .catch(() => null);
+}
+
 export function getServers(em: string) {
   if(browser) {
   let url =

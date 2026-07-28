@@ -41,6 +41,7 @@ const files = require("./scripts/files.js");
 const scraper = require("./scripts/scraper.js");
 const schedules = require("./scripts/schedules.js");
 const autoupdate = require("./scripts/autoupdate.js");
+const modpackChecker = require("./scripts/modpackChecker.js");
 
 
 if (!fs.existsSync("config.txt")) {
@@ -486,6 +487,7 @@ process.stdin.on("data", (data) => {
   runPeriodicTasks            - Run periodic maintenance tasks immediately.
   refreshFileAccess           - Refresh file access keys and restart the FTP server (if needed).
   checkSubscriptions          - Verify Stripe subscriptions for accounts.
+  checkModpacks               - Boot the top 10 Forge and Fabric 1.18.2 modpacks in a scratch server and record pass/fail (also runs automatically every 12h).
 
   numServersOnline            - Print number of servers currently online and percentage.
   getServerOwner              - Prompt for a server id and print the owning account.
@@ -661,6 +663,19 @@ Type a command and press Enter. For commands that prompt (e.g. getServerOwner, b
     case "checkSubscriptions":
       console.log("Verifying subscriptions...");
       checkSubscriptions();
+      break;
+    case "checkModpacks":
+      if (modpackChecker.isRunning()) {
+        console.log("A modpack check is already running.");
+      } else {
+        console.log(
+          "Starting modpack check. This boots each pack in turn and can take a while — " +
+            "results land in logs/modpackChecks.json."
+        );
+        modpackChecker
+          .checkModpacks()
+          .catch((e) => console.log("Modpack check failed: " + e));
+      }
       break;
     case "scanAccountIds":
       fs.readdirSync("accounts").forEach((file) => {
@@ -1021,6 +1036,11 @@ schedules.registerFunction("autoUpdateServers", async () => {
   autoupdate.autoUpdatePaperServers(f);
 });
 
+schedules.registerFunction("checkModpacks", async () => {
+  console.log("[System Task] Checking popular modpacks...");
+  await modpackChecker.checkModpacks();
+});
+
 // Create system tasks for maintenance
 (async () => {
   try {
@@ -1031,6 +1051,7 @@ schedules.registerFunction("autoUpdateServers", async () => {
     const hasFullJarTask = allSchedules.systemTasks.some((t) => t.command === "downloadFullJars");
     const hasMaintenanceTask = allSchedules.systemTasks.some((t) => t.command === "runPeriodicTasks");
     const hasAutoUpdateTask = allSchedules.systemTasks.some((t) => t.command === "autoUpdateServers");
+    const hasModpackCheckTask = allSchedules.systemTasks.some((t) => t.command === "checkModpacks");
 
     if (!hasPartialJarTask) {
       schedules.createSystemTask(null, "Download Partial Jars", "function", "0 */2 * * *", "downloadPartialJars");
@@ -1052,6 +1073,13 @@ schedules.registerFunction("autoUpdateServers", async () => {
       // downloaded Paper builds are present when eligible servers are checked.
       schedules.createSystemTask(null, "Auto-Update Servers", "function", "30 */2 * * *", "autoUpdateServers");
       console.log("[Init] Created system task: Auto-Update Servers (every 2h)");
+    }
+
+    if (!hasModpackCheckTask) {
+      // Offset to :15 so a long modpack run isn't competing with the jar
+      // scrape or the subscription sweep that both fire on the hour.
+      schedules.createSystemTask(null, "Check Popular Modpacks", "function", "15 */12 * * *", "checkModpacks");
+      console.log("[Init] Created system task: Check Popular Modpacks (every 12h)");
     }
   } catch (err) {
     console.error("[Init] Error creating system tasks:", err);

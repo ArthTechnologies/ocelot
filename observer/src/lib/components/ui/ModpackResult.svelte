@@ -4,9 +4,12 @@
   import ChooseVersionModpack from "$lib/components/ui/ChooseVersionModpack.svelte";
   import { browser } from "$app/environment";
   import { t } from "$lib/scripts/i18n";
-  import { AlertCircle, BadgeCheck, Download } from "lucide-svelte";
+  import { AlertCircle, BadgeCheck, Download, ShieldCheck, ShieldX } from "lucide-svelte";
   import TranslateableText from "./TranslateableText.svelte";
   export let name: string;
+  // Result of the automated boot check for this pack, or null when there isn't
+  // one / the viewer isn't an admin. Shape: { status, reason, checkedAt }.
+  export let check: { status: string; reason?: string; checkedAt?: number } | null = null;
   export let author: string;
   export let desc: string;
   export let icon: string;
@@ -43,6 +46,15 @@
   if (browser) {
     software = localStorage.getItem("serverSoftware");
   }
+
+  const checkedWhen = (ts: number | undefined) =>
+    ts ? new Date(ts).toLocaleString() : "unknown time";
+
+  // Both the reason and when it ran go in the tooltip — the badge itself stays
+  // to the two words an admin scans for.
+  $: checkTooltip = check
+    ? `${check.reason || ""} (checked ${checkedWhen(check.checkedAt)})`.trim()
+    : "";
 </script>
 
 <div class="bg-base-200 rounded-lg p-3">
@@ -126,6 +138,22 @@
             >
               <AlertCircle class="mr-1.5 shrink-0" size="16" />
               {client}
+            </div>
+          {/if}
+          {#if check && (check.status === "passed" || check.status === "failed")}
+            <div
+              class="tooltip tooltip-top text-left flex px-2 py-1 rounded-md place-items-center text-sm w-fit
+                {check.status === 'passed'
+                ? 'bg-success text-success-content'
+                : 'bg-error text-error-content'}"
+              data-tip={checkTooltip}
+            >
+              {#if check.status === "passed"}
+                <ShieldCheck class="mr-1.5 shrink-0" size="16" />
+              {:else}
+                <ShieldX class="mr-1.5 shrink-0" size="16" />
+              {/if}
+              Automated check {check.status}
             </div>
           {/if}
         </div>

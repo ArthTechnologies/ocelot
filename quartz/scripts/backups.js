@@ -19,7 +19,21 @@ const backupProgress = {};
 
 async function getServerIds() {
   const items = await fs.readdir("./servers");
-  return items.filter((x) => !isNaN(x)).map((x) => parseInt(x));
+  const numeric = items.filter((x) => !isNaN(x));
+
+  // The modpack checker boots throwaway servers in a reserved slot. Backing
+  // one of those up would burn disk on a world that's deleted minutes later.
+  const ids = [];
+  for (const item of numeric) {
+    try {
+      const raw = await fs.readFile(`./servers/${item}/server.json`, "utf8");
+      if (JSON.parse(raw).modpackCheck === true) continue;
+    } catch (err) {
+      // No/unreadable server.json — treat it as a normal server, as before.
+    }
+    ids.push(parseInt(item));
+  }
+  return ids;
 }
 
 async function getWorldsTotalSize() {

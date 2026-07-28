@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { searchMods, searchPlugins, usingCurseForge } from "$lib/scripts/req";
+  import { getModpackChecks, searchMods, searchPlugins, usingCurseForge } from "$lib/scripts/req";
   import ModpackResult from "./ModpackResult.svelte";
   import { t } from "$lib/scripts/i18n";
   import FeaturedPlugin from "./FeaturedPlugin.svelte";
@@ -13,6 +13,9 @@
   let promise;
   let mrResults = [];
   let cfResults = [];
+  // "platform:projectId" -> check result. Empty for non-admins, since the
+  // endpoint 403s for them, which is what keeps the badge admin-only.
+  let checksByPack = {};
   let query = "";
   let tab = "cf";
   let skeletonsLength = 15;
@@ -25,6 +28,15 @@
   let modpackVersionName = "";
   onMount(() => {
     if (browser) {
+      getModpackChecks().then((data) => {
+        if (!data || !Array.isArray(data.results)) return;
+        const map = {};
+        for (const result of data.results) {
+          map[result.platform + ":" + result.projectId] = result;
+        }
+        checksByPack = map;
+      });
+
       search("mr");
       if (usingCurseForge) search("cf");
       else document.getElementById("mr").classList.add("tab-active");
@@ -310,11 +322,17 @@
       <div id="modpacks" class="space-y-2">
         {#if tab == "mr"}
           {#each mrResults as result}
-            <ModpackResult {...result} />
+            <ModpackResult
+              {...result}
+              check={checksByPack[result.platform + ":" + result.id] || null}
+            />
           {/each}
         {:else if tab == "cf"}
           {#each cfResults as result}
-            <ModpackResult {...result} />
+            <ModpackResult
+              {...result}
+              check={checksByPack[result.platform + ":" + result.id] || null}
+            />
           {/each}
         {/if}
       </div>

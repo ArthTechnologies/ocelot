@@ -124,6 +124,7 @@ quartz/
 │   ├── security.js     # Security utilities
 │   ├── utils.js        # General utilities
 │   ├── accountLinking.js # Cross-login-method account lookup/linking helpers
+│   ├── modpackChecker.js # Automated boot-check of popular modpacks
 │   └── migrations.js   # Database migrations
 ├── config.txt          # Configuration file (API keys, settings)
 └── servers/            # Running server instances
@@ -171,6 +172,14 @@ quartz/
 - Distribute servers across multiple backend instances
 - Node registry and routing
 - Load balancing
+
+#### Automated Modpack Checks
+`scripts/modpackChecker.js` boots the 10 most popular Forge (CurseForge) and Fabric (Modrinth) 1.18.2 modpacks one at a time and records whether each reaches an online state. Runs every 12h as the `checkModpacks` system task, or on demand via the `checkModpacks` console command. Results land in `logs/modpackChecks.json`.
+- Uses a **single reserved server slot** (`modpackCheckServerId` in config.txt, default `50000`), wiped between packs. The slot is refused at startup if it falls inside `[idOffset, idOffset + maxServers)` — the range `/server/reserve` hands to customers — or if `10000 + id + 66` isn't a valid port.
+- Its `server.json` carries `adminServer: true` (so the subscription sweeper won't bin it) and `modpackCheck: true` (so `backups.js` won't back up a throwaway world).
+- **Install and boot are deliberately sequential.** `run()` normally kicks off `downloadModpack()` and spawns the server concurrently; for Fabric there's no installer step to mask that, so a half-installed pack could reach "Done" and be recorded as a pass. The checker downloads first, waits for the index file to be rewritten with `currentVersionDateAdded` (which only happens after every mod download settles), then calls `run()` with `modpackURL` undefined.
+- A missing `assets/jars/<loader>-1.18.2-*.jar` is reported as `skipped`, not `failed` — the loader jar is the panel's problem, not the pack's.
+- `GET /admin/modpack-checks` serves the log behind the existing `verifyAdmin` middleware; the frontend badge in `ModpackResult.svelte` is admin-only purely because that endpoint 403s for everyone else.
 
 #### Agent Routes (`/agent`)
 - Endpoints in `routes/agent.js`, mounted at `/agent`, meant to be called locally by AI coding agents (e.g. Claude Code) working on this repo — not by Observer or any other client

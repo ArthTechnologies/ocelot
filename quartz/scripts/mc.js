@@ -1252,6 +1252,15 @@ function kill(id) {
   killObstructingProcess(parseInt(id));
   states[id] = "false";
 }
+
+// Last `chars` of a server's console output, without touching the incremental
+// read index readTerminal() maintains for connected clients. Used by the
+// modpack checker to record why a start failed.
+function getTerminalTail(id, chars = 4000) {
+  const output = terminalOutput[id];
+  if (typeof output !== "string") return "";
+  return output.length > chars ? output.slice(output.length - chars) : output;
+}
 // Global state to track terminal processing index
 if (typeof globalTerminalState === 'undefined') {
   var globalTerminalState = {};
@@ -1593,6 +1602,7 @@ module.exports = {
   kill,
   checkServer,
   readTerminal,
+  getTerminalTail,
   writeTerminal,
   stopAsync,
   proxiesToggle,

@@ -36,6 +36,19 @@ function verifyAdmin(req, res, next) {
 
 router.use(verifyAdmin);
 
+// Results of the automated modpack boot check. Admin-only: it's internal QA
+// data, and the badge it drives is only rendered for admins.
+router.get("/modpack-checks", (req, res) => {
+  try {
+    const modpackChecker = require("../scripts/modpackChecker.js");
+    const data = modpackChecker.readLog();
+    res.json({ ...data, running: modpackChecker.isRunning() });
+  } catch (err) {
+    console.error("Error reading modpack checks:", err);
+    res.status(500).json({ error: "Failed to read modpack checks" });
+  }
+});
+
 // Get system tasks
 router.get("/system-tasks", (req, res) => {
   try {
