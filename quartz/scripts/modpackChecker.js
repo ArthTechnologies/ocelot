@@ -31,6 +31,12 @@ const DOWNLOAD_TIMEOUT_MS = Number(config.modpackCheckDownloadTimeoutMs) || 10 *
 // If it hasn't even left "false" by now, run() never got going.
 const LAUNCH_GRACE_MS = 90 * 1000;
 const POLL_MS = 2000;
+// mc.killObstructingProcess fires its `docker kill` 2.5s after `docker stop`,
+// so wait slightly longer than that before deleting the slot out from under a
+// container that's still shutting down.
+const KILL_SETTLE_MS = 3000;
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let running = false;
 
@@ -44,6 +50,7 @@ let progress = {
   total: 0,
   current: null,
   currentStartedAt: null,
+  attempt: 1,
   passed: 0,
   failed: 0,
   skipped: 0,
@@ -58,6 +65,7 @@ function resetProgress() {
     total: 0,
     current: null,
     currentStartedAt: null,
+    attempt: 1,
     passed: 0,
     failed: 0,
     skipped: 0,
@@ -395,40 +403,15 @@ function waitForOnline(id) {
   });
 }
 
-async function checkOne(pack, id) {
-  const startedAt = Date.now();
-
-  const base = {
-    platform: pack.platform,
-    projectId: pack.projectId,
-    name: pack.name,
-    slug: pack.slug,
-    loader: pack.loader,
-    versionId: pack.versionId || null,
-    versionName: pack.versionName || null,
-    checkedAt: startedAt,
-  };
-
-  if (pack.unavailable) {
-    return { ...base, status: "skipped", reason: pack.unavailable, durationMs: 0 };
-  }
-
-  if (!jarAvailable(pack.software, GAME_VERSION)) {
-    return {
-      ...base,
-      status: "skipped",
-      reason: `No ${pack.software} ${GAME_VERSION} jar in assets/jars — can't test this loader.`,
-      durationMs: 0,
-    };
-  }
-
-  log(`Checking ${pack.name} (${pack.platform}:${pack.projectId})…`);
-
+// One install-and-boot attempt. Always leaves the slot killed and empty, so
+// the next attempt (or pack) starts from nothing.
+async function runAttempt(pack, id) {
   let outcome;
   // Recorded even on success: "passed with 142/187 mods" is the difference
   // between a healthy pack and one that only booted because half of it is
   // missing.
   let mods = { expected: 0, installed: 0 };
+
   try {
     await prepareSlot(id, pack);
 
@@ -474,17 +457,82 @@ async function checkOne(pack, id) {
 
   progress.phase = "cleaning up";
   try {
+    // No-op if it already died; otherwise this is what stops a container that
+    // is still up after a failed boot.
     mc().kill(id);
   } catch (e) {
     log(`Couldn't kill slot ${id}: ${e.message}`);
   }
+  // killObstructingProcess schedules its `docker kill` 2.5s out, so give the
+  // container a moment to actually go before the folder is pulled from under
+  // it. Not a timeout — a fixed settle so the retry starts clean.
+  await wait(KILL_SETTLE_MS);
   await removeFolder(`servers/${id}`);
+
+  return { outcome, mods, consoleTail };
+}
+
+async function checkOne(pack, id) {
+  const startedAt = Date.now();
+
+  const base = {
+    platform: pack.platform,
+    projectId: pack.projectId,
+    name: pack.name,
+    slug: pack.slug,
+    loader: pack.loader,
+    versionId: pack.versionId || null,
+    versionName: pack.versionName || null,
+    checkedAt: startedAt,
+  };
+
+  if (pack.unavailable) {
+    return { ...base, status: "skipped", reason: pack.unavailable, durationMs: 0 };
+  }
+
+  if (!jarAvailable(pack.software, GAME_VERSION)) {
+    return {
+      ...base,
+      status: "skipped",
+      reason: `No ${pack.software} ${GAME_VERSION} jar in assets/jars — can't test this loader.`,
+      durationMs: 0,
+    };
+  }
+
+  log(`Checking ${pack.name} (${pack.platform}:${pack.projectId})…`);
+
+  let attempt = await runAttempt(pack, id);
+  let attempts = 1;
+  let firstFailure = null;
+
+  // Downloads time out and containers fail to come up for reasons that have
+  // nothing to do with the pack. One retry separates a genuinely broken pack
+  // from a bad night. Per-attempt timeouts are unchanged.
+  if (attempt.outcome.status === "failed") {
+    firstFailure = attempt.outcome.reason;
+    log(`${pack.name}: attempt 1 failed (${firstFailure}) — retrying once.`);
+    attempts = 2;
+    progress.attempt = 2;
+    attempt = await runAttempt(pack, id);
+  }
+
+  const { outcome, mods, consoleTail } = attempt;
 
   log(
     `${pack.name}: ${outcome.status} — ${outcome.reason}` +
-      (mods.expected ? ` (${mods.installed}/${mods.expected} mods)` : "")
+      (mods.expected ? ` (${mods.installed}/${mods.expected} mods)` : "") +
+      (attempts > 1 ? ` [attempt ${attempts}]` : "")
   );
-  return { ...base, ...outcome, mods, consoleTail, durationMs: Date.now() - startedAt };
+
+  return {
+    ...base,
+    ...outcome,
+    mods,
+    attempts,
+    firstFailure,
+    consoleTail,
+    durationMs: Date.now() - startedAt,
+  };
 }
 
 // ------------------------------------------------------------------ public
@@ -534,6 +582,7 @@ async function checkModpacks() {
       progress.index = results.length + 1;
       progress.current = pack.name;
       progress.currentStartedAt = Date.now();
+      progress.attempt = 1;
       // Reset here so a pack that gets skipped doesn't leave the previous
       // pack's phase showing.
       progress.phase = "checking";

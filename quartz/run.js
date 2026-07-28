@@ -742,7 +742,8 @@ Type a command and press Enter. For commands that prompt (e.g. getServerOwner, b
       console.log(
         `Modpack check: ${p.phase}` +
           (p.total ? ` — pack ${p.index}/${p.total}` : "") +
-          (p.current ? ` (${p.current})` : "")
+          (p.current ? ` (${p.current})` : "") +
+          (p.attempt > 1 ? `, attempt ${p.attempt}` : "")
       );
       console.log(
         `  ${p.passed} passed, ${p.failed} failed, ${p.skipped} skipped` +

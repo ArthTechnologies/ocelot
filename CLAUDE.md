@@ -187,6 +187,8 @@ The console wrapper at the top of `run.js` prints `[timestamp] [tag] message`, w
 - Its `server.json` carries `adminServer: true` (so the subscription sweeper won't bin it) and `modpackCheck: true` (so `backups.js` won't back up a throwaway world).
 - **Install and boot are deliberately sequential.** `run()` normally kicks off `downloadModpack()` and spawns the server concurrently; for Fabric there's no installer step to mask that, so a half-installed pack could reach "Done" and be recorded as a pass. The checker downloads first, waits for the index file to be rewritten with `currentVersionDateAdded` (which only happens after every mod download settles), then calls `run()` with `modpackURL` undefined.
 - A missing `assets/jars/<loader>-1.18.2-*.jar` is reported as `skipped`, not `failed` — the loader jar is the panel's problem, not the pack's.
+- A failed attempt is **retried once**, killing the container and wiping the slot in between. Per-attempt timeouts are unchanged, so a failing pack costs up to twice the wall time. `attempts` and `firstFailure` are recorded on the result. `skipped` never retries.
+- Results carry `mods: { expected, installed }`. CurseForge serves nothing for mods whose authors disabled third-party downloads, so a pack can install partially and still boot — a pass with far fewer mods than expected is not a healthy pack.
 - `GET /admin/modpack-checks` serves the log behind the existing `verifyAdmin` middleware; the frontend badge in `ModpackResult.svelte` is admin-only purely because that endpoint 403s for everyone else.
 
 #### Agent Routes (`/agent`)
