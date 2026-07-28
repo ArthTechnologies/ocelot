@@ -1408,6 +1408,10 @@ function downloadModpack(id, modpackURL, modpackID, versionID) {
                     modpack.versionID = versionID;
                     writeJSON(folder + "/modrinth.index.json", modpack);
                     deleteClientSideMods(id);
+                    // Cosmetic, so it runs alongside rather than blocking.
+                    setModpackIcon(id, "mr", modpackID).catch((e) =>
+                      console.log("Modpack icon failed for " + id + ": " + e.message)
+                    );
                     return utils.refreshPermissions();
                     });
                   });
@@ -1532,6 +1536,10 @@ function downloadModpack(id, modpackURL, modpackID, versionID) {
                     modpack.versionID = versionID;
                     writeJSON(folder + "/curseforge.index.json", modpack);
                     deleteClientSideMods(id);
+                    // Cosmetic, so it runs alongside rather than blocking.
+                    setModpackIcon(id, "cf", modpackID).catch((e) =>
+                      console.log("Modpack icon failed for " + id + ": " + e.message)
+                    );
                     //remove temp folder
                     exec("rm -r " + folder + "/temp");
                     });
@@ -1569,6 +1577,127 @@ function getPlayerList(id) {
     players[id] = [];
   }
   return players[id];
+}
+
+// Minecraft only reads servers/<id>/server-icon.png, and only when it is
+// exactly 64x64. Modpack artwork is usually 256x256 and Modrinth sometimes
+// serves WebP, so it has to be converted. Needs ImageMagick on the host
+// (`apt install imagemagick`); without it the default icon is left alone.
+let imageMagickBin; // undefined = not looked up yet, null = not installed
+
+function findImageMagick() {
+  if (imageMagickBin !== undefined) return imageMagickBin;
+
+  imageMagickBin = null;
+  for (const bin of ["magick", "convert"]) {
+    try {
+      execSync(`command -v ${bin}`, { stdio: "ignore" });
+      imageMagickBin = bin;
+      break;
+    } catch (e) {
+      // not on PATH
+    }
+  }
+
+  if (!imageMagickBin) {
+    console.log(
+      "ImageMagick not found — modpack artwork won't be used as the server icon. " +
+        "Install it with `apt install imagemagick`."
+    );
+  }
+  return imageMagickBin;
+}
+
+async function modpackIconUrl(platform, modpackID) {
+  if (modpackID === undefined || modpackID === null || modpackID === "") return null;
+
+  try {
+    if (platform === "mr") {
+      const response = await fetch(
+        `https://api.modrinth.com/v2/project/${encodeURIComponent(modpackID)}`,
+        { signal: AbortSignal.timeout(15000) }
+      );
+      if (!response.ok) return null;
+      const project = await response.json();
+      return project.icon_url || null;
+    }
+
+    const apiKey = config.curseforgeKey;
+    if (!apiKey) return null;
+    const response = await fetch(
+      `https://api.curseforge.com/v1/mods/${encodeURIComponent(modpackID)}`,
+      { headers: { "x-api-key": apiKey }, signal: AbortSignal.timeout(15000) }
+    );
+    if (!response.ok) return null;
+    const logo = (await response.json())?.data?.logo;
+    return (logo && (logo.thumbnailUrl || logo.url)) || null;
+  } catch (e) {
+    console.log("Could not look up modpack artwork: " + e.message);
+    return null;
+  }
+}
+
+async function setModpackIcon(id, platform, modpackID) {
+  const magick = findImageMagick();
+  if (!magick) return;
+
+  const url = await modpackIconUrl(platform, modpackID);
+  // Plain http(s) only. execFile below doesn't use a shell, but this also
+  // rejects anything odd coming back from the APIs.
+  if (!url || !/^https?:\/\/\S+$/.test(url)) return;
+
+  const { execFile } = require("child_process");
+  const tmp = `servers/${id}/.modpack-icon`;
+  const dest = `servers/${id}/server-icon.png`;
+
+  await new Promise((resolve) => {
+    execFile("curl", ["-sS", "-L", "--max-time", "30", "-o", tmp, url], () => resolve());
+  });
+  if (!fs.existsSync(tmp)) return;
+
+  await new Promise((resolve) => {
+    execFile(
+      magick,
+      [
+        // [0] takes the first frame — without it an animated source makes
+        // ImageMagick write server-icon-0.png, server-icon-1.png, ...
+        `${tmp}[0]`,
+        // ^ scales to cover then centre-crops, so a non-square logo isn't squashed.
+        "-resize",
+        "64x64^",
+        "-gravity",
+        "center",
+        "-extent",
+        "64x64",
+        // Force a plain 32-bit RGBA PNG; Minecraft is picky about the rest.
+        `PNG32:${dest}`,
+      ],
+      (error, stdout, stderr) => {
+        if (error) {
+          console.log(
+            "Could not convert modpack artwork for server " + id + ": " +
+              String(stderr || error.message).trim()
+          );
+        } else {
+          // The server reads this from inside the container as uid 1000, and
+          // refreshPermissions may already have run by the time we get here.
+          try {
+            fs.chmodSync(dest, 0o664);
+          } catch (e) {
+            // best effort
+          }
+          console.log("Set modpack artwork as the server icon for " + id);
+        }
+        resolve();
+      }
+    );
+  });
+
+  try {
+    fs.unlinkSync(tmp);
+  } catch (e) {
+    // best effort
+  }
 }
 
 function deleteClientSideMods(id) {
