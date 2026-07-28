@@ -294,17 +294,25 @@ function modpackIndexPath(id, platform) {
 // recorded as a pass. Both download paths rewrite their index file with
 // projectID/currentVersionDateAdded only after every mod download has settled,
 // so that rewrite is the completion signal to wait on.
-function waitForModpackInstall(id, platform) {
+function waitForModpackInstall(id, pack) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
-    const indexPath = modpackIndexPath(id, platform);
+    const indexPath = modpackIndexPath(id, pack.platform);
 
     const timer = setInterval(() => {
       if (fs.existsSync(indexPath)) {
         const index = readJSON(indexPath); // {} while mid-write
-        if (index && index.currentVersionDateAdded) {
+        // downloadModpack has no cancellation, so a download abandoned when an
+        // earlier pack timed out keeps writing into this shared slot. Requiring
+        // the index to name *this* pack stops a stale write being mistaken for
+        // this pack finishing.
+        if (
+          index &&
+          index.currentVersionDateAdded &&
+          String(index.projectID) === String(pack.projectId)
+        ) {
           clearInterval(timer);
-          return resolve({ ok: true });
+          return resolve({ ok: true, index });
         }
       }
 
@@ -319,6 +327,32 @@ function waitForModpackInstall(id, platform) {
       }
     }, POLL_MS);
   });
+}
+
+// How many mods actually landed versus how many the manifest asked for.
+// CurseForge serves nothing for mods whose authors disabled third-party
+// downloads (downloadModpack logs "error parsing json for <projectID>" and
+// moves on), so a pack can install "successfully" with half its mods missing
+// and then boot fine — which would be a meaningless pass.
+function modInstallStats(id, pack, index) {
+  let expected = 0;
+  if (index && Array.isArray(index.files)) {
+    expected =
+      pack.platform === "mr"
+        ? index.files.filter((f) => f.path && f.path.includes("mods/")).length
+        : index.files.length;
+  }
+
+  let installed = 0;
+  try {
+    installed = fs
+      .readdirSync(`servers/${id}/mods`)
+      .filter((f) => f.endsWith(".jar")).length;
+  } catch (e) {
+    installed = 0; // no mods folder at all
+  }
+
+  return { expected, installed };
 }
 
 // Poll until the server is online, gives up, or dies.
@@ -391,6 +425,10 @@ async function checkOne(pack, id) {
   log(`Checking ${pack.name} (${pack.platform}:${pack.projectId})…`);
 
   let outcome;
+  // Recorded even on success: "passed with 142/187 mods" is the difference
+  // between a healthy pack and one that only booted because half of it is
+  // missing.
+  let mods = { expected: 0, installed: 0 };
   try {
     await prepareSlot(id, pack);
 
@@ -398,16 +436,27 @@ async function checkOne(pack, id) {
     // can't be left to overlap the way run() would do it.
     progress.phase = "downloading";
     mc().downloadModpack(id, pack.downloadUrl, pack.projectId, pack.versionId);
-    const installed = await waitForModpackInstall(id, pack.platform);
+    const installed = await waitForModpackInstall(id, pack);
 
     if (!installed.ok) {
       outcome = { status: "failed", reason: installed.reason };
     } else {
-      progress.phase = "booting";
-      // modpackURL is deliberately undefined: the pack is already on disk and
-      // passing it would make run() download it a second time.
-      mc().run(id, pack.software, GAME_VERSION, [], [], undefined, true, undefined);
-      outcome = await waitForOnline(id);
+      mods = modInstallStats(id, pack, installed.index);
+
+      // Booting a pack with none of its mods proves nothing, and burns the
+      // full start timeout doing it.
+      if (mods.expected > 0 && mods.installed === 0) {
+        outcome = {
+          status: "failed",
+          reason: `None of the ${mods.expected} mods downloaded — the pack couldn't be installed.`,
+        };
+      } else {
+        progress.phase = "booting";
+        // modpackURL is deliberately undefined: the pack is already on disk and
+        // passing it would make run() download it a second time.
+        mc().run(id, pack.software, GAME_VERSION, [], [], undefined, true, undefined);
+        outcome = await waitForOnline(id);
+      }
     }
   } catch (err) {
     outcome = { status: "failed", reason: `Check errored: ${err.message}` };
@@ -431,8 +480,11 @@ async function checkOne(pack, id) {
   }
   await removeFolder(`servers/${id}`);
 
-  log(`${pack.name}: ${outcome.status} — ${outcome.reason}`);
-  return { ...base, ...outcome, consoleTail, durationMs: Date.now() - startedAt };
+  log(
+    `${pack.name}: ${outcome.status} — ${outcome.reason}` +
+      (mods.expected ? ` (${mods.installed}/${mods.expected} mods)` : "")
+  );
+  return { ...base, ...outcome, mods, consoleTail, durationMs: Date.now() - startedAt };
 }
 
 // ------------------------------------------------------------------ public

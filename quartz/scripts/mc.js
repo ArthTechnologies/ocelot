@@ -1569,6 +1569,15 @@ function deleteClientSideMods(id) {
   // made every call throw ENOENT, silently swallowed by the global
   // uncaughtException handler, so this never actually deleted anything.
   const modsFolder = "servers/" + id + "/mods";
+  // A modpack whose mod downloads all failed (CurseForge returns nothing for
+  // mods with third-party downloads disabled) never creates this folder, and
+  // the server folder itself may have been removed by the time this runs —
+  // downloadModpack calls us from a promise chain nobody awaits, so throwing
+  // here surfaces as an unhandled rejection rather than being caught.
+  if (!fs.existsSync(modsFolder)) {
+    console.log("No mods folder for server " + id + " — nothing to filter.");
+    return;
+  }
   const folder = fs.readdirSync(modsFolder);
   const list = fs.readFileSync("assets/clientsidemods.txt", "utf8").split("\n");
   for (let i = 0; i < folder.length; i++) {
