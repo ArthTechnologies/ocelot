@@ -1,7 +1,24 @@
 // SvelteKit server hooks - runs on server startup
 import { startNodeMonitoring } from '$lib/server/nodeMonitor';
 import { env } from '$env/dynamic/public';
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
+
+// SvelteKit replaces the message of an unexpected error with "Internal Error"
+// in production so internals aren't leaked to users. This panel is operated by
+// the people who run it, so surface the real failure instead — otherwise a
+// broken page in production is indistinguishable from a missing route.
+//
+// NOTE: this deliberately exposes internal messages, file paths and stack
+// frames to anyone who can trigger an error. Remove the `stack` line (or the
+// whole hook) if the panel is ever opened to untrusted users.
+export const handleError: HandleServerError = ({ error, event }) => {
+  const err = error as Error;
+  const message = err?.message ?? String(error);
+
+  console.error(`[Observer] Unhandled error on ${event.url.pathname}:`, error);
+
+  return { message, stack: err?.stack };
+};
 
 // Initialize node monitoring once on first request
 // This replaces ocelot_old's run.js startup behavior
