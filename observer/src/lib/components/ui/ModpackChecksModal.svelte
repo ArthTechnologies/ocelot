@@ -162,16 +162,19 @@
         {#if data?.running && progress}
           <div class="rounded-xl border border-warning/30 bg-warning/5 p-4">
             <div class="flex items-center justify-between mb-2">
-              <p class="font-semibold text-sm flex items-center gap-2">
+              <p class="font-semibold text-sm flex items-center gap-2 flex-wrap">
                 <Loader size={14} class="animate-spin text-warning" />
-                {progress.current || "Discovering packs…"}
-                {#if progress.currentGameVersion}
-                  <span class="badge badge-ghost badge-sm">
-                    {progress.currentLoader} {progress.currentGameVersion}
+                {#if progress.currentPacks && progress.currentPacks.length > 0}
+                  <span>
+                    {progress.currentPacks.map(p => p.name).join(", ")}
                   </span>
-                {/if}
-                {#if progress.attempt > 1}
-                  <span class="badge badge-warning badge-sm">attempt {progress.attempt}</span>
+                  {#each progress.currentPacks as pack}
+                    <span class="badge badge-ghost badge-sm">
+                      {pack.loader} {pack.gameVersion}
+                    </span>
+                  {/each}
+                {:else}
+                  <span>Discovering packs…</span>
                 {/if}
               </p>
               <p class="text-xs text-base-content/60">
