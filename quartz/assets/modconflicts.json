@@ -1,0 +1,7 @@
+[
+  {
+    "disable": "radium",
+    "whenPresent": ["modernfix", "improvedmobs"],
+    "reason": "Radium's AI goal/tick optimisations conflict with these"
+  }
+]

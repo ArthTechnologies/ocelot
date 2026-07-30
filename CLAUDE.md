@@ -169,6 +169,12 @@ quartz/
 - Automatic mod/plugin downloading and installation
 - Modpack support with automatic extraction
 
+After a modpack install, `mc.js` filters the `mods/` folder twice, in this order:
+1. `deleteClientSideMods()` — **deletes** anything matching `assets/clientsidemods.txt`, an unconditional list of client-only mods.
+2. `resolveModConflicts()` — **renames to `.jar.disabled`** anything matching a rule in `assets/modconflicts.json`, whose format is `[{ "disable": "radium", "whenPresent": ["modernfix", "improvedmobs"], "reason": "..." }]`. Use this list for mods that only break in the presence of another mod; the rename (rather than a delete) lets an admin restore the jar from the Files tab.
+
+Both match on the file name lowercased with `-`/`_` stripped, so a bare token like `radium` also catches `Radium-mc1.18.2-0.12.2.jar`. Conflict rules only consider live `.jar` files, so a jar already renamed to `.jar.disabled` is neither a trigger nor a target and re-running the check is a no-op. Both run only on the modpack install path — mods uploaded manually afterwards are not filtered.
+
 #### Multi-Node Support (Ocelot)
 - Distribute servers across multiple backend instances
 - Node registry and routing

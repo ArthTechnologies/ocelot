@@ -1408,6 +1408,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID) {
                     modpack.versionID = versionID;
                     writeJSON(folder + "/modrinth.index.json", modpack);
                     deleteClientSideMods(id);
+                    resolveModConflicts(id);
                     // Cosmetic, so it runs alongside rather than blocking.
                     setModpackIcon(id, "mr", modpackID).catch((e) =>
                       console.log("Modpack icon failed for " + id + ": " + e.message)
@@ -1536,6 +1537,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID) {
                     modpack.versionID = versionID;
                     writeJSON(folder + "/curseforge.index.json", modpack);
                     deleteClientSideMods(id);
+                    resolveModConflicts(id);
                     // Cosmetic, so it runs alongside rather than blocking.
                     setModpackIcon(id, "cf", modpackID).catch((e) =>
                       console.log("Modpack icon failed for " + id + ": " + e.message)
@@ -1733,6 +1735,99 @@ function deleteClientSideMods(id) {
         }
         console.log("deleting client side mod: " + folder[i]);
         fs.unlinkSync(modPath);
+      }
+    }
+  }
+}
+
+// Some mods only break in the presence of another mod, so they can't live in
+// clientsidemods.txt (which is an unconditional strip list). Rules live in
+// assets/modconflicts.json as
+//   [{ "disable": "radium", "whenPresent": ["modernfix"], "reason": "..." }]
+// and the offender is renamed to .jar.disabled rather than deleted, so an
+// admin can put it back from the Files tab without reinstalling the modpack.
+function resolveModConflicts(id) {
+  //`id` is the full server folder name, same caveat as deleteClientSideMods
+  const modsFolder = "servers/" + id + "/mods";
+  if (!fs.existsSync(modsFolder)) {
+    console.log("No mods folder for server " + id + " — no conflicts to check.");
+    return;
+  }
+
+  let rules;
+  try {
+    rules = JSON.parse(fs.readFileSync("assets/modconflicts.json", "utf8"));
+  } catch (e) {
+    console.log("Could not read assets/modconflicts.json: " + e.message);
+    return;
+  }
+  if (!Array.isArray(rules)) {
+    console.log("assets/modconflicts.json is not an array — skipping conflict check.");
+    return;
+  }
+
+  const normalize = (name) => name.toLowerCase().replace(/[-_]/g, "").trim();
+
+  //only live .jar files count, so anything already renamed to .jar.disabled is
+  //neither a trigger nor a candidate and re-running this is a no-op
+  const jars = fs
+    .readdirSync(modsFolder)
+    .filter(
+      (f) =>
+        f.toLowerCase().endsWith(".jar") &&
+        fs.statSync(modsFolder + "/" + f).isFile()
+    );
+  const normalized = jars.map(normalize);
+
+  for (let i = 0; i < rules.length; i++) {
+    const rule = rules[i];
+    if (!rule || !rule.disable || !Array.isArray(rule.whenPresent)) {
+      continue;
+    }
+    const target = normalize(rule.disable);
+    if (!target) {
+      continue;
+    }
+
+    const targets = jars.filter((f, j) => normalized[j].includes(target));
+    if (targets.length === 0) {
+      continue;
+    }
+
+    //the target jar can't trigger its own rule
+    const triggers = [];
+    for (let k = 0; k < rule.whenPresent.length; k++) {
+      const trigger = normalize(rule.whenPresent[k]);
+      if (!trigger) {
+        continue;
+      }
+      jars.forEach((f, j) => {
+        if (normalized[j].includes(trigger) && !targets.includes(f)) {
+          triggers.push(f);
+        }
+      });
+    }
+    if (triggers.length === 0) {
+      continue;
+    }
+
+    for (let t = 0; t < targets.length; t++) {
+      const modPath = modsFolder + "/" + targets[t];
+      try {
+        fs.renameSync(modPath, modPath + ".disabled");
+        console.log(
+          "disabled " +
+            targets[t] +
+            " on server " +
+            id +
+            " — conflicts with " +
+            triggers.join(", ") +
+            (rule.reason ? " (" + rule.reason + ")" : "")
+        );
+      } catch (e) {
+        console.log(
+          "could not disable " + targets[t] + " on server " + id + ": " + e.message
+        );
       }
     }
   }
