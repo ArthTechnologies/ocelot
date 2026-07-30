@@ -58,62 +58,113 @@ export function stripLogLevelBlocks(line: string) {
   return line.replace(/\[[^[\]]*\/(?:INFO|WARN)\]:?[ \t]?/g, "");
 }
 
-// Lines a run of which folds into a single console row. Two kinds of match:
-//
-//   GROUPED_LINE_PREFIXES  - the line starts with this (leading whitespace
-//                            ignored, so indented stack frames still match)
-//   GROUPED_LINE_CONTAINS  - the token appears anywhere in the line
-//
-// Both are matched case-sensitively. Adding a new kind of repetitive log spam
-// is a one-line addition to whichever list fits.
-export const GROUPED_LINE_PREFIXES = ["at "];
-export const GROUPED_LINE_CONTAINS = [
-  "Incorrect key",
-  "Loaded entity",
-  "Skipping loading recipe",
-];
+// Stack trace and known repetitive patterns that should always group
+const GROUPED_LINE_PREFIXES = ["at "];
 
-// What a line groups under, or null if it groups with nothing. Two lines only
-// fold together when this is equal for both, so a run of stack frames sitting
-// directly above a run of "Incorrect key" warnings stays two rows.
-function lineGroupKey(line: string) {
-  const start = line.trimStart();
-  for (const prefix of GROUPED_LINE_PREFIXES) {
-    if (start.startsWith(prefix)) return "prefix:" + prefix;
+// Extract all phrases (words/tokens) longer than 6 characters from a line
+function extractPhrases(line: string): Set<string> {
+  const tokens = line.split(/\s+/);
+  const phrases = new Set<string>();
+  for (const token of tokens) {
+    // Remove common punctuation but keep the core word
+    const cleaned = token.replace(/[.,!?;:\[\](){}]/g, "");
+    if (cleaned.length > 6) {
+      phrases.add(cleaned.toLowerCase());
+    }
   }
-  for (const token of GROUPED_LINE_CONTAINS) {
-    if (line.includes(token)) return "contains:" + token;
+  return phrases;
+}
+
+// Check if a line matches any of the known prefixes
+function matchesPrefixPattern(line: string): boolean {
+  const trimmed = line.trimStart();
+  return GROUPED_LINE_PREFIXES.some(prefix => trimmed.startsWith(prefix));
+}
+
+// Find common phrases between two lines
+function findCommonPhrases(phrases1: Set<string>, phrases2: Set<string>): Set<string> {
+  const common = new Set<string>();
+  for (const phrase of phrases1) {
+    if (phrases2.has(phrase)) {
+      common.add(phrase);
+    }
   }
-  return null;
+  return common;
 }
 
 // Groups console lines into the rows the terminal renders. A run of consecutive
-// lines sharing a group key collapses into a single row, so a 60-frame stack
-// trace (or 200 repeated warnings) costs one line of the console instead of
-// sixty; everything else stays one line per row.
+// lines sharing common phrases (>6 chars) collapses into a single row, so a
+// 60-frame stack trace (or 200 repeated warnings) costs one line of the console
+// instead of sixty; everything else stays one line per row.
 //
 // `lineNum` is the number of the first line in the row, which is also the key
 // the collapse state is stored under - stable because the console only ever
 // gets appended to.
 export function groupStackFrames(lines: string[]) {
   const rows: { lineNum: number; lines: string[] }[] = [];
+  const phraseCache: Set<string>[] = lines.map(line => extractPhrases(line));
+  const prefixCache: boolean[] = lines.map(line => matchesPrefixPattern(line));
 
   for (let i = 0; i < lines.length; i++) {
-    const key = lineGroupKey(lines[i]);
+    const currentPrefix = prefixCache[i];
 
-    // a lone matching line is left as an ordinary row - grouping starts at two
-    if (key !== null && key === lineGroupKey(lines[i + 1] || "")) {
-      const start = i;
-      const group: string[] = [];
-      while (i < lines.length && lineGroupKey(lines[i]) === key) {
-        group.push(lines[i]);
-        i++;
+    // For "at" chains, allow occasional non-"at" lines in between
+    if (currentPrefix) {
+      let groupEnd = i;
+      let consecutiveNonAtCount = 0;
+
+      while (groupEnd + 1 < lines.length) {
+        const nextIsAt = prefixCache[groupEnd + 1];
+
+        if (nextIsAt) {
+          // Found another "at" line, continue the group
+          groupEnd++;
+          consecutiveNonAtCount = 0;
+        } else {
+          // Non-"at" line - allow up to 1 consecutive non-"at" line within the chain
+          consecutiveNonAtCount++;
+          if (consecutiveNonAtCount <= 1) {
+            groupEnd++;
+          } else {
+            break;
+          }
+        }
       }
-      i--;
-      rows.push({ lineNum: start + 1, lines: group });
-    } else {
-      rows.push({ lineNum: i + 1, lines: [lines[i]] });
+
+      const group: string[] = [];
+      for (let j = i; j <= groupEnd; j++) {
+        group.push(lines[j]);
+      }
+      rows.push({ lineNum: i + 1, lines: group });
+      i = groupEnd;
+      continue;
     }
+
+    // Check if current line shares phrases with the next line (dynamic grouping)
+    const nextPhrases = i + 1 < lines.length ? phraseCache[i + 1] : new Set<string>();
+    const hasNextMatch = i + 1 < lines.length && findCommonPhrases(phraseCache[i], nextPhrases).size > 0;
+
+    if (hasNextMatch) {
+      // Count how many consecutive lines share phrases starting from this one
+      let groupEnd = i;
+      while (groupEnd + 1 < lines.length && findCommonPhrases(phraseCache[groupEnd], phraseCache[groupEnd + 1]).size > 0) {
+        groupEnd++;
+      }
+
+      // Only group if we have 3 or more consecutive lines
+      const groupSize = groupEnd - i + 1;
+      if (groupSize >= 3) {
+        const group: string[] = [];
+        for (let j = i; j <= groupEnd; j++) {
+          group.push(lines[j]);
+        }
+        rows.push({ lineNum: i + 1, lines: group });
+        i = groupEnd;
+        continue;
+      }
+    }
+
+    rows.push({ lineNum: i + 1, lines: [lines[i]] });
   }
 
   return rows;
