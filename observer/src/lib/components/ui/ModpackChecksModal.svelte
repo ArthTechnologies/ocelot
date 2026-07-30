@@ -292,6 +292,16 @@
                               <span>{row.platform === "cf" ? "CurseForge" : "Modrinth"} · {row.projectId}</span>
                               {#if row.slug}<span>{row.slug}</span>{/if}
                             </div>
+                            {#if row.mods?.manifest}
+                              <div class="text-base-content/60">
+                                Manifest lists {row.mods.manifest} mods · panel removed
+                                {row.mods.removedClientSide || 0} client-side
+                                {#if row.mods.disabledByConflict}
+                                  and disabled {row.mods.disabledByConflict} conflicting
+                                {/if}
+                                · {row.mods.installed}/{row.mods.expected} expected on the server
+                              </div>
+                            {/if}
                             {#if row.firstFailure}
                               <div>
                                 <span class="font-semibold">First attempt:</span>

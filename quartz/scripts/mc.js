@@ -1765,6 +1765,30 @@ async function setModpackIcon(id, platform, modpackID) {
   }
 }
 
+// What the two mods/ filters below took out on the most recent install, keyed
+// by server id. Only the modpack checker reads it: without this, mods the panel
+// itself removed look identical to mods that failed to download, and a healthy
+// pack gets recorded as "179/187 mods".
+const modFilterStats = {};
+
+function emptyModFilterStats() {
+  return { removedClientSide: [], disabledByConflict: [] };
+}
+
+function resetModFilterStats(id) {
+  modFilterStats[id] = emptyModFilterStats();
+}
+
+function getModFilterStats(id) {
+  const stats = modFilterStats[id] || emptyModFilterStats();
+  return {
+    removedClientSide: [...stats.removedClientSide],
+    disabledByConflict: [...stats.disabledByConflict],
+  };
+}
+
+// Returns the file names it deleted. Always runs before resolveModConflicts on
+// an install, so it resets the whole record for this server.
 function deleteClientSideMods(id) {
   // NOTE: `id` here is already the full server folder name (e.g. "128"),
   // same as everywhere else in this file (see `folder = "servers/" + id` in
@@ -1778,9 +1802,12 @@ function deleteClientSideMods(id) {
   // the server folder itself may have been removed by the time this runs —
   // downloadModpack calls us from a promise chain nobody awaits, so throwing
   // here surfaces as an unhandled rejection rather than being caught.
+  resetModFilterStats(id);
+  const removed = modFilterStats[id].removedClientSide;
+
   if (!fs.existsSync(modsFolder)) {
     console.log("No mods folder for server " + id + " — nothing to filter.");
-    return;
+    return removed;
   }
   const folder = fs.readdirSync(modsFolder);
   const list = fs.readFileSync("assets/clientsidemods.txt", "utf8").split("\n");
@@ -1798,9 +1825,14 @@ function deleteClientSideMods(id) {
         }
         console.log("deleting client side mod: " + folder[i]);
         fs.unlinkSync(modPath);
+        removed.push(folder[i]);
+        //a file can match two entries in the list; without this the second
+        //match statSyncs a path that no longer exists and throws
+        break;
       }
     }
   }
+  return removed;
 }
 
 // Some mods only break in the presence of another mod, so they can't live in
@@ -1809,12 +1841,16 @@ function deleteClientSideMods(id) {
 //   [{ "disable": "radium", "whenPresent": ["modernfix"], "reason": "..." }]
 // and the offender is renamed to .jar.disabled rather than deleted, so an
 // admin can put it back from the Files tab without reinstalling the modpack.
+// Returns the file names it disabled.
 function resolveModConflicts(id) {
   //`id` is the full server folder name, same caveat as deleteClientSideMods
   const modsFolder = "servers/" + id + "/mods";
+  if (!modFilterStats[id]) resetModFilterStats(id);
+  const disabled = modFilterStats[id].disabledByConflict;
+
   if (!fs.existsSync(modsFolder)) {
     console.log("No mods folder for server " + id + " — no conflicts to check.");
-    return;
+    return disabled;
   }
 
   let rules;
@@ -1822,11 +1858,11 @@ function resolveModConflicts(id) {
     rules = JSON.parse(fs.readFileSync("assets/modconflicts.json", "utf8"));
   } catch (e) {
     console.log("Could not read assets/modconflicts.json: " + e.message);
-    return;
+    return disabled;
   }
   if (!Array.isArray(rules)) {
     console.log("assets/modconflicts.json is not an array — skipping conflict check.");
-    return;
+    return disabled;
   }
 
   const normalize = (name) => name.toLowerCase().replace(/[-_]/g, "").trim();
@@ -1878,6 +1914,7 @@ function resolveModConflicts(id) {
       const modPath = modsFolder + "/" + targets[t];
       try {
         fs.renameSync(modPath, modPath + ".disabled");
+        disabled.push(targets[t]);
         console.log(
           "disabled " +
             targets[t] +
@@ -1894,6 +1931,8 @@ function resolveModConflicts(id) {
       }
     }
   }
+
+  return disabled;
 }
 
 
@@ -1913,4 +1952,6 @@ module.exports = {
   killAsync,
   getServersOnThreads,
   getPlayerList,
+  getModFilterStats,
+  resetModFilterStats,
 };

@@ -368,9 +368,9 @@ function waitForModpackInstall(id, pack) {
 // moves on), so a pack can install "successfully" with half its mods missing
 // and then boot fine — which would be a meaningless pass.
 function modInstallStats(id, pack, index) {
-  let expected = 0;
+  let manifest = 0;
   if (index && Array.isArray(index.files)) {
-    expected =
+    manifest =
       pack.platform === "mr"
         ? index.files.filter((f) => f.path && f.path.includes("mods/")).length
         : index.files.length;
@@ -385,7 +385,17 @@ function modInstallStats(id, pack, index) {
     installed = 0; // no mods folder at all
   }
 
-  return { expected, installed };
+  // downloadModpack strips client-side mods and renames conflicting ones to
+  // .jar.disabled before we get here, so both are gone from the .jar count.
+  // They downloaded fine — the panel removed them on purpose — so they come out
+  // of the denominator too. Leaving them in made every modded pack look like a
+  // partial install, which is exactly the signal `expected` exists to give.
+  const filtered = mc().getModFilterStats(id);
+  const removedClientSide = filtered.removedClientSide.length;
+  const disabledByConflict = filtered.disabledByConflict.length;
+  const expected = Math.max(0, manifest - removedClientSide - disabledByConflict);
+
+  return { expected, installed, manifest, removedClientSide, disabledByConflict };
 }
 
 // Poll until the server is online, gives up, or dies.
@@ -435,10 +445,19 @@ async function runAttempt(pack, id) {
   // Recorded even on success: "passed with 142/187 mods" is the difference
   // between a healthy pack and one that only booted because half of it is
   // missing.
-  let mods = { expected: 0, installed: 0 };
+  let mods = {
+    expected: 0,
+    installed: 0,
+    manifest: 0,
+    removedClientSide: 0,
+    disabledByConflict: 0,
+  };
 
   try {
     await prepareSlot(id, pack);
+    // The filters set this on every install, but a retry reusing the slot must
+    // never be able to read the previous attempt's numbers.
+    mc().resetModFilterStats(id);
 
     // Install first, boot second — see waitForModpackInstall for why these
     // can't be left to overlap the way run() would do it.
@@ -547,9 +566,15 @@ async function checkOne(pack, id) {
 
   const { outcome, mods, consoleTail } = attempt;
 
+  const filteredOut = (mods.removedClientSide || 0) + (mods.disabledByConflict || 0);
   log(
     `${pack.name}: ${outcome.status} — ${outcome.reason}` +
-      (mods.expected ? ` (${mods.installed}/${mods.expected} mods)` : "") +
+      (mods.expected ? ` (${mods.installed}/${mods.expected} mods` : "") +
+      (mods.expected && filteredOut
+        ? `, ${filteredOut} filtered out by the panel)`
+        : mods.expected
+        ? ")"
+        : "") +
       (attempts > 1 ? ` [attempt ${attempts}]` : "")
   );
 
