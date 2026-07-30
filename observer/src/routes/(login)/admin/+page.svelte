@@ -9,10 +9,14 @@
     DollarSign,
     Zap,
     BarChart3,
-    Download
+    Download,
+    Boxes
   } from 'lucide-svelte';
   import { fileSizeShort } from '$lib/scripts/utils';
   import { getAdminDashboard } from '$lib/scripts/req';
+  import ModpackChecksModal from '$lib/components/ui/ModpackChecksModal.svelte';
+
+  let showModpackChecks = false;
 
   let accounts = [];
   let latestSnapshot: any = null;
@@ -114,14 +118,24 @@
         <h1 class="text-5xl font-bold text-base-content mb-2 tracking-tight">Admin Dashboard</h1>
         <p class="text-base-content/50 text-sm tracking-wide uppercase letter-spacing">System monitoring and account management</p>
       </div>
-      <button
-        on:click={downloadAsJSON}
-        class="btn btn-ghost btn-sm text-primary hover:bg-primary/10"
-        title="Download dashboard data as JSON"
-      >
-        <Download class="w-5 h-5 mr-1.5" />
-        <span>Export</span>
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          on:click={() => (showModpackChecks = true)}
+          class="btn btn-ghost btn-sm text-primary hover:bg-primary/10"
+          title="Results of the automated modpack boot check"
+        >
+          <Boxes class="w-5 h-5 mr-1.5" />
+          <span>Modpack Checker</span>
+        </button>
+        <button
+          on:click={downloadAsJSON}
+          class="btn btn-ghost btn-sm text-primary hover:bg-primary/10"
+          title="Download dashboard data as JSON"
+        >
+          <Download class="w-5 h-5 mr-1.5" />
+          <span>Export</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -402,6 +416,10 @@
     </div>
   </div>
 </div>
+
+{#if showModpackChecks}
+  <ModpackChecksModal on:close={() => (showModpackChecks = false)} />
+{/if}
 
 <style lang="postcss">
   :global(.stat) {

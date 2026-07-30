@@ -522,7 +522,7 @@ process.stdin.on("data", (data) => {
   runPeriodicTasks            - Run periodic maintenance tasks immediately.
   refreshFileAccess           - Refresh file access keys and restart the FTP server (if needed).
   checkSubscriptions          - Verify Stripe subscriptions for accounts.
-  checkModpacks               - Boot the top 10 Forge and Fabric 1.18.2 modpacks in a scratch server and record pass/fail (also runs automatically every 12h).
+  checkModpacks               - Boot the top 10 most-downloaded Forge modpacks on each of 1.18.2, 1.12.2, 1.20.1, 1.16.5 and 1.19.2, plus the top 10 Fabric 1.18.2 packs, in a scratch server and record pass/fail (also runs automatically every Sunday).
   modpackCheckerProgress      - Show progress of the running modpack check, or the last result.
 
   numServersOnline            - Print number of servers currently online and percentage.
@@ -1163,11 +1163,25 @@ schedules.registerFunction("checkModpacks", async () => {
       console.log("[Init] Created system task: Auto-Update Servers (every 2h)");
     }
 
+    // Weekly, early Sunday. A run now covers five Forge versions plus Fabric —
+    // 60 packs, each of which can take two attempts — so it is far too long to
+    // repeat twice a day. Offset to :15 so it isn't competing with the jar
+    // scrape or the subscription sweep that both fire on the hour.
+    const MODPACK_CHECK_CRON = "15 4 * * 0";
+
     if (!hasModpackCheckTask) {
-      // Offset to :15 so a long modpack run isn't competing with the jar
-      // scrape or the subscription sweep that both fire on the hour.
-      schedules.createSystemTask(null, "Check Popular Modpacks", "function", "15 */12 * * *", "checkModpacks");
-      console.log("[Init] Created system task: Check Popular Modpacks (every 12h)");
+      schedules.createSystemTask(null, "Check Popular Modpacks", "function", MODPACK_CHECK_CRON, "checkModpacks");
+      console.log("[Init] Created system task: Check Popular Modpacks (weekly, Sunday 04:15)");
+    } else {
+      // Panels set up before the switch to weekly still carry the 12h cron, and
+      // nothing else would ever rewrite it.
+      const existing = allSchedules.systemTasks.find((t) => t.command === "checkModpacks");
+      if (existing && existing.schedule !== MODPACK_CHECK_CRON) {
+        schedules.updateTask(existing.id, { schedule: MODPACK_CHECK_CRON });
+        console.log(
+          `[Init] Updated system task: Check Popular Modpacks (${existing.schedule} -> weekly, Sunday 04:15)`
+        );
+      }
     }
   } catch (err) {
     console.error("[Init] Error creating system tasks:", err);

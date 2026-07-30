@@ -42,7 +42,15 @@ router.get("/modpack-checks", (req, res) => {
   try {
     const modpackChecker = require("../scripts/modpackChecker.js");
     const data = modpackChecker.readLog();
-    res.json({ ...data, running: modpackChecker.isRunning() });
+    // `progress` is what the admin modal renders while a run is in flight -
+    // a run spans 60 packs and hours, so "still going, 23/60" is the only
+    // useful answer during one.
+    res.json({
+      ...data,
+      running: modpackChecker.isRunning(),
+      progress: modpackChecker.getProgress(),
+      forgeGameVersions: modpackChecker.FORGE_GAME_VERSIONS,
+    });
   } catch (err) {
     console.error("Error reading modpack checks:", err);
     res.status(500).json({ error: "Failed to read modpack checks" });

@@ -13,15 +13,22 @@ const config = utils.getConfig();
 // wiped between packs. Nothing here touches customer servers.
 
 const LOG_PATH = "logs/modpackChecks.json";
+// The version Fabric is checked on, and the one anything version-less falls
+// back to (the log's `gameVersion`, the reserved slot's server.json, …).
 const GAME_VERSION = "1.18.2";
+// Forge is checked across every version people still run packs on. Top TOP_N
+// per version, so this is 5x the Forge work of a single-version run — see the
+// note on the weekly schedule in run.js.
+const FORGE_GAME_VERSIONS = ["1.18.2", "1.12.2", "1.20.1", "1.16.5", "1.19.2"];
 const TOP_N = 10;
 
 // CurseForge magic numbers: game 432 is Minecraft, class 4471 is Modpacks,
-// loader 1 is Forge, and sortField 2 is Popularity.
+// loader 1 is Forge, and sortField 6 is TotalDownloads (2 would be Popularity,
+// which blends recency and relevance rather than ranking on downloads).
 const CF_GAME_ID = 432;
 const CF_MODPACK_CLASS = 4471;
 const CF_LOADER_FORGE = 1;
-const CF_SORT_POPULARITY = 2;
+const CF_SORT_DOWNLOADS = 6;
 
 // A pack has to install a loader, generate a world and reach "Done" — slow
 // packs on a cold cache genuinely take this long.
@@ -42,34 +49,28 @@ let running = false;
 
 // Live state for the `modpackCheckerProgress` console command. A single run can
 // take an hour, so "is it stuck or just slow?" needs an answer.
-let progress = {
-  running: false,
-  phase: "idle",
-  startedAt: null,
-  index: 0,
-  total: 0,
-  current: null,
-  currentStartedAt: null,
-  attempt: 1,
-  passed: 0,
-  failed: 0,
-  skipped: 0,
-};
-
-function resetProgress() {
-  progress = {
+function emptyProgress() {
+  return {
     running: false,
     phase: "idle",
     startedAt: null,
     index: 0,
     total: 0,
     current: null,
+    currentGameVersion: null,
+    currentLoader: null,
     currentStartedAt: null,
     attempt: 1,
     passed: 0,
     failed: 0,
     skipped: 0,
   };
+}
+
+let progress = emptyProgress();
+
+function resetProgress() {
+  progress = emptyProgress();
 }
 
 function getProgress() {
@@ -141,8 +142,10 @@ async function fetchJson(url, headers = {}) {
 
 // ---------------------------------------------------------------- discovery
 
-// Top Forge packs for this version, newest usable file each.
-async function topForgeModpacks() {
+// Top Forge packs by total downloads for one game version, newest usable file
+// each. Called once per entry in FORGE_GAME_VERSIONS — the ranking is per
+// version, so each list is the top packs people actually run on that version.
+async function topForgeModpacks(gameVersion) {
   const apiKey = config.curseforgeKey;
   if (!apiKey) {
     log("No curseforgeKey configured — skipping the Forge half.");
@@ -152,9 +155,9 @@ async function topForgeModpacks() {
   const search = await fetchJson(
     `https://api.curseforge.com/v1/mods/search?gameId=${CF_GAME_ID}` +
       `&classId=${CF_MODPACK_CLASS}` +
-      `&gameVersion=${GAME_VERSION}` +
+      `&gameVersion=${gameVersion}` +
       `&modLoaderType=${CF_LOADER_FORGE}` +
-      `&sortField=${CF_SORT_POPULARITY}&sortOrder=desc&index=0&pageSize=${TOP_N}`,
+      `&sortField=${CF_SORT_DOWNLOADS}&sortOrder=desc&index=0&pageSize=${TOP_N}`,
     { "x-api-key": apiKey }
   );
 
@@ -163,13 +166,16 @@ async function topForgeModpacks() {
     try {
       const filesResponse = await fetchJson(
         `https://api.curseforge.com/v1/mods/${mod.id}/files` +
-          `?gameVersion=${GAME_VERSION}&modLoaderType=${CF_LOADER_FORGE}&pageSize=10`,
+          `?gameVersion=${gameVersion}&modLoaderType=${CF_LOADER_FORGE}&pageSize=10`,
         { "x-api-key": apiKey }
       );
 
       const file = (filesResponse.data || [])[0];
       if (!file) {
-        packs.push(unavailable("cf", mod.id, mod.name, mod.slug, "forge", "No 1.18.2 Forge file published."));
+        packs.push(
+          unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
+            `No ${gameVersion} Forge file published.`)
+        );
         continue;
       }
 
@@ -183,7 +189,10 @@ async function topForgeModpacks() {
         downloadUrl = direct.data;
       }
       if (!downloadUrl) {
-        packs.push(unavailable("cf", mod.id, mod.name, mod.slug, "forge", "Author disabled third-party downloads."));
+        packs.push(
+          unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
+            "Author disabled third-party downloads.")
+        );
         continue;
       }
 
@@ -194,12 +203,16 @@ async function topForgeModpacks() {
         slug: mod.slug,
         loader: "forge",
         software: "forge",
+        gameVersion,
         versionId: file.id,
         versionName: file.displayName,
         downloadUrl,
       });
     } catch (err) {
-      packs.push(unavailable("cf", mod.id, mod.name, mod.slug, "forge", `Lookup failed: ${err.message}`));
+      packs.push(
+        unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
+          `Lookup failed: ${err.message}`)
+      );
     }
   }
   return packs;
@@ -229,7 +242,8 @@ async function topFabricModpacks() {
       const file = version && (version.files.find((f) => f.primary) || version.files[0]);
       if (!file) {
         packs.push(
-          unavailable("mr", hit.project_id, hit.title, hit.slug, "fabric", "No 1.18.2 Fabric file published.")
+          unavailable("mr", hit.project_id, hit.title, hit.slug, "fabric", GAME_VERSION,
+            `No ${GAME_VERSION} Fabric file published.`)
         );
         continue;
       }
@@ -241,21 +255,32 @@ async function topFabricModpacks() {
         slug: hit.slug,
         loader: "fabric",
         software: "fabric",
+        gameVersion: GAME_VERSION,
         versionId: version.id,
         versionName: version.version_number,
         downloadUrl: file.url,
       });
     } catch (err) {
       packs.push(
-        unavailable("mr", hit.project_id, hit.title, hit.slug, "fabric", `Lookup failed: ${err.message}`)
+        unavailable("mr", hit.project_id, hit.title, hit.slug, "fabric", GAME_VERSION,
+          `Lookup failed: ${err.message}`)
       );
     }
   }
   return packs;
 }
 
-function unavailable(platform, projectId, name, slug, loader, reason) {
-  return { platform, projectId, name, slug, loader, software: loader, unavailable: reason };
+function unavailable(platform, projectId, name, slug, loader, gameVersion, reason) {
+  return {
+    platform,
+    projectId,
+    name,
+    slug,
+    loader,
+    software: loader,
+    gameVersion,
+    unavailable: reason,
+  };
 }
 
 // ------------------------------------------------------------ test harness
@@ -279,7 +304,7 @@ async function prepareSlot(id, pack) {
     id: String(id),
     name: `Modpack check — ${pack.name}`,
     software: pack.software,
-    version: GAME_VERSION,
+    version: pack.gameVersion || GAME_VERSION,
     specialDatapacks: [],
     specialPlugins: [],
     allowedAccounts: "",
@@ -437,7 +462,7 @@ async function runAttempt(pack, id) {
         progress.phase = "booting";
         // modpackURL is deliberately undefined: the pack is already on disk and
         // passing it would make run() download it a second time.
-        mc().run(id, pack.software, GAME_VERSION, [], [], undefined, true, undefined);
+        mc().run(id, pack.software, pack.gameVersion || GAME_VERSION, [], [], undefined, true, undefined);
         outcome = await waitForOnline(id);
       }
     }
@@ -474,6 +499,7 @@ async function runAttempt(pack, id) {
 
 async function checkOne(pack, id) {
   const startedAt = Date.now();
+  const gameVersion = pack.gameVersion || GAME_VERSION;
 
   const base = {
     platform: pack.platform,
@@ -481,6 +507,7 @@ async function checkOne(pack, id) {
     name: pack.name,
     slug: pack.slug,
     loader: pack.loader,
+    gameVersion,
     versionId: pack.versionId || null,
     versionName: pack.versionName || null,
     checkedAt: startedAt,
@@ -490,16 +517,18 @@ async function checkOne(pack, id) {
     return { ...base, status: "skipped", reason: pack.unavailable, durationMs: 0 };
   }
 
-  if (!jarAvailable(pack.software, GAME_VERSION)) {
+  // Per version: a panel can perfectly well have a forge-1.18.2 jar and no
+  // forge-1.12.2 one, and that's the panel's gap rather than the pack's.
+  if (!jarAvailable(pack.software, gameVersion)) {
     return {
       ...base,
       status: "skipped",
-      reason: `No ${pack.software} ${GAME_VERSION} jar in assets/jars — can't test this loader.`,
+      reason: `No ${pack.software} ${gameVersion} jar in assets/jars — can't test this loader.`,
       durationMs: 0,
     };
   }
 
-  log(`Checking ${pack.name} (${pack.platform}:${pack.projectId})…`);
+  log(`Checking ${pack.name} (${pack.platform}:${pack.projectId}, ${gameVersion})…`);
 
   let attempt = await runAttempt(pack, id);
   let attempts = 1;
@@ -558,21 +587,26 @@ async function checkModpacks() {
   progress.running = true;
   progress.phase = "discovering";
   progress.startedAt = startedAt;
-  log(`Starting check of the top ${TOP_N} Forge and Fabric ${GAME_VERSION} modpacks…`);
+  log(
+    `Starting check of the top ${TOP_N} Forge modpacks by downloads on each of ` +
+      `${FORGE_GAME_VERSIONS.join(", ")}, plus the top ${TOP_N} Fabric ${GAME_VERSION} packs…`
+  );
 
   try {
-    const [forge, fabric] = await Promise.all([
-      topForgeModpacks().catch((err) => {
-        log("CurseForge discovery failed: " + err.message);
-        return [];
-      }),
+    const discovered = await Promise.all([
+      ...FORGE_GAME_VERSIONS.map((gameVersion) =>
+        topForgeModpacks(gameVersion).catch((err) => {
+          log(`CurseForge discovery failed for ${gameVersion}: ${err.message}`);
+          return [];
+        })
+      ),
       topFabricModpacks().catch((err) => {
         log("Modrinth discovery failed: " + err.message);
         return [];
       }),
     ]);
 
-    const packs = [...forge, ...fabric];
+    const packs = discovered.flat();
     progress.total = packs.length;
 
     const results = [];
@@ -581,6 +615,8 @@ async function checkModpacks() {
     for (const pack of packs) {
       progress.index = results.length + 1;
       progress.current = pack.name;
+      progress.currentGameVersion = pack.gameVersion || GAME_VERSION;
+      progress.currentLoader = pack.loader;
       progress.currentStartedAt = Date.now();
       progress.attempt = 1;
       // Reset here so a pack that gets skipped doesn't leave the previous
@@ -599,7 +635,11 @@ async function checkModpacks() {
       lastRun: startedAt,
       finishedAt: Date.now(),
       durationMs: Date.now() - startedAt,
+      // gameVersion is kept for older readers; gameVersions is what a run
+      // spanning several Forge versions is actually described by.
       gameVersion: GAME_VERSION,
+      gameVersions: [...new Set(results.map((r) => r.gameVersion).filter(Boolean))],
+      forgeGameVersions: FORGE_GAME_VERSIONS,
       passed: results.filter((r) => r.status === "passed").length,
       failed: results.filter((r) => r.status === "failed").length,
       skipped: results.filter((r) => r.status === "skipped").length,
@@ -623,4 +663,12 @@ function isRunning() {
   return running;
 }
 
-module.exports = { checkModpacks, readLog, isRunning, getProgress, LOG_PATH, GAME_VERSION };
+module.exports = {
+  checkModpacks,
+  readLog,
+  isRunning,
+  getProgress,
+  LOG_PATH,
+  GAME_VERSION,
+  FORGE_GAME_VERSIONS,
+};
