@@ -8,11 +8,11 @@
     import { t } from "$lib/scripts/i18n";
     import { readTerminal, writeTerminal } from "$lib/scripts/req";
     import { alert, groupStackFrames, stripLogLevelBlocks } from "$lib/scripts/utils";
-    import { CopyIcon, SendIcon } from "lucide-svelte";
+    import { condenseTimestamps, groupSimilarLines, showLineNumbers } from "$lib/stores/terminalPrefs";
+    import { get } from "svelte/store";
+    import { CopyIcon, SendIcon, Wrench } from "lucide-svelte";
 
     export let id: number;
-
-    let condenseTimestamps = true;
 
     function condenseTimestamp(timeStr: string): string {
       return timeStr.replace(/\[(\d{1,2}):(\d{2}):(\d{2})\]/g, (_, hours, minutes) => {
@@ -139,7 +139,12 @@ send(input);
     if (!lines) return;
 
     const lineArray = lines.split("\n").filter(line => line !== "");
-    const rows = groupStackFrames(lineArray);
+    const shouldGroup = get(groupSimilarLines);
+    const shouldCondense = get(condenseTimestamps);
+    const shouldShowLineNumbers = get(showLineNumbers);
+    const rows = shouldGroup
+      ? groupStackFrames(lineArray)
+      : lineArray.map((line, index) => ({ lineNum: index + 1, lines: [line] }));
 
     // On first render, collapse all lines by default
     if (collapsedLines.size === 0) {
@@ -157,7 +162,7 @@ send(input);
       //while collapsed only the first frame is visible, so the rest of the
       //trace is advertised on that line rather than below the fold
       let content = frames[0];
-      if (condenseTimestamps) {
+      if (shouldCondense) {
         content = condenseTimestamp(content);
       }
       if (frames.length > 1) {
@@ -165,14 +170,18 @@ send(input);
           content += `<span class="terminal-frame-count">+${frames.length - 1} more</span>`;
         }
         let remainingFrames = frames.slice(1).join("\n");
-        if (condenseTimestamps) {
+        if (shouldCondense) {
           remainingFrames = condenseTimestamp(remainingFrames);
         }
         content += "\n" + remainingFrames;
       }
 
+      const lineNumberHtml = shouldShowLineNumbers
+        ? `<div class="terminal-line-number">${lineNum}</div>`
+        : "";
+
       html += `<div class="terminal-line-wrapper ${displayClass}" data-line="${lineNum}">
-        <div class="terminal-line-number">${lineNum}</div>
+        ${lineNumberHtml}
         <div class="terminal-line-content" onclick="window.toggleTerminalLine(${lineNum})">${content}</div>
       </div>`;
     });
@@ -292,6 +301,27 @@ function updateElementWidth() {
 import { onMount, onDestroy } from "svelte";
 
 let showFinder = false;
+let showPrefs = false;
+let prefsRef: HTMLDivElement | undefined;
+
+function togglePrefs() {
+  showPrefs = !showPrefs;
+}
+
+function handleClickOutside(e: MouseEvent) {
+  if (showPrefs && prefsRef && !prefsRef.contains(e.target as Node)) {
+    showPrefs = false;
+  }
+}
+
+// Re-render whenever a preference changes - safe to call before the terminal
+// has any content, renderTerminalLines() no-ops until data-lines exists.
+$: if (browser) {
+  $condenseTimestamps;
+  $groupSimilarLines;
+  $showLineNumbers;
+  renderTerminalLines();
+}
 
 function handleKeyDown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === "f") {
@@ -307,6 +337,7 @@ if (browser) {
   onMount(() => {
     window.addEventListener("resize", updateElementWidth);
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("mousedown", handleClickOutside);
     updateElementWidth(); // Initial call to set width on mount
     window.toggleTerminalLine = toggleLineCollapse;
     (window as any).renderTerminalLines = renderTerminalLines;
@@ -322,6 +353,7 @@ if (browser) {
   onDestroy(() => {
     window.removeEventListener("resize", updateElementWidth);
     window.removeEventListener("keydown", handleKeyDown);
+    window.removeEventListener("mousedown", handleClickOutside);
     delete window.toggleTerminalLine;
   });
 
@@ -335,20 +367,34 @@ if (browser) {
       <div class="flex items-center justify-center w-7 h-7 rounded-md bg-base-200/50">
         <div id="stickIndicatorDot" class="w-2 h-2 rounded-full transition-colors bg-white"></div>
       </div>
-      <label class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-base-200/50 cursor-pointer hover:bg-base-200/70 transition">
-        <input
-          type="checkbox"
-          bind:checked={condenseTimestamps}
-          on:change={() => {
-            const terminal = document.getElementById("terminal");
-            if (terminal) {
-              window.renderTerminalLines?.();
-            }
-          }}
-          class="checkbox checkbox-xs"
-        />
-        <span class="text-xs text-gray-300">Condense Timestamps</span>
-      </label>
+      <div class="relative" bind:this={prefsRef}>
+        <div class="tooltip tooltip-left" data-tip="Console preferences">
+          <button
+            class="btn btn-ghost btn-sm btn-circle"
+            on:click={togglePrefs}
+            aria-label="Console preferences"
+          >
+            <Wrench size="16" />
+          </button>
+        </div>
+        {#if showPrefs}
+          <div class="terminal-prefs-dropdown">
+            <p class="text-xs font-semibold text-gray-300 mb-2">Preferences</p>
+            <label class="flex items-center gap-2 py-1 cursor-pointer">
+              <input type="checkbox" bind:checked={$condenseTimestamps} class="checkbox checkbox-xs" />
+              <span class="text-xs text-gray-300">Condense Timestamps</span>
+            </label>
+            <label class="flex items-center gap-2 py-1 cursor-pointer">
+              <input type="checkbox" bind:checked={$groupSimilarLines} class="checkbox checkbox-xs" />
+              <span class="text-xs text-gray-300">Group together similar lines</span>
+            </label>
+            <label class="flex items-center gap-2 py-1 cursor-pointer">
+              <input type="checkbox" bind:checked={$showLineNumbers} class="checkbox checkbox-xs" />
+              <span class="text-xs text-gray-300">Show line numbers</span>
+            </label>
+          </div>
+        {/if}
+      </div>
       <div class="tooltip tooltip-left" data-tip="Copy console">
         <button
           class="btn btn-ghost btn-sm btn-circle"
