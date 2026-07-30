@@ -140,6 +140,71 @@ function checkServer(id) {
     state: states[id],
   };
 }
+// Forge/NeoForge 1.17+ launch from an argfile inside
+// libraries/net/{minecraftforge/forge,neoforged/neoforge}/<build>/unix_args.txt.
+// True when `version` uses that layout — year-based versions (26.x, 27.x, …)
+// always do, as do 1.17 and up.
+function usesLoaderArgFile(version) {
+  if (parseInt(version.split(".")[0]) >= 2 && !version.startsWith("1.")) {
+    return true;
+  }
+  return parseInt(version.split(".")[1]) >= 17;
+}
+
+// Highest build number wins, comparing every number group in the folder name
+// ("1.18.2-40.2.21" -> [1,18,2,40,2,21]) so a longer build sorts above a
+// shorter one with the same prefix.
+function compareLoaderBuilds(a, b) {
+  const na = (a.match(/\d+/g) || []).map(Number);
+  const nb = (b.match(/\d+/g) || []).map(Number);
+  for (let i = 0; i < Math.max(na.length, nb.length); i++) {
+    const diff = (na[i] || 0) - (nb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+// Picks which build to launch out of libraries/…/forge. A server can end up
+// with several here (a version or software switch leaves the old build behind),
+// and this used to take readdirSync()[0] — an arbitrary directory-order pick
+// that could launch a build the installer didn't just install.
+//
+// On the argfile layout only builds that actually have a unix_args.txt are
+// eligible, since that's the file the exec line points at. If none qualify we
+// still return the highest build rather than undefined, which would put the
+// literal string "undefined" in the launch command.
+function pickLoaderBuild(libDir, version) {
+  let builds;
+  try {
+    builds = fs
+      .readdirSync(libDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch (e) {
+    return undefined;
+  }
+  if (builds.length === 0) {
+    return undefined;
+  }
+
+  const sorted = builds.slice().sort(compareLoaderBuilds);
+
+  if (usesLoaderArgFile(version)) {
+    const withArgFile = sorted.filter((build) =>
+      fs.existsSync(libDir + "/" + build + "/unix_args.txt")
+    );
+    if (withArgFile.length > 0) {
+      return withArgFile[withArgFile.length - 1];
+    }
+    console.log(
+      "no build in " + libDir + " has a unix_args.txt — falling back to " +
+        sorted[sorted.length - 1]
+    );
+  }
+
+  return sorted[sorted.length - 1];
+}
+
 function run(
   id,
   software,
@@ -877,9 +942,7 @@ function run(
             let forgeVersion;
 
             if (fs.existsSync(folder +libraryline)) {
-              forgeVersion = fs.readdirSync(
-                folder + libraryline
-              )[0];
+              forgeVersion = pickLoaderBuild(folder + libraryline, version);
             }
 
             execLine =
