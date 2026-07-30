@@ -1,6 +1,6 @@
 <script>
   import { browser } from "$app/environment";
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { writeTerminal } from "$lib/scripts/req";
   import TerminalFinder from "$lib/components/ui/TerminalFinder.svelte";
   import { Maximize2, Minimize2 } from "lucide-svelte";
@@ -95,8 +95,14 @@
     isFocused = !isFocused;
   }
 
+  function isFullscreenOpen() {
+    const toggle = document.getElementById("fullscreenTerminal");
+    return toggle instanceof HTMLInputElement && toggle.checked;
+  }
+
   function handleKeyDown(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+    //only capture find while the fullscreen terminal is actually open
+    if ((e.ctrlKey || e.metaKey) && e.key === "f" && isFullscreenOpen()) {
       e.preventDefault();
       showFinder = true;
     }
@@ -116,6 +122,11 @@
     onMount(() => {
       window.addEventListener("keydown", handleKeyDown);
       window.toggleTerminalLine2 = toggleLineCollapse2;
+    });
+
+    onDestroy(() => {
+      window.removeEventListener("keydown", handleKeyDown);
+      delete window.toggleTerminalLine2;
     });
   }
 </script>

@@ -191,6 +191,9 @@ let showFinder = false;
 
 function handleKeyDown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+    //the fullscreen terminal brings its own finder while it's open
+    const fullscreen = document.getElementById("fullscreenTerminal");
+    if (fullscreen instanceof HTMLInputElement && fullscreen.checked) return;
     e.preventDefault();
     showFinder = true;
   }
