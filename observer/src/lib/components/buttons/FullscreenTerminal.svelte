@@ -2,6 +2,7 @@
   import { browser } from "$app/environment";
   import { onMount, onDestroy } from "svelte";
   import { writeTerminal } from "$lib/scripts/req";
+  import { stripLogLevelBlocks } from "$lib/scripts/utils";
   import TerminalFinder from "$lib/components/ui/TerminalFinder.svelte";
   import { Maximize2, Minimize2 } from "lucide-svelte";
   import { t } from "$lib/scripts/i18n";
@@ -77,7 +78,7 @@
 
       html += `<div class="terminal-line-wrapper ${displayClass}" data-line="${lineNum}">
         <div class="terminal-line-number">${lineNum}</div>
-        <div class="terminal-line-content" onclick="window.toggleTerminalLine2(${lineNum})">${line}</div>
+        <div class="terminal-line-content" onclick="window.toggleTerminalLine2(${lineNum})">${stripLogLevelBlocks(line)}</div>
       </div>`;
     });
 

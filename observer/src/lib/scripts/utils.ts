@@ -50,6 +50,14 @@ if (total < 1024 * 100) { // For kilobytes (kB)
 
 }
 
+// Drops log-level blocks from a console line for display - "[Server thread/INFO]",
+// "[main/WARN]" and friends. A trailing ":" belongs to the block rather than the
+// message ("[Server thread/INFO]: Done" -> "Done"), so it goes too, along with
+// the single space that followed it.
+export function stripLogLevelBlocks(line: string) {
+  return line.replace(/\[[^[\]]*\/(?:INFO|WARN)\]:?[ \t]?/g, "");
+}
+
 export function handleDesc(desc: string, suffix: string = "") {
   let newDesc = desc;
         //change youtube.com to youtube-nocookie.com

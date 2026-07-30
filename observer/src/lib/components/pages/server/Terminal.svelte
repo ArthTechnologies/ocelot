@@ -7,7 +7,7 @@
     import TerminalFinder from "$lib/components/ui/TerminalFinder.svelte";
     import { t } from "$lib/scripts/i18n";
     import { readTerminal, writeTerminal } from "$lib/scripts/req";
-    import { alert } from "$lib/scripts/utils";
+    import { alert, stripLogLevelBlocks } from "$lib/scripts/utils";
     import { CopyIcon, SendIcon } from "lucide-svelte";
   
     
@@ -124,7 +124,7 @@ send(input);
 
       html += `<div class="terminal-line-wrapper ${displayClass}" data-line="${lineNum}">
         <div class="terminal-line-number">${lineNum}</div>
-        <div class="terminal-line-content" onclick="window.toggleTerminalLine(${lineNum})">${line}</div>
+        <div class="terminal-line-content" onclick="window.toggleTerminalLine(${lineNum})">${stripLogLevelBlocks(line)}</div>
       </div>`;
     });
 
