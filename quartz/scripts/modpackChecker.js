@@ -19,7 +19,7 @@ const GAME_VERSION = "1.18.2";
 // Forge is checked across every version people still run packs on. Top TOP_N
 // per version, so this is 5x the Forge work of a single-version run — see the
 // note on the weekly schedule in run.js.
-const FORGE_GAME_VERSIONS = ["1.18.2", "1.12.2", "1.20.1", "1.16.5", "1.19.2"];
+const FORGE_GAME_VERSIONS = ["1.18.2", "1.12.2", "1.20.1"];
 const TOP_N = 10;
 
 // CurseForge magic numbers: game 432 is Minecraft, class 4471 is Modpacks,
@@ -56,11 +56,7 @@ function emptyProgress() {
     startedAt: null,
     index: 0,
     total: 0,
-    current: null,
-    currentGameVersion: null,
-    currentLoader: null,
-    currentStartedAt: null,
-    attempt: 1,
+    currentPacks: [], // Array of up to 2 concurrent packs
     passed: 0,
     failed: 0,
     skipped: 0,
@@ -87,11 +83,16 @@ function log(message) {
   console.log("[ModpackCheck] " + message);
 }
 
-// The reserved slot. Kept clear of [idOffset, idOffset + maxServers), which is
+// The reserved slots (two for parallel checking). Kept clear of [idOffset, idOffset + maxServers), which is
 // the range /server/reserve hands out to customers.
 function checkServerId() {
   const configured = parseInt(config.modpackCheckServerId);
   return Number.isFinite(configured) ? configured : 50000;
+}
+
+function checkServerIds() {
+  const primary = checkServerId();
+  return [primary, primary + 1];
 }
 
 function slotIsSafe(id) {
@@ -560,7 +561,6 @@ async function checkOne(pack, id) {
     firstFailure = attempt.outcome.reason;
     log(`${pack.name}: attempt 1 failed (${firstFailure}) — retrying once.`);
     attempts = 2;
-    progress.attempt = 2;
     attempt = await runAttempt(pack, id);
   }
 
@@ -597,11 +597,11 @@ async function checkModpacks() {
     return readLog();
   }
 
-  const id = checkServerId();
-  if (!slotIsSafe(id)) {
+  const [id1, id2] = checkServerIds();
+  if (!slotIsSafe(id1) || !slotIsSafe(id2)) {
     log(
-      `Refusing to run: slot ${id} overlaps the customer id range or maps to an ` +
-        `invalid port. Set modpackCheckServerId in config.txt to a free id.`
+      `Refusing to run: slots ${id1} and ${id2} overlap the customer id range or map to ` +
+        `invalid ports. Set modpackCheckServerId in config.txt to a free id.`
     );
     return readLog();
   }
@@ -635,25 +635,33 @@ async function checkModpacks() {
     progress.total = packs.length;
 
     const results = [];
-    // Strictly one at a time: they share the slot, and a real pack needs the
-    // whole box to install.
-    for (const pack of packs) {
-      progress.index = results.length + 1;
-      progress.current = pack.name;
-      progress.currentGameVersion = pack.gameVersion || GAME_VERSION;
-      progress.currentLoader = pack.loader;
-      progress.currentStartedAt = Date.now();
-      progress.attempt = 1;
-      // Reset here so a pack that gets skipped doesn't leave the previous
-      // pack's phase showing.
+    // Process packs in parallel pairs: 2 at a time using separate slots.
+    // Split packs into pairs and check each pair concurrently.
+    for (let i = 0; i < packs.length; i += 2) {
+      const pair = [packs[i], packs[i + 1]].filter(Boolean);
       progress.phase = "checking";
+      progress.currentPacks = pair.map(p => ({
+        name: p.name,
+        gameVersion: p.gameVersion || GAME_VERSION,
+        loader: p.loader,
+        startedAt: Date.now()
+      }));
+      progress.index = i + 1;
 
-      const result = await checkOne(pack, id);
-      results.push(result);
+      // Run both packs in parallel using different slots
+      const checkPromises = pair.map((pack, idx) => {
+        const slotId = idx === 0 ? id1 : id2;
+        return checkOne(pack, slotId);
+      });
 
-      if (result.status === "passed") progress.passed++;
-      else if (result.status === "failed") progress.failed++;
-      else progress.skipped++;
+      const pairResults = await Promise.all(checkPromises);
+      results.push(...pairResults);
+
+      pairResults.forEach(result => {
+        if (result.status === "passed") progress.passed++;
+        else if (result.status === "failed") progress.failed++;
+        else progress.skipped++;
+      });
     }
 
     const data = {
