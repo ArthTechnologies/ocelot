@@ -7,7 +7,7 @@
     import TerminalFinder from "$lib/components/ui/TerminalFinder.svelte";
     import { t } from "$lib/scripts/i18n";
     import { readTerminal, writeTerminal } from "$lib/scripts/req";
-    import { alert, stripLogLevelBlocks } from "$lib/scripts/utils";
+    import { alert, groupStackFrames, stripLogLevelBlocks } from "$lib/scripts/utils";
     import { CopyIcon, SendIcon } from "lucide-svelte";
   
     
@@ -107,24 +107,34 @@ send(input);
     if (!lines) return;
 
     const lineArray = lines.split("\n").filter(line => line !== "");
+    const rows = groupStackFrames(lineArray);
 
     // On first render, collapse all lines by default
     if (collapsedLines.size === 0) {
-      for (let i = 1; i <= lineArray.length; i++) {
-        collapsedLines.add(i);
-      }
+      rows.forEach((row) => collapsedLines.add(row.lineNum));
     }
 
     let html = '<div class="terminal-output">';
 
-    lineArray.forEach((line, index) => {
-      const lineNum = index + 1;
+    rows.forEach((row) => {
+      const lineNum = row.lineNum;
       const isCollapsed = collapsedLines.has(lineNum);
       const displayClass = isCollapsed ? "terminal-line-collapsed" : "";
 
+      const frames = row.lines.map(stripLogLevelBlocks);
+      //while collapsed only the first frame is visible, so the rest of the
+      //trace is advertised on that line rather than below the fold
+      let content = frames[0];
+      if (frames.length > 1) {
+        if (isCollapsed) {
+          content += `<span class="terminal-frame-count">+${frames.length - 1} more</span>`;
+        }
+        content += "\n" + frames.slice(1).join("\n");
+      }
+
       html += `<div class="terminal-line-wrapper ${displayClass}" data-line="${lineNum}">
         <div class="terminal-line-number">${lineNum}</div>
-        <div class="terminal-line-content" onclick="window.toggleTerminalLine(${lineNum})">${stripLogLevelBlocks(line)}</div>
+        <div class="terminal-line-content" onclick="window.toggleTerminalLine(${lineNum})">${content}</div>
       </div>`;
     });
 
@@ -366,7 +376,29 @@ if (browser) {
     min-width: 0;
   }
 
+  :global(.terminal-frame-count) {
+    margin-left: 0.5rem;
+    padding: 0 0.35rem;
+    border-radius: 0.25rem;
+    font-size: 0.8em;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.55);
+
+    @media (prefers-color-scheme: light) {
+      background-color: rgba(0, 0, 0, 0.07);
+      color: rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  //the theme toggle stamps data-theme on :root, and it has to win over the
+  //prefers-color-scheme default above
+  :global(:root[data-theme="light"] .terminal-frame-count) {
+    background-color: rgba(0, 0, 0, 0.07);
+    color: rgba(0, 0, 0, 0.5);
+  }
+
   :root[data-theme="light"] {
+
     :global(.terminal-line-wrapper) {
       &:hover {
         background-color: rgba(0, 0, 0, 0.04);
