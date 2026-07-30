@@ -19,3 +19,4 @@ citresewn
 jecharacters
 justenoughcharacters
 imblocker
+notenoughanimations
