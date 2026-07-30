@@ -7,7 +7,8 @@
     import TerminalFinder from "$lib/components/ui/TerminalFinder.svelte";
     import { t } from "$lib/scripts/i18n";
     import { readTerminal, writeTerminal } from "$lib/scripts/req";
-    import { SendIcon } from "lucide-svelte";
+    import { alert } from "$lib/scripts/utils";
+    import { CopyIcon, SendIcon } from "lucide-svelte";
   
     
     export let id: number;
@@ -39,6 +40,52 @@ send(input);
         readCmd();
       }, 200);
   }
+  //data-lines holds the console text before the line-number markup is wrapped
+  //around it, so this copies what the server actually printed
+  function copyTerminal() {
+    const terminal = document.getElementById("terminal");
+    const text = terminal?.getAttribute("data-lines") || "";
+
+    if (text.trim() === "") {
+      alert("Nothing in the console to copy");
+      return;
+    }
+
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => alert("Console copied to clipboard", "success"),
+        () => fallbackCopy(text)
+      );
+    } else {
+      //a panel served over plain http has no navigator.clipboard at all
+      fallbackCopy(text);
+    }
+  }
+
+  function fallbackCopy(text: string) {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch (e) {
+      copied = false;
+    }
+    document.body.removeChild(area);
+
+    if (copied) {
+      alert("Console copied to clipboard", "success");
+    } else {
+      alert("Could not copy the console");
+    }
+  }
+
   let scrollCorrected = false;
   let collapsedLines = new Set();
 
@@ -217,7 +264,18 @@ if (browser) {
 </script>
 
 <div class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradientStroke" id="terminalContainerContainer">
-        <p class="font-ubuntu text-gray-200 text-lg ml-1 mb-2">Server Console</p>
+  <div class="flex items-center justify-between mb-2">
+    <p class="font-ubuntu text-gray-200 text-lg ml-1">Server Console</p>
+    <div class="tooltip tooltip-left" data-tip="Copy console">
+      <button
+        class="btn btn-ghost btn-sm btn-circle"
+        on:click={copyTerminal}
+        aria-label="Copy console to clipboard"
+      >
+        <CopyIcon size="16" />
+      </button>
+    </div>
+  </div>
   <div  class="relative mb-3 w-full ">
     <FullscreenTerminal />
     <TerminalFinder isVisible={showFinder} fullscreen={false} on:close={() => showFinder = false} />
