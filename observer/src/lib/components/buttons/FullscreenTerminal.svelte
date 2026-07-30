@@ -1,11 +1,14 @@
 <script>
   import { browser } from "$app/environment";
+  import { onMount } from "svelte";
   import { writeTerminal } from "$lib/scripts/req";
+  import TerminalFinder from "$lib/components/ui/TerminalFinder.svelte";
   import { Maximize2, Minimize2 } from "lucide-svelte";
   import { t } from "$lib/scripts/i18n";
   let id;
   let scrollCorrected = false;
   let isFocused = false;
+  let showFinder = false;
 
   if (browser) {
     id = localStorage.getItem("serverID");
@@ -56,6 +59,19 @@
 
     isFocused = !isFocused;
   }
+
+  function handleKeyDown(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+      e.preventDefault();
+      showFinder = true;
+    }
+  }
+
+  if (browser) {
+    onMount(() => {
+      window.addEventListener("keydown", handleKeyDown);
+    });
+  }
 </script>
 
 <label for="fullscreenTerminal"
@@ -73,6 +89,7 @@
 <div
   class="modal bg-base-100 h-screen w-screen max-sm:items-start items-center"
 >
+  <TerminalFinder isVisible={showFinder} fullscreen={true} on:close={() => showFinder = false} />
   <div class="flex flex-col space-y-3 items-center my-5 md:py-[2rem]">
     <div id="terminalContainerContainer2" class="relative">
       <div

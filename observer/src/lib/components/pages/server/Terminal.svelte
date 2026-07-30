@@ -4,6 +4,7 @@
 
     import { browser } from "$app/environment";
     import FullscreenTerminal from "$lib/components/buttons/FullscreenTerminal.svelte";
+    import TerminalFinder from "$lib/components/ui/TerminalFinder.svelte";
     import { t } from "$lib/scripts/i18n";
     import { readTerminal, writeTerminal } from "$lib/scripts/req";
     import { SendIcon } from "lucide-svelte";
@@ -148,11 +149,27 @@ function updateElementWidth() {
 </script>
 
 <script lang="ts">
-import { onMount } from "svelte";
-  if (browser) {
+import { onMount, onDestroy } from "svelte";
+
+let showFinder = false;
+
+function handleKeyDown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+    e.preventDefault();
+    showFinder = true;
+  }
+}
+
+if (browser) {
   onMount(() => {
     window.addEventListener("resize", updateElementWidth);
+    window.addEventListener("keydown", handleKeyDown);
     updateElementWidth(); // Initial call to set width on mount
+  });
+
+  onDestroy(() => {
+    window.removeEventListener("resize", updateElementWidth);
+    window.removeEventListener("keydown", handleKeyDown);
   });
 
 }
@@ -162,6 +179,7 @@ import { onMount } from "svelte";
         <p class="font-ubuntu text-gray-200 text-lg ml-1 mb-2">Server Console</p>
   <div  class="relative mb-3 w-full ">
     <FullscreenTerminal />
+    <TerminalFinder isVisible={showFinder} fullscreen={false} on:close={() => showFinder = false} />
     <div
       id="terminalContainer"
       class="bg-base-100 rounded-xl overflow-auto  h-[30rem] 2xl:h-[35rem] mb-2 "

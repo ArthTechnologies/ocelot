@@ -2,9 +2,12 @@
   import { getVersions } from "$lib/scripts/req";
 
   import ChooseVersionModpack from "$lib/components/ui/ChooseVersionModpack.svelte";
+  import CheckDetailsModal from "$lib/components/ui/CheckDetailsModal.svelte";
   import { browser } from "$app/environment";
   import { t } from "$lib/scripts/i18n";
-  import { AlertCircle, BadgeCheck, Download, ShieldCheck, ShieldX } from "lucide-svelte";
+  // lucide-svelte 0.263 names the shield-with-X icon ShieldClose; it was only
+  // renamed to ShieldX in later versions.
+  import { AlertCircle, BadgeCheck, Download, ShieldCheck, ShieldClose } from "lucide-svelte";
   import TranslateableText from "./TranslateableText.svelte";
   export let name: string;
   // Result of the automated boot check for this pack, or null when there isn't
@@ -19,6 +22,9 @@
   export let platform: string;
 
   export let slug: string;
+
+  let showCheckModal = false;
+
   let verified = false;
   switch (name) {
     case "The Pixelmon Modpack":
@@ -49,12 +55,6 @@
 
   const checkedWhen = (ts: number | undefined) =>
     ts ? new Date(ts).toLocaleString() : "unknown time";
-
-  // Both the reason and when it ran go in the tooltip — the badge itself stays
-  // to the two words an admin scans for.
-  $: checkTooltip = check
-    ? `${check.reason || ""} (checked ${checkedWhen(check.checkedAt)})`.trim()
-    : "";
 </script>
 
 <div class="bg-base-200 rounded-lg p-3">
@@ -141,20 +141,20 @@
             </div>
           {/if}
           {#if check && (check.status === "passed" || check.status === "failed")}
-            <div
-              class="tooltip tooltip-top text-left flex px-2 py-1 rounded-md place-items-center text-sm w-fit
+            <button
+              on:click={() => showCheckModal = true}
+              class="flex px-2 py-1 rounded-md place-items-center text-sm w-fit cursor-pointer transition-opacity hover:opacity-80
                 {check.status === 'passed'
                 ? 'bg-success text-success-content'
                 : 'bg-error text-error-content'}"
-              data-tip={checkTooltip}
             >
               {#if check.status === "passed"}
                 <ShieldCheck class="mr-1.5 shrink-0" size="16" />
               {:else}
-                <ShieldX class="mr-1.5 shrink-0" size="16" />
+                <ShieldClose class="mr-1.5 shrink-0" size="16" />
               {/if}
               Automated check {check.status}
-            </div>
+            </button>
           {/if}
         </div>
       </div>
@@ -170,3 +170,11 @@
     />
   </div>
 </div>
+
+{#if showCheckModal && check}
+  <CheckDetailsModal
+    {name}
+    {check}
+    on:close={() => showCheckModal = false}
+  />
+{/if}
