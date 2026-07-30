@@ -9,9 +9,20 @@
     import { readTerminal, writeTerminal } from "$lib/scripts/req";
     import { alert, groupStackFrames, stripLogLevelBlocks } from "$lib/scripts/utils";
     import { CopyIcon, SendIcon } from "lucide-svelte";
-  
-    
+
     export let id: number;
+
+    let condenseTimestamps = true;
+
+    function condenseTimestamp(timeStr: string): string {
+      return timeStr.replace(/\[(\d{1,2}):(\d{2}):(\d{2})\]/g, (_, hours, minutes) => {
+        const hour = parseInt(hours);
+        const min = minutes;
+        const period = hour >= 12 ? 'pm' : 'am';
+        const displayHour = hour % 12 || 12;
+        return `[${displayHour}:${min}${period}]`;
+      });
+    }
 
     if (browser	) {
         id = localStorage.getItem("serverID");
@@ -146,11 +157,18 @@ send(input);
       //while collapsed only the first frame is visible, so the rest of the
       //trace is advertised on that line rather than below the fold
       let content = frames[0];
+      if (condenseTimestamps) {
+        content = condenseTimestamp(content);
+      }
       if (frames.length > 1) {
         if (isCollapsed) {
           content += `<span class="terminal-frame-count">+${frames.length - 1} more</span>`;
         }
-        content += "\n" + frames.slice(1).join("\n");
+        let remainingFrames = frames.slice(1).join("\n");
+        if (condenseTimestamps) {
+          remainingFrames = condenseTimestamp(remainingFrames);
+        }
+        content += "\n" + remainingFrames;
       }
 
       html += `<div class="terminal-line-wrapper ${displayClass}" data-line="${lineNum}">
@@ -291,6 +309,7 @@ if (browser) {
     window.addEventListener("keydown", handleKeyDown);
     updateElementWidth(); // Initial call to set width on mount
     window.toggleTerminalLine = toggleLineCollapse;
+    (window as any).renderTerminalLines = renderTerminalLines;
 
     const terminalContainer = document.getElementById("terminalContainer");
     if (terminalContainer) {
@@ -316,6 +335,20 @@ if (browser) {
       <div class="flex items-center justify-center w-7 h-7 rounded-md bg-base-200/50">
         <div id="stickIndicatorDot" class="w-2 h-2 rounded-full transition-colors bg-white"></div>
       </div>
+      <label class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-base-200/50 cursor-pointer hover:bg-base-200/70 transition">
+        <input
+          type="checkbox"
+          bind:checked={condenseTimestamps}
+          on:change={() => {
+            const terminal = document.getElementById("terminal");
+            if (terminal) {
+              window.renderTerminalLines?.();
+            }
+          }}
+          class="checkbox checkbox-xs"
+        />
+        <span class="text-xs text-gray-300">Condense Timestamps</span>
+      </label>
       <div class="tooltip tooltip-left" data-tip="Copy console">
         <button
           class="btn btn-ghost btn-sm btn-circle"
