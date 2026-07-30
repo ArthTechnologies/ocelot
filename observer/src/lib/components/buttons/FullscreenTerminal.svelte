@@ -2,7 +2,7 @@
   import { browser } from "$app/environment";
   import { onMount, onDestroy } from "svelte";
   import { writeTerminal } from "$lib/scripts/req";
-  import { groupStackFrames, stripLogLevelBlocks } from "$lib/scripts/utils";
+  import { groupStackFrames, stripLogLevelBlocks, portal } from "$lib/scripts/utils";
   import TerminalFinder from "$lib/components/ui/TerminalFinder.svelte";
   import { Maximize2, Minimize2 } from "lucide-svelte";
   import { t } from "$lib/scripts/i18n";
@@ -148,41 +148,45 @@
   </div></label
 >
 
-<input
-  type="checkbox"
-  id="fullscreenTerminal"
-  class="modal-toggle"
-  on:click={correctScroll}
-/>
-<div
-  class="modal bg-base-100 h-screen w-screen max-sm:items-start items-center"
->
-  <TerminalFinder isVisible={showFinder} fullscreen={true} on:close={() => showFinder = false} />
-  <div class="flex flex-col space-y-3 items-center my-5 md:py-[2rem]">
-    <div id="terminalContainerContainer2" class="relative">
-      <div
-        id="terminalContainer2"
-        class="p-5 bg-base-100 rounded-xl shadow-xl overflow-auto h-[80vh] md:h-[85vh] rounded-xl w-[90vw] z-[999]"
-      >
-        <label
-          for="fullscreenTerminal"
-          class="btn btn-neutral btn-sm btn-circle absolute right-2 top-2"
-          ><Minimize2 size="17" /></label
+{#if browser}
+<div use:portal>
+  <input
+    type="checkbox"
+    id="fullscreenTerminal"
+    class="modal-toggle"
+    on:click={correctScroll}
+  />
+  <div
+    class="modal bg-base-100 h-screen w-screen max-sm:items-start items-center"
+  >
+    <TerminalFinder isVisible={showFinder} fullscreen={true} on:close={() => showFinder = false} />
+    <div class="flex flex-col space-y-3 items-center my-5 md:py-[2rem]">
+      <div id="terminalContainerContainer2" class="relative">
+        <div
+          id="terminalContainer2"
+          class="p-5 bg-base-100 rounded-xl shadow-xl overflow-auto h-[80vh] md:h-[85vh] rounded-xl w-[90vw] z-[999]"
         >
-        <div class=" sm:text-xs xl:text-base font-mono">
-          <p id="terminal2" />
+          <label
+            for="fullscreenTerminal"
+            class="btn btn-neutral btn-sm btn-circle absolute right-2 top-2"
+            ><Minimize2 size="17" /></label
+          >
+          <div class=" sm:text-xs xl:text-base font-mono">
+            <p id="terminal2" />
+          </div>
         </div>
       </div>
+      <input
+        on:keypress={writeCmd}
+        id="input2"
+        type="text"
+        placeholder={$t("p.enterCommand")}
+        class="input input-secondary bg-base-200 w-full"
+      />
     </div>
-    <input
-      on:keypress={writeCmd}
-      id="input2"
-      type="text"
-      placeholder={$t("p.enterCommand")}
-      class="input input-secondary bg-base-200 w-full"
-    />
   </div>
 </div>
+{/if}
 
 <style lang="scss">
   :global(.terminal-output) {

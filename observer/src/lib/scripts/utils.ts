@@ -16,6 +16,18 @@ export function fileSizeShort(bytes: number) {
   return `${(bytes / 1000000000).toFixed(1)}gB`;
 }
 
+// Moves the node (and its children) to document.body on mount, so fixed-position
+// modals nested inside a `.neutralGradientStroke` card escape that ancestor's
+// z-index stacking context instead of being trapped beneath sibling cards.
+export function portal(node: HTMLElement) {
+  document.body.appendChild(node);
+  return {
+    destroy() {
+      node.parentNode?.removeChild(node);
+    }
+  };
+}
+
 export function includesAny(str:string, substrings:string[]) {
   return substrings.some(substring => str.indexOf(substring) !== -1);
 }
