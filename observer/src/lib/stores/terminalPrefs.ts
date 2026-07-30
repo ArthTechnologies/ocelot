@@ -20,4 +20,4 @@ function persistedBoolean(key: string, defaultValue: boolean): Writable<boolean>
 
 export const condenseTimestamps = persistedBoolean("terminalCondenseTimestamps", true);
 export const groupSimilarLines = persistedBoolean("terminalGroupSimilarLines", true);
-export const showLineNumbers = persistedBoolean("terminalShowLineNumbers", true);
+export const showLineNumbers = persistedBoolean("terminalShowLineNumbers", false);

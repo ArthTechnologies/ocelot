@@ -3,6 +3,7 @@
   import { onMount, onDestroy } from "svelte";
   import { writeTerminal } from "$lib/scripts/req";
   import { groupStackFrames, stripLogLevelBlocks, portal } from "$lib/scripts/utils";
+  import { condenseTimestamps, groupSimilarLines, showLineNumbers } from "$lib/stores/terminalPrefs";
   import TerminalFinder from "$lib/components/ui/TerminalFinder.svelte";
   import { Maximize2, Minimize2 } from "lucide-svelte";
   import { t } from "$lib/scripts/i18n";
@@ -12,8 +13,28 @@
   let showFinder = false;
   let collapsedLines2 = new Set();
 
+  /** @param {string} timeStr */
+  function condenseTimestamp(timeStr) {
+    return timeStr.replace(/\[(\d{1,2}):(\d{2}):(\d{2})\]/g, (/** @type {string} */ _, /** @type {string} */ hours, /** @type {string} */ minutes) => {
+      const hour = parseInt(hours);
+      const min = minutes;
+      const period = hour >= 12 ? 'pm' : 'am';
+      const displayHour = hour % 12 || 12;
+      return `[${displayHour}:${min}${period}]`;
+    });
+  }
+
   if (browser) {
     id = localStorage.getItem("serverID");
+  }
+
+  // Keeps the fullscreen terminal in sync with the same preferences used by
+  // the inline terminal - re-render whenever a toggle changes.
+  $: if (browser) {
+    $condenseTimestamps;
+    $groupSimilarLines;
+    $showLineNumbers;
+    renderTerminalLines2();
   }
   function writeCmd(event) {
     //take input value
@@ -61,7 +82,12 @@
     if (!lines) return;
 
     const lineArray = lines.split("\n").filter(line => line !== "");
-    const rows = groupStackFrames(lineArray);
+    const shouldGroup = $groupSimilarLines;
+    const shouldCondense = $condenseTimestamps;
+    const shouldShowLineNumbers = $showLineNumbers;
+    const rows = shouldGroup
+      ? groupStackFrames(lineArray)
+      : lineArray.map((line, index) => ({ lineNum: index + 1, lines: [line] }));
 
     // On first render, collapse all lines by default
     if (collapsedLines2.size === 0) {
@@ -79,15 +105,26 @@
       //while collapsed only the first frame is visible, so the rest of the
       //trace is advertised on that line rather than below the fold
       let content = frames[0];
+      if (shouldCondense) {
+        content = condenseTimestamp(content);
+      }
       if (frames.length > 1) {
         if (isCollapsed) {
           content += `<span class="terminal-frame-count">+${frames.length - 1} more</span>`;
         }
-        content += "\n" + frames.slice(1).join("\n");
+        let remainingFrames = frames.slice(1).join("\n");
+        if (shouldCondense) {
+          remainingFrames = condenseTimestamp(remainingFrames);
+        }
+        content += "\n" + remainingFrames;
       }
 
+      const lineNumberHtml = shouldShowLineNumbers
+        ? `<div class="terminal-line-number">${lineNum}</div>`
+        : "";
+
       html += `<div class="terminal-line-wrapper ${displayClass}" data-line="${lineNum}">
-        <div class="terminal-line-number">${lineNum}</div>
+        ${lineNumberHtml}
         <div class="terminal-line-content" onclick="window.toggleTerminalLine2(${lineNum})">${content}</div>
       </div>`;
     });

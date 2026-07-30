@@ -413,7 +413,7 @@ if (browser) {
       id="terminalContainer"
       class="bg-base-100 rounded-xl overflow-auto  h-[30rem] 2xl:h-[35rem] mb-2 "
     >
-      <div class="pl-1 pr-4 py-5 text-[14px] font-mono relative ">
+      <div class="{$showLineNumbers ? 'pl-1' : 'pl-4'} pr-4 py-5 text-[14px] font-mono relative ">
         <p id="terminal" />
       </div>
     </div>
@@ -434,6 +434,24 @@ if (browser) {
 </div>
 
 <style lang="scss">
+  .terminal-prefs-dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 30;
+    width: 14rem;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--fallback-b2, oklch(var(--b2)));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+    @media (prefers-color-scheme: light) {
+      border-color: rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  }
+
   :global(.terminal-output) {
     display: flex;
     flex-direction: column;
