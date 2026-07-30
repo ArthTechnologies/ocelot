@@ -86,6 +86,7 @@
   let port = 10000;
   let id = 0;
   let desc: string = "";
+  let rawDesc: string = "";
   let email: string = "";
   let state = "false";
 
@@ -177,6 +178,7 @@
         .then((response) => response.json())
         .then((data) => {
           document.getElementById("rawDesc").innerText = data.desc;
+          rawDesc = data.desc;
           //displays bold, italic formatings
           //removes all other formating codes
           desc = data.desc
@@ -484,7 +486,7 @@
       </div>
     </div>
 
-    <div class="flex gap-1.5 hidden md:flex scale-95 w-[20rem]">
+    <div class="flex gap-1.5 hidden lg:flex scale-95 w-[20rem]">
          
 
           {#await memoryReq}
@@ -520,7 +522,7 @@
 
   <!-- Start Bottom Section-->
   <div
-    class="md:space-x-7 flex xs:flex-col-reverse max-xl:flex-col max-xl:items-center gap-0 justify-between md:px-5"
+    class="md:space-x-7 flex xs:flex-col-reverse max-lg:flex-col max-lg:items-center gap-0 justify-between md:px-5"
   >
     <!-- Start Left Side-->
     <div class="flex flex-col space-y-3 w-full">
@@ -585,10 +587,10 @@
     <!-- End Left Side-->
     <!-- Start Right Side-->
     <div
-      class="flex flex-col items-center place-content-start mb-20 md:pl-0 mt-[3.75rem] gap-5 w-full md:w-[19.75rem]"
+      class="flex flex-col items-center place-content-start mb-20 lg:pl-0 mt-[3.75rem] gap-5 w-full lg:w-[18.5rem] xl:w-[19.75rem]"
     >
       <div class="space-y-5 w-full">
-    <ServerInfo {name} {address} {port} {subdomain} {modded} {geyser} />
+    <ServerInfo {name} {address} {port} {subdomain} {modded} {geyser} description={rawDesc} />
 
     <PlayerList {id}/>
       </div>

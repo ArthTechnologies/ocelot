@@ -7,7 +7,7 @@
     getServerNode,
   } from "$lib/scripts/req";
   import { t } from "$lib/scripts/i18n";
-  import { ClipboardList, Info, AlertCircle } from "lucide-svelte";
+  import { ClipboardList, Info, AlertCircle, AlertCircleIcon, AlertOctagonIcon, InfoIcon } from "lucide-svelte";
   import { onMount } from "svelte";
   import { alert } from "$lib/scripts/utils";
   import DeleteServer from "$lib/components/ui/DeleteServer.svelte";
@@ -21,6 +21,8 @@
   let fSecret = "";
   let proxiesEnabled = false;
   let activeSection = "general";
+  let iconUploadState = 0;
+  let iconUploadData: string;
 
   let software: string;
   let name: string;
@@ -246,6 +248,58 @@
         alert("Error: " + err);
       });
   }
+
+  function handleIconFileChange() {
+    const fileInput = document.getElementById("iconFileUpload") as HTMLInputElement;
+    if (fileInput?.files?.length > 0) {
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        iconUploadData = e.target?.result as string;
+        img.onload = function () {
+          if (img.width !== 64 || img.height !== 64) {
+            iconUploadState = 1;
+          } else {
+            iconUploadState = 2;
+          }
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function uploadIconFile() {
+    const fileInput = document.getElementById("iconFileUpload") as HTMLInputElement;
+    if (fileInput?.files?.length > 0) {
+      const file = fileInput.files[0];
+      const formData = new FormData();
+      formData.append("file", file);
+      fetch(apiurl + "server/" + id + "/settings/icon", {
+        method: "POST",
+        body: formData,
+        headers: {
+          token: localStorage.getItem("token"),
+          username: localStorage.getItem("accountEmail"),
+        },
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.msg.includes("Success")) {
+            iconPreview = iconUploadData;
+            iconUploadState = 0;
+            fileInput.value = "";
+            alert("Image uploaded successfully", "success");
+          } else {
+            alert(data.error || "Failed to upload icon", "error");
+          }
+        })
+        .catch((err) => {
+          alert("Error uploading icon: " + err, "error");
+        });
+    }
+  }
 </script>
 
 <SettingsLayout bind:activeSection>
@@ -351,6 +405,42 @@
             placeholder={$t("settings.p.enterURL")}
           />
           <img src={iconPreview} alt="Server icon preview" class="h-12 w-12 rounded-lg object-cover" />
+        </div>
+
+        <!-- File Upload Section -->
+        <div class="divider my-3"></div>
+        <div class="space-y-3">
+          <h4 class="text-sm font-semibold">Or upload from file</h4>
+          <input
+            id="iconFileUpload"
+            type="file"
+            on:change={handleIconFileChange}
+            class="file-input file-input-bordered w-full"
+            accept="image/*"
+          />
+
+          {#if iconUploadState === 1}
+            <div class="bg-error rounded-lg text-white p-4 py-1.5 flex items-center space-x-2">
+              <AlertCircleIcon size="20" />
+              <span class="text-sm">Please convert your image to 64x64 pixels.</span>
+            </div>
+          {:else if iconUploadState === 2}
+            <div class="bg-success rounded-lg text-white p-4 py-1.5 flex items-center space-x-2">
+              <AlertOctagonIcon size="20" />
+              <span class="text-sm">Image is valid</span>
+            </div>
+          {:else if iconUploadState === 0 && (document.getElementById("iconFileUpload") as HTMLInputElement)?.files?.length}
+            <div class="bg-info rounded-lg text-white p-4 py-1.5 flex items-center space-x-2">
+              <InfoIcon size="20" />
+              <span class="text-sm">Upload a 64x64 image</span>
+            </div>
+          {/if}
+
+          {#if (document.getElementById("iconFileUpload") as HTMLInputElement)?.files?.length}
+            <button class="btn btn-primary w-full" on:click={uploadIconFile}>
+              Upload Icon
+            </button>
+          {/if}
         </div>
       </div>
     </div>

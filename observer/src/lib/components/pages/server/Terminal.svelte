@@ -249,7 +249,7 @@ send(input);
     ratio = 0.0000905 * screenWidth + 0.37665;
   }
 
-  return ratio * screenWidth;
+  return ratio * screenWidth + 40;
 }
 
 function updateElementWidth() {
@@ -334,7 +334,7 @@ if (browser) {
       id="terminalContainer"
       class="bg-base-100 rounded-xl overflow-auto  h-[30rem] 2xl:h-[35rem] mb-2 "
     >
-      <div class="pl-1 pr-4 py-5 text-sm xl:text-[1rem] font-mono relative ">
+      <div class="pl-1 pr-4 py-5 text-[14px] font-mono relative ">
         <p id="terminal" />
       </div>
     </div>
