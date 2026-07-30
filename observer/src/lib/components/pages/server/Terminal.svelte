@@ -40,11 +40,53 @@ send(input);
       }, 200);
   }
   let scrollCorrected = false;
+  let collapsedLines = new Set();
+
+  function toggleLineCollapse(lineNum) {
+    if (collapsedLines.has(lineNum)) {
+      collapsedLines.delete(lineNum);
+    } else {
+      collapsedLines.add(lineNum);
+    }
+    collapsedLines = collapsedLines;
+    renderTerminalLines();
+  }
+
+  function renderTerminalLines() {
+    const terminal = document.getElementById("terminal");
+    if (!terminal) return;
+
+    const lines = terminal.getAttribute("data-lines") || "";
+    if (!lines) return;
+
+    const lineArray = lines.split("\n").filter(line => line !== "");
+
+    // On first render, collapse all lines by default
+    if (collapsedLines.size === 0) {
+      for (let i = 1; i <= lineArray.length; i++) {
+        collapsedLines.add(i);
+      }
+    }
+
+    let html = '<div class="terminal-output">';
+
+    lineArray.forEach((line, index) => {
+      const lineNum = index + 1;
+      const isCollapsed = collapsedLines.has(lineNum);
+      const displayClass = isCollapsed ? "terminal-line-collapsed" : "";
+
+      html += `<div class="terminal-line-wrapper ${displayClass}" data-line="${lineNum}">
+        <div class="terminal-line-number">${lineNum}</div>
+        <div class="terminal-line-content" onclick="window.toggleTerminalLine(${lineNum})">${line}</div>
+      </div>`;
+    });
+
+    html += "</div>";
+    terminal.innerHTML = html;
+  }
+
   export function readCmd() {
-
-
     if (browser) {
-
       readTerminal(id).then((response) => {
         let difference = 0;
 
@@ -52,47 +94,42 @@ send(input);
         const terminal = document.getElementById("terminal");
         const filteredResponse = response
           .replace(/\x1B\[[0-9;]*[mG]/g, "")
-          .replace(/\n/g, "<p>");
+          .replace(/\n/g, "<LINEBREAK>");
 
-        //response replace newlines with <p>, remove things that start with [ and end with m
-        if (response.length < 100000) {
-          terminalContainer.scrollTop +=
-            50 *
-            (filteredResponse.split("<p>").length -
-              terminal.innerHTML.split("<p>").length);
+        if (response.length < 1000000) {
+          const oldLineCount = (terminal.getAttribute("data-lines") || "").split("\n").length;
+          const newLineCount = filteredResponse.split("<LINEBREAK>").length;
+
+          terminalContainer.scrollTop += 50 * (newLineCount - oldLineCount);
+
           if (
-            filteredResponse.length - terminal.innerHTML.length !=
+            filteredResponse.length - (terminal.getAttribute("data-lines") || "").length !=
             difference
           ) {
-            difference = filteredResponse.length - terminal.innerHTML.length;
-
-            terminal.innerHTML = filteredResponse;
+            difference = filteredResponse.length - (terminal.getAttribute("data-lines") || "").length;
+            terminal.setAttribute("data-lines", filteredResponse.replace(/<LINEBREAK>/g, "\n"));
+            renderTerminalLines();
           }
         } else {
-          terminalContainer.scrollTop +=
-            50 *
-            (filteredResponse
-              .substring(filteredResponse.length - 100000)
-              .split("<p>").length -
-              terminal.innerHTML.split("<p>").length);
-          terminal.innerHTML = filteredResponse.substring(
-            filteredResponse.length - 100000,
+          const truncated = filteredResponse.substring(
+            filteredResponse.length - 1000000,
           );
+          const oldLineCount = (terminal.getAttribute("data-lines") || "").split("\n").length;
+          const newLineCount = truncated.split("<LINEBREAK>").length;
+
+          terminalContainer.scrollTop += 50 * (newLineCount - oldLineCount);
+          terminal.setAttribute("data-lines", truncated.replace(/<LINEBREAK>/g, "\n"));
+          renderTerminalLines();
         }
 
         //scroll down the height of the new lines added
-        if (
-          terminal.innerHTML.split("<p>").length <
-          filteredResponse.split("<p>").length
-        ) {
-          //adding to scrollTop doesn't get it to the complete bottom,
-          //so this remedies that by snapping it to the bottom if needed.
+        const lineCount = (terminal.getAttribute("data-lines") || "").split("\n").length;
+        if (lineCount > 0) {
           let difference =
             terminalContainer.scrollHeight - terminalContainer.scrollTop;
           const terminalContainerContainer = document.getElementById(
             "terminalContainerContainer",
           );
-          console.log(difference, terminalContainerContainer?.clientHeight);
           if (difference <= terminalContainerContainer?.clientHeight) {
             setTimeout(() => {
               terminalContainer.scrollTop = terminalContainer.scrollHeight;
@@ -103,7 +140,6 @@ send(input);
         //if this is the first time the terminal is loaded, this will scroll to the bottom.
         if (scrollCorrected == false) {
           terminalContainer.scrollTop = terminalContainer.scrollHeight;
-
           scrollCorrected = true;
         }
       });
@@ -165,11 +201,13 @@ if (browser) {
     window.addEventListener("resize", updateElementWidth);
     window.addEventListener("keydown", handleKeyDown);
     updateElementWidth(); // Initial call to set width on mount
+    window.toggleTerminalLine = toggleLineCollapse;
   });
 
   onDestroy(() => {
     window.removeEventListener("resize", updateElementWidth);
     window.removeEventListener("keydown", handleKeyDown);
+    delete window.toggleTerminalLine;
   });
 
 }
@@ -203,3 +241,80 @@ if (browser) {
 
 </div>
 </div>
+
+<style lang="scss">
+  :global(.terminal-output) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.terminal-line-wrapper) {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.25rem 0;
+    margin: 0;
+    border-radius: 0.375rem;
+    transition: background-color 0.15s ease;
+    cursor: pointer;
+    position: relative;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    @media (prefers-color-scheme: light) {
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+      }
+    }
+  }
+
+  :global(.terminal-line-wrapper.terminal-line-collapsed) {
+    max-height: 1.5em;
+    overflow: hidden;
+    opacity: 0.6;
+
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+
+  :global(.terminal-line-number) {
+    flex-shrink: 0;
+    width: 3.5rem;
+    text-align: right;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: 600;
+    font-size: 0.875em;
+    font-family: monospace;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding-right: 0.75rem;
+    user-select: none;
+
+    @media (prefers-color-scheme: light) {
+      color: rgba(0, 0, 0, 0.35);
+      border-right-color: rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  :global(.terminal-line-content) {
+    flex: 1;
+    word-break: break-word;
+    white-space: pre-wrap;
+    min-width: 0;
+  }
+
+  :root[data-theme="light"] {
+    :global(.terminal-line-wrapper) {
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+      }
+    }
+
+    :global(.terminal-line-number) {
+      color: rgba(0, 0, 0, 0.35);
+      border-right-color: rgba(0, 0, 0, 0.1);
+    }
+  }
+</style>

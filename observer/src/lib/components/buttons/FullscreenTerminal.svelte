@@ -9,6 +9,7 @@
   let scrollCorrected = false;
   let isFocused = false;
   let showFinder = false;
+  let collapsedLines2 = new Set();
 
   if (browser) {
     id = localStorage.getItem("serverID");
@@ -33,22 +34,56 @@
       const terminalContainer2 = document.getElementById("terminalContainer2");
       const terminal = document.getElementById("terminal");
       const terminal2 = document.getElementById("terminal2");
-      if (terminal2 != null) {
-        //scroll down the height of the new lines added
-        if (
-          terminal2.innerHTML.split("<p>").length <
-          terminal.innerHTML.split("<p>").length
-        ) {
+      if (terminal2 != null && terminal != null) {
+        const terminal2Lines = (terminal2.getAttribute("data-lines") || "").split("\n").length;
+        const terminalLines = (terminal.getAttribute("data-lines") || "").split("\n").length;
+
+        if (terminal2Lines < terminalLines) {
           terminalContainer2.scrollTop +=
-            12 *
-            (terminal.innerHTML.split("<p>").length -
-              terminal2.innerHTML.split("<p>").length);
+            12 * (terminalLines - terminal2Lines);
         }
-        document.getElementById("terminal2").innerHTML =
-          document.getElementById("terminal").innerHTML;
+
+        const dataLines = terminal.getAttribute("data-lines");
+        if (dataLines && terminal2.getAttribute("data-lines") !== dataLines) {
+          terminal2.setAttribute("data-lines", dataLines);
+          renderTerminalLines2();
+        }
       }
     }
   }, 100);
+
+  function renderTerminalLines2() {
+    const terminal2 = document.getElementById("terminal2");
+    if (!terminal2) return;
+
+    const lines = terminal2.getAttribute("data-lines") || "";
+    if (!lines) return;
+
+    const lineArray = lines.split("\n").filter(line => line !== "");
+
+    // On first render, collapse all lines by default
+    if (collapsedLines2.size === 0) {
+      for (let i = 1; i <= lineArray.length; i++) {
+        collapsedLines2.add(i);
+      }
+    }
+
+    let html = '<div class="terminal-output">';
+
+    lineArray.forEach((line, index) => {
+      const lineNum = index + 1;
+      const isCollapsed = collapsedLines2.has(lineNum);
+      const displayClass = isCollapsed ? "terminal-line-collapsed" : "";
+
+      html += `<div class="terminal-line-wrapper ${displayClass}" data-line="${lineNum}">
+        <div class="terminal-line-number">${lineNum}</div>
+        <div class="terminal-line-content" onclick="window.toggleTerminalLine2(${lineNum})">${line}</div>
+      </div>`;
+    });
+
+    html += "</div>";
+    terminal2.innerHTML = html;
+  }
 
   function correctScroll() {
     const terminalContainer2 = document.getElementById("terminalContainer2");
@@ -67,9 +102,20 @@
     }
   }
 
+  function toggleLineCollapse2(lineNum) {
+    if (collapsedLines2.has(lineNum)) {
+      collapsedLines2.delete(lineNum);
+    } else {
+      collapsedLines2.add(lineNum);
+    }
+    collapsedLines2 = collapsedLines2;
+    renderTerminalLines2();
+  }
+
   if (browser) {
     onMount(() => {
       window.addEventListener("keydown", handleKeyDown);
+      window.toggleTerminalLine2 = toggleLineCollapse2;
     });
   }
 </script>
@@ -115,3 +161,80 @@
     />
   </div>
 </div>
+
+<style lang="scss">
+  :global(.terminal-output) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.terminal-line-wrapper) {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.25rem 0;
+    margin: 0;
+    border-radius: 0.375rem;
+    transition: background-color 0.15s ease;
+    cursor: pointer;
+    position: relative;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    @media (prefers-color-scheme: light) {
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+      }
+    }
+  }
+
+  :global(.terminal-line-wrapper.terminal-line-collapsed) {
+    max-height: 1.5em;
+    overflow: hidden;
+    opacity: 0.6;
+
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+
+  :global(.terminal-line-number) {
+    flex-shrink: 0;
+    width: 3.5rem;
+    text-align: right;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: 600;
+    font-size: 0.875em;
+    font-family: monospace;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding-right: 0.75rem;
+    user-select: none;
+
+    @media (prefers-color-scheme: light) {
+      color: rgba(0, 0, 0, 0.35);
+      border-right-color: rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  :global(.terminal-line-content) {
+    flex: 1;
+    word-break: break-word;
+    white-space: pre-wrap;
+    min-width: 0;
+  }
+
+  :root[data-theme="light"] {
+    :global(.terminal-line-wrapper) {
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+      }
+    }
+
+    :global(.terminal-line-number) {
+      color: rgba(0, 0, 0, 0.35);
+      border-right-color: rgba(0, 0, 0, 0.1);
+    }
+  }
+</style>
