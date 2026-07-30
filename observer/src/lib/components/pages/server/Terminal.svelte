@@ -89,6 +89,27 @@ send(input);
   let scrollCorrected = false;
   let collapsedLines = new Set();
 
+  // Whether the container's scroll position is at (or within a few px of) the
+  // bottom. Must be checked against the scrollable element itself, not an
+  // ancestor - an ancestor's clientHeight includes the header/input chrome
+  // too, which makes the threshold too generous and reports "at bottom" even
+  // when scrolled well up.
+  function isNearBottom(container: HTMLElement, threshold = 10) {
+    return container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
+  }
+
+  // Written straight to the DOM rather than to a Svelte-bound variable: this
+  // block and the onMount below sit in two different <script> tags (module vs
+  // instance context), and reassigning a module-context variable never
+  // triggers a re-render - the indicator would just freeze at its first value.
+  function updateStickIndicator(atBottom: boolean) {
+    const dot = document.getElementById("stickIndicatorDot");
+    if (dot) {
+      dot.classList.toggle("bg-white", atBottom);
+      dot.classList.toggle("bg-gray-500", !atBottom);
+    }
+  }
+
   function toggleLineCollapse(lineNum) {
     if (collapsedLines.has(lineNum)) {
       collapsedLines.delete(lineNum);
@@ -149,6 +170,14 @@ send(input);
 
         const terminalContainer = document.getElementById("terminalContainer");
         const terminal = document.getElementById("terminal");
+        if (!terminalContainer || !terminal) return;
+
+        // Must be read before anything below moves the scrollbar - the nudges
+        // further down used to run unconditionally on every poll, which kept
+        // dragging scrollTop back down even right after the user scrolled up,
+        // so this check never had a chance to see "scrolled away" for long.
+        const wasAtBottom = isNearBottom(terminalContainer);
+
         const filteredResponse = response
           .replace(/\x1B\[[0-9;]*[mG]/g, "")
           .replace(/\n/g, "<LINEBREAK>");
@@ -157,7 +186,9 @@ send(input);
           const oldLineCount = (terminal.getAttribute("data-lines") || "").split("\n").length;
           const newLineCount = filteredResponse.split("<LINEBREAK>").length;
 
-          terminalContainer.scrollTop += 50 * (newLineCount - oldLineCount);
+          if (wasAtBottom) {
+            terminalContainer.scrollTop += 50 * (newLineCount - oldLineCount);
+          }
 
           if (
             filteredResponse.length - (terminal.getAttribute("data-lines") || "").length !=
@@ -174,24 +205,20 @@ send(input);
           const oldLineCount = (terminal.getAttribute("data-lines") || "").split("\n").length;
           const newLineCount = truncated.split("<LINEBREAK>").length;
 
-          terminalContainer.scrollTop += 50 * (newLineCount - oldLineCount);
+          if (wasAtBottom) {
+            terminalContainer.scrollTop += 50 * (newLineCount - oldLineCount);
+          }
           terminal.setAttribute("data-lines", truncated.replace(/<LINEBREAK>/g, "\n"));
           renderTerminalLines();
         }
 
-        //scroll down the height of the new lines added
-        const lineCount = (terminal.getAttribute("data-lines") || "").split("\n").length;
-        if (lineCount > 0) {
-          let difference =
-            terminalContainer.scrollHeight - terminalContainer.scrollTop;
-          const terminalContainerContainer = document.getElementById(
-            "terminalContainerContainer",
-          );
-          if (difference <= terminalContainerContainer?.clientHeight) {
-            setTimeout(() => {
-              terminalContainer.scrollTop = terminalContainer.scrollHeight;
-            }, 1);
-          }
+        // Only follow new output down if the user was already at the bottom -
+        // otherwise leave their scroll position exactly where they put it.
+        if (wasAtBottom) {
+          setTimeout(() => {
+            terminalContainer.scrollTop = terminalContainer.scrollHeight;
+            updateStickIndicator(true);
+          }, 1);
         }
 
         //if this is the first time the terminal is loaded, this will scroll to the bottom.
@@ -199,6 +226,8 @@ send(input);
           terminalContainer.scrollTop = terminalContainer.scrollHeight;
           scrollCorrected = true;
         }
+
+        updateStickIndicator(wasAtBottom);
       });
     }
   }
@@ -262,6 +291,13 @@ if (browser) {
     window.addEventListener("keydown", handleKeyDown);
     updateElementWidth(); // Initial call to set width on mount
     window.toggleTerminalLine = toggleLineCollapse;
+
+    const terminalContainer = document.getElementById("terminalContainer");
+    if (terminalContainer) {
+      terminalContainer.addEventListener("scroll", () => {
+        updateStickIndicator(isNearBottom(terminalContainer));
+      });
+    }
   });
 
   onDestroy(() => {
@@ -276,14 +312,19 @@ if (browser) {
 <div class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradientStroke" id="terminalContainerContainer">
   <div class="flex items-center justify-between mb-2">
     <p class="font-ubuntu text-gray-200 text-lg ml-1">Server Console</p>
-    <div class="tooltip tooltip-left" data-tip="Copy console">
-      <button
-        class="btn btn-ghost btn-sm btn-circle"
-        on:click={copyTerminal}
-        aria-label="Copy console to clipboard"
-      >
-        <CopyIcon size="16" />
-      </button>
+    <div class="flex items-center gap-3">
+      <div class="flex items-center justify-center w-7 h-7 rounded-md bg-base-200/50">
+        <div id="stickIndicatorDot" class="w-2 h-2 rounded-full transition-colors bg-white"></div>
+      </div>
+      <div class="tooltip tooltip-left" data-tip="Copy console">
+        <button
+          class="btn btn-ghost btn-sm btn-circle"
+          on:click={copyTerminal}
+          aria-label="Copy console to clipboard"
+        >
+          <CopyIcon size="16" />
+        </button>
+      </div>
     </div>
   </div>
   <div  class="relative mb-3 w-full ">
