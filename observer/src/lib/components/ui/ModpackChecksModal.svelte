@@ -66,13 +66,20 @@
     return `${s}s`;
   }
 
-  const results = () => (data?.results || []) as any[];
+  // `results` must stay a reactive declaration, not a plain function: Svelte's
+  // `$:` dependency tracking only sees identifiers literally referenced in a
+  // statement, so a `$: counts = { ... results() ... }` block calling a
+  // separately-defined `const results = () => data?.results` never reruns
+  // when `data` changes — it only "depends on" `results`, which is never
+  // reassigned. Declaring `results` itself with `$:` makes it a real
+  // dependency that downstream reactive statements correctly pick up.
+  $: results = (data?.results || []) as any[];
 
   $: counts = {
-    all: results().length,
-    passed: results().filter((r) => r.status === "passed").length,
-    failed: results().filter((r) => r.status === "failed").length,
-    skipped: results().filter((r) => r.status === "skipped").length,
+    all: results.length,
+    passed: results.filter((r) => r.status === "passed").length,
+    failed: results.filter((r) => r.status === "failed").length,
+    skipped: results.filter((r) => r.status === "skipped").length,
   };
 
   $: filters = [
@@ -84,7 +91,7 @@
 
   // One section per loader + game version, in the order the checker ran them.
   $: groups = (() => {
-    const shown = results().filter((r) => filter === "all" || r.status === filter);
+    const shown = results.filter((r) => filter === "all" || r.status === filter);
     const map = new Map<string, any[]>();
     for (const r of shown) {
       const key = `${r.loader || "?"} ${r.gameVersion || data?.gameVersion || "?"}`;
