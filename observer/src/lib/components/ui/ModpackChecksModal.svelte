@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
-  import { getModpackChecks } from "$lib/scripts/req";
+  import { getModpackChecks, runModpackCheck, runOneModpackCheck } from "$lib/scripts/req";
   import {
     X,
     RefreshCw,
@@ -10,6 +10,8 @@
     ChevronDown,
     ChevronRight,
     Loader,
+    Play,
+    RotateCw,
   } from "lucide-svelte";
 
   const dispatch = createEventDispatcher();
@@ -20,6 +22,9 @@
   let filter = "all";
   let expanded: string | null = null;
   let pollTimer: any = null;
+  let starting = false; // "Run Check" clicked, waiting on the start response
+  let recheckingKey: string | null = null; // rowKey mid single-pack recheck
+  let actionError = "";
 
   // While a run is in flight the endpoint is the only window into it, so poll.
   // A run takes hours, so 5s is plenty.
@@ -35,8 +40,48 @@
     }
     loading = false;
 
+    // Both a full run and a single-pack recheck share the backend's `running`
+    // flag, so once it drops there's nothing left in flight to track locally.
+    if (!data?.running) {
+      recheckingKey = null;
+      starting = false;
+    }
+
     clearTimeout(pollTimer);
     if (data?.running) pollTimer = setTimeout(load, POLL_MS);
+  }
+
+  async function startFullCheck() {
+    if (starting || data?.running) return;
+    starting = true;
+    actionError = "";
+    const res = await runModpackCheck();
+    if (!res || res.ok === false) {
+      actionError = res?.error || "Couldn't start the check.";
+      starting = false;
+      return;
+    }
+    load();
+  }
+
+  async function recheckPack(row: any) {
+    if (data?.running || recheckingKey) return;
+    recheckingKey = rowKey(row);
+    actionError = "";
+    const res = await runOneModpackCheck({
+      platform: row.platform,
+      projectId: row.projectId,
+      gameVersion: row.gameVersion,
+      loader: row.loader,
+      name: row.name,
+      slug: row.slug,
+    });
+    if (!res || res.ok === false) {
+      actionError = res?.error || "Couldn't start the recheck.";
+      recheckingKey = null;
+      return;
+    }
+    load();
   }
 
   onMount(() => {
@@ -142,6 +187,19 @@
         </p>
       </div>
       <div class="flex items-center gap-1">
+        <button
+          class="btn btn-primary btn-sm gap-1.5"
+          disabled={starting || data?.running}
+          on:click={startFullCheck}
+          title="Run a full modpack check now"
+        >
+          {#if starting || data?.running}
+            <Loader size={14} class="animate-spin" />
+          {:else}
+            <Play size={14} />
+          {/if}
+          Run Check
+        </button>
         <button class="btn btn-ghost btn-sm btn-circle" on:click={load} title="Refresh">
           <RefreshCw size={16} />
         </button>
@@ -157,6 +215,9 @@
 
     <!-- Body -->
     <div class="overflow-y-auto px-6 py-5 flex flex-col gap-5">
+      {#if actionError}
+        <div class="alert alert-error bg-error/10 border border-error/30 text-sm">{actionError}</div>
+      {/if}
       {#if loading}
         <div class="flex items-center gap-3 text-base-content/60">
           <span class="loading loading-spinner loading-md text-primary"></span>
@@ -203,8 +264,7 @@
           <div class="text-base-content/60 text-sm py-8 text-center">
             No checks have completed yet.
             {#if !data?.running}
-              Run <code class="px-1">checkModpacks</code> in the panel console, or wait for the
-              weekly run.
+              Click <span class="font-medium">Run Check</span> above, or wait for the weekly run.
             {/if}
           </div>
         {:else}
@@ -297,10 +357,24 @@
                       <tr>
                         <td colspan="6" class="bg-base-200/40">
                           <div class="text-xs space-y-2 py-1">
-                            <div class="flex flex-wrap gap-x-6 gap-y-1 text-base-content/60">
-                              <span>Checked {when(row.checkedAt)}</span>
-                              <span>{row.platform === "cf" ? "CurseForge" : "Modrinth"} · {row.projectId}</span>
-                              {#if row.slug}<span>{row.slug}</span>{/if}
+                            <div class="flex items-center justify-between gap-3 flex-wrap">
+                              <div class="flex flex-wrap gap-x-6 gap-y-1 text-base-content/60">
+                                <span>Checked {when(row.checkedAt)}</span>
+                                <span>{row.platform === "cf" ? "CurseForge" : "Modrinth"} · {row.projectId}</span>
+                                {#if row.slug}<span>{row.slug}</span>{/if}
+                              </div>
+                              <button
+                                class="btn btn-xs btn-ghost bg-base-200 gap-1.5"
+                                disabled={data?.running || !!recheckingKey}
+                                on:click|stopPropagation={() => recheckPack(row)}
+                                title="Re-check just this pack"
+                              >
+                                {#if recheckingKey === rowKey(row)}
+                                  <Loader size={12} class="animate-spin" /> Rechecking…
+                                {:else}
+                                  <RotateCw size={12} /> Recheck
+                                {/if}
+                              </button>
                             </div>
                             {#if row.mods?.manifest}
                               <div class="text-base-content/60">

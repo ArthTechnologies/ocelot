@@ -57,6 +57,42 @@ router.get("/modpack-checks", (req, res) => {
   }
 });
 
+// Kick off a full modpack check on demand — the same job the weekly cron runs.
+// Fire-and-forget: a run boots ~60 packs and can take hours, so the response
+// only confirms it started. The frontend polls GET /admin/modpack-checks for
+// `running`/`progress`, exactly like it does for the scheduled run.
+router.post("/modpack-checks/run", (req, res) => {
+  const modpackChecker = require("../scripts/modpackChecker.js");
+  if (modpackChecker.isRunning()) {
+    return res.status(409).json({ error: "A modpack check is already running." });
+  }
+  modpackChecker
+    .checkModpacks()
+    .catch((err) => console.log("Modpack check failed: " + err.message));
+  res.json({ started: true });
+});
+
+// Re-check a single pack from the completed report (the "recheck" button on a
+// result row) instead of re-running the whole batch. Body identifies the pack
+// the same way a result row does: platform, projectId, gameVersion, plus
+// loader/name/slug carried through from the row for display while it runs.
+router.post("/modpack-checks/run-one", (req, res) => {
+  const modpackChecker = require("../scripts/modpackChecker.js");
+  const { platform, projectId, gameVersion, loader, name, slug } = req.body || {};
+
+  if (!platform || projectId === undefined || projectId === null || !gameVersion) {
+    return res.status(400).json({ error: "platform, projectId and gameVersion are required" });
+  }
+  if (modpackChecker.isRunning()) {
+    return res.status(409).json({ error: "A modpack check is already running." });
+  }
+
+  modpackChecker
+    .checkOneModpack({ platform, projectId, gameVersion, loader, name, slug })
+    .catch((err) => console.log("Modpack recheck failed: " + err.message));
+  res.json({ started: true });
+});
+
 // Get system tasks
 router.get("/system-tasks", (req, res) => {
   try {

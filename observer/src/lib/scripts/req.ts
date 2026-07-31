@@ -468,6 +468,50 @@ export function getModpackChecks() {
     .catch(() => null);
 }
 
+// Starts a full modpack check on demand (the same job the weekly cron runs).
+// Fire-and-forget on the backend — call getModpackChecks() / poll it to watch
+// progress. Resolves to the parsed error body on failure (e.g. already
+// running) so the caller can show why nothing started, or null on a network error.
+export function runModpackCheck() {
+  if (!browser) return Promise.resolve(null);
+
+  return fetch(apiurl + "admin/modpack-checks/run", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      token: localStorage.getItem("token") || "",
+      username: localStorage.getItem("accountEmail") || "",
+    },
+  })
+    .then(async (res) => ({ ok: res.ok, ...(await res.json().catch(() => ({}))) }))
+    .catch(() => null);
+}
+
+// Re-checks a single pack from a completed report row instead of the whole
+// batch — pass the row's platform/projectId/gameVersion/loader/name/slug.
+export function runOneModpackCheck(pack: {
+  platform: string;
+  projectId: string | number;
+  gameVersion: string;
+  loader?: string;
+  name?: string;
+  slug?: string;
+}) {
+  if (!browser) return Promise.resolve(null);
+
+  return fetch(apiurl + "admin/modpack-checks/run-one", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      token: localStorage.getItem("token") || "",
+      username: localStorage.getItem("accountEmail") || "",
+    },
+    body: JSON.stringify(pack),
+  })
+    .then(async (res) => ({ ok: res.ok, ...(await res.json().catch(() => ({}))) }))
+    .catch(() => null);
+}
+
 // Curated list of Forge-only CurseForge modpacks, keyed by numeric CF mod id.
 // The version picker uses this to treat a version with no loader tag as Forge
 // when the pack itself is known Forge-only (RLCraft's newest release does

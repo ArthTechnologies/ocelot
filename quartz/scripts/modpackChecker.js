@@ -170,6 +170,68 @@ async function fetchJson(url, headers = {}) {
 
 // ---------------------------------------------------------------- discovery
 
+// Resolves one CurseForge mod entry {id, name, slug} to a checkable pack for a
+// given game version, or an `unavailable` placeholder. Split out of
+// topForgeModpacks so a single-pack recheck (checkOneModpack) can reuse the
+// exact same file/download-url resolution instead of re-searching CurseForge.
+async function resolveForgePack(mod, gameVersion) {
+  const apiKey = config.curseforgeKey;
+  try {
+    let filesResponse = await fetchJson(
+      `https://api.curseforge.com/v1/mods/${mod.id}/files` +
+        `?gameVersion=${gameVersion}&modLoaderType=${CF_LOADER_FORGE}&pageSize=10`,
+      { "x-api-key": apiKey }
+    );
+
+    let file = (filesResponse.data || [])[0];
+    // The loader filter above depends on the file being tagged with a
+    // loader, which isn't guaranteed (see FORGE_ONLY_PATH comment above) —
+    // for packs we've confirmed are Forge-only, fall back to the newest
+    // file for the version instead of reporting the pack unavailable.
+    if (!file && isForgeOnlyModpack(mod.id)) {
+      filesResponse = await fetchJson(
+        `https://api.curseforge.com/v1/mods/${mod.id}/files?gameVersion=${gameVersion}&pageSize=1`,
+        { "x-api-key": apiKey }
+      );
+      file = (filesResponse.data || [])[0];
+    }
+    if (!file) {
+      return unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
+        `No ${gameVersion} Forge file published.`);
+    }
+
+    // Authors can forbid third-party downloads, which blanks downloadUrl.
+    let downloadUrl = file.downloadUrl;
+    if (!downloadUrl) {
+      const direct = await fetchJson(
+        `https://api.curseforge.com/v1/mods/${mod.id}/files/${file.id}/download-url`,
+        { "x-api-key": apiKey }
+      );
+      downloadUrl = direct.data;
+    }
+    if (!downloadUrl) {
+      return unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
+        "Author disabled third-party downloads.");
+    }
+
+    return {
+      platform: "cf",
+      projectId: mod.id,
+      name: mod.name,
+      slug: mod.slug,
+      loader: "forge",
+      software: "forge",
+      gameVersion,
+      versionId: file.id,
+      versionName: file.displayName,
+      downloadUrl,
+    };
+  } catch (err) {
+    return unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
+      `Lookup failed: ${err.message}`);
+  }
+}
+
 // Top Forge packs by total downloads for one game version, newest usable file
 // each. Called once per entry in FORGE_GAME_VERSIONS — the ranking is per
 // version, so each list is the top packs people actually run on that version.
@@ -191,70 +253,46 @@ async function topForgeModpacks(gameVersion) {
 
   const packs = [];
   for (const mod of search.data || []) {
-    try {
-      let filesResponse = await fetchJson(
-        `https://api.curseforge.com/v1/mods/${mod.id}/files` +
-          `?gameVersion=${gameVersion}&modLoaderType=${CF_LOADER_FORGE}&pageSize=10`,
-        { "x-api-key": apiKey }
-      );
-
-      let file = (filesResponse.data || [])[0];
-      // The loader filter above depends on the file being tagged with a
-      // loader, which isn't guaranteed (see FORGE_ONLY_PATH comment above) —
-      // for packs we've confirmed are Forge-only, fall back to the newest
-      // file for the version instead of reporting the pack unavailable.
-      if (!file && isForgeOnlyModpack(mod.id)) {
-        filesResponse = await fetchJson(
-          `https://api.curseforge.com/v1/mods/${mod.id}/files?gameVersion=${gameVersion}&pageSize=1`,
-          { "x-api-key": apiKey }
-        );
-        file = (filesResponse.data || [])[0];
-      }
-      if (!file) {
-        packs.push(
-          unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
-            `No ${gameVersion} Forge file published.`)
-        );
-        continue;
-      }
-
-      // Authors can forbid third-party downloads, which blanks downloadUrl.
-      let downloadUrl = file.downloadUrl;
-      if (!downloadUrl) {
-        const direct = await fetchJson(
-          `https://api.curseforge.com/v1/mods/${mod.id}/files/${file.id}/download-url`,
-          { "x-api-key": apiKey }
-        );
-        downloadUrl = direct.data;
-      }
-      if (!downloadUrl) {
-        packs.push(
-          unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
-            "Author disabled third-party downloads.")
-        );
-        continue;
-      }
-
-      packs.push({
-        platform: "cf",
-        projectId: mod.id,
-        name: mod.name,
-        slug: mod.slug,
-        loader: "forge",
-        software: "forge",
-        gameVersion,
-        versionId: file.id,
-        versionName: file.displayName,
-        downloadUrl,
-      });
-    } catch (err) {
-      packs.push(
-        unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
-          `Lookup failed: ${err.message}`)
-      );
-    }
+    packs.push(await resolveForgePack(mod, gameVersion));
   }
   return packs;
+}
+
+// Resolves one Modrinth project hit {project_id, title, slug} to a checkable
+// pack for a given game version, or an `unavailable` placeholder. Split out
+// of topFabricModpacks for the same reason as resolveForgePack above.
+async function resolveFabricPack(hit, gameVersion) {
+  const base = (config.labrinthUrl || "https://api.modrinth.com/v2/").replace(/\/?$/, "/");
+  try {
+    const versions = await fetchJson(
+      `${base}project/${hit.project_id}/version` +
+        `?game_versions=${encodeURIComponent(`["${gameVersion}"]`)}` +
+        `&loaders=${encodeURIComponent('["fabric"]')}`
+    );
+
+    const version = (versions || [])[0];
+    const file = version && (version.files.find((f) => f.primary) || version.files[0]);
+    if (!file) {
+      return unavailable("mr", hit.project_id, hit.title, hit.slug, "fabric", gameVersion,
+        `No ${gameVersion} Fabric file published.`);
+    }
+
+    return {
+      platform: "mr",
+      projectId: hit.project_id,
+      name: hit.title,
+      slug: hit.slug,
+      loader: "fabric",
+      software: "fabric",
+      gameVersion,
+      versionId: version.id,
+      versionName: version.version_number,
+      downloadUrl: file.url,
+    };
+  } catch (err) {
+    return unavailable("mr", hit.project_id, hit.title, hit.slug, "fabric", gameVersion,
+      `Lookup failed: ${err.message}`);
+  }
 }
 
 // Top Fabric packs for this version on Modrinth.
@@ -270,41 +308,7 @@ async function topFabricModpacks() {
 
   const packs = [];
   for (const hit of search.hits || []) {
-    try {
-      const versions = await fetchJson(
-        `${base}project/${hit.project_id}/version` +
-          `?game_versions=${encodeURIComponent(`["${GAME_VERSION}"]`)}` +
-          `&loaders=${encodeURIComponent('["fabric"]')}`
-      );
-
-      const version = (versions || [])[0];
-      const file = version && (version.files.find((f) => f.primary) || version.files[0]);
-      if (!file) {
-        packs.push(
-          unavailable("mr", hit.project_id, hit.title, hit.slug, "fabric", GAME_VERSION,
-            `No ${GAME_VERSION} Fabric file published.`)
-        );
-        continue;
-      }
-
-      packs.push({
-        platform: "mr",
-        projectId: hit.project_id,
-        name: hit.title,
-        slug: hit.slug,
-        loader: "fabric",
-        software: "fabric",
-        gameVersion: GAME_VERSION,
-        versionId: version.id,
-        versionName: version.version_number,
-        downloadUrl: file.url,
-      });
-    } catch (err) {
-      packs.push(
-        unavailable("mr", hit.project_id, hit.title, hit.slug, "fabric", GAME_VERSION,
-          `Lookup failed: ${err.message}`)
-      );
-    }
+    packs.push(await resolveFabricPack(hit, GAME_VERSION));
   }
   return packs;
 }
@@ -734,8 +738,79 @@ function isRunning() {
   return running;
 }
 
+// Re-runs a single pack the admin already sees in the report — identified by
+// platform+projectId+gameVersion — without kicking off a full batch. The
+// caller (the admin "recheck" button) already has the row from the last
+// checkModpacks run, so name/slug are passed through rather than re-fetched;
+// only the file/download-url lookup is redone, since that's the part that
+// actually goes stale between runs.
+//
+// Shares the `running` flag with checkModpacks so the two can't stomp on the
+// same reserved slot, and uses only the primary slot (id1) rather than the
+// pair checkModpacks uses for its parallel packs.
+async function checkOneModpack({ platform, projectId, gameVersion, loader, name, slug }) {
+  if (running) {
+    throw new Error("A modpack check is already running.");
+  }
+
+  const id = checkServerId();
+  if (!slotIsSafe(id)) {
+    throw new Error(
+      `Refusing to run: slot ${id} overlaps the customer id range or maps to an invalid port.`
+    );
+  }
+
+  running = true;
+  resetProgress();
+  progress.running = true;
+  progress.phase = "checking";
+  progress.startedAt = Date.now();
+  progress.total = 1;
+  progress.currentPacks = [{ name, gameVersion, loader, startedAt: Date.now() }];
+
+  try {
+    let pack;
+    if (platform === "cf") {
+      pack = await resolveForgePack({ id: projectId, name, slug }, gameVersion);
+    } else if (platform === "mr") {
+      pack = await resolveFabricPack({ project_id: projectId, title: name, slug }, gameVersion);
+    } else {
+      throw new Error(`Unknown platform "${platform}".`);
+    }
+
+    const result = await checkOne(pack, id);
+
+    const data = readLog();
+    const existingIndex = data.results.findIndex(
+      (r) =>
+        r.platform === platform &&
+        String(r.projectId) === String(projectId) &&
+        r.gameVersion === gameVersion
+    );
+    if (existingIndex === -1) data.results.push(result);
+    else data.results[existingIndex] = result;
+
+    data.passed = data.results.filter((r) => r.status === "passed").length;
+    data.failed = data.results.filter((r) => r.status === "failed").length;
+    data.skipped = data.results.filter((r) => r.status === "skipped").length;
+    data.gameVersions = [...new Set(data.results.map((r) => r.gameVersion).filter(Boolean))];
+    writeLog(data);
+
+    progress.index = 1;
+    if (result.status === "passed") progress.passed++;
+    else if (result.status === "failed") progress.failed++;
+    else progress.skipped++;
+
+    return result;
+  } finally {
+    running = false;
+    resetProgress();
+  }
+}
+
 module.exports = {
   checkModpacks,
+  checkOneModpack,
   readLog,
   isRunning,
   getProgress,
