@@ -1397,7 +1397,36 @@ function writeTerminal(id, cmd) {
   console.log("[" + timestamp + "] writing to terminal: " + cmd);
   eventEmitter.emit("writeCmd:" + id);
 }
-function downloadModpack(id, modpackURL, modpackID, versionID) {
+// Runs `worker` over `items` with at most `limit` in flight at once. `limit`
+// defaults to Infinity (start everything at once) so normal customer installs
+// keep their existing behavior — only callers that pass a real cap (the
+// modpack checker) are throttled. Workers here never reject, so this only
+// needs to track completion, not success/failure.
+function runLimited(items, limit, worker) {
+  return new Promise((resolve) => {
+    if (items.length === 0) return resolve();
+    let index = 0;
+    let inFlight = 0;
+    let completed = 0;
+
+    function startNext() {
+      while (inFlight < limit && index < items.length) {
+        const item = items[index++];
+        inFlight++;
+        worker(item).then(() => {
+          inFlight--;
+          completed++;
+          if (completed === items.length) resolve();
+          else startNext();
+        });
+      }
+    }
+
+    startNext();
+  });
+}
+
+function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Infinity) {
   const folder = "servers/" + id;
 
   // Every mod below is fetched with `curl -o <folder>/mods/<name>.jar`, and
@@ -1429,7 +1458,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID) {
                     );
 
                     //for each file in modpack.files, download it
-                    const modDownloads = [];
+                    const modFilesToDownload = [];
                     for (let i in modpack.files) {
                       //if the prefixhas a backslash, convert it to slash, as backslashes are ignored in linux
                       if (modpack.files[i].path.includes("\\")) {
@@ -1439,27 +1468,22 @@ function downloadModpack(id, modpackURL, modpackID, versionID) {
                         );
                       }
 
-
                       if (modpack.files[i].path.includes("mods/")) {
-                        modDownloads.push(
-                          new Promise((resolve) => {
-                            files.downloadAsync(
-                                    folder +
-                                        "/mods/lr_" +
-                                        modpack.files[i].downloads[0].split("data/")[1].split("/versions")[0] + "_" +
-                                        modpack.files[i].path.split("mods/")[1].split(".jar")[0].replace("_", "-").replace(" ", "-")+".jar",
-                            modpack.files[i].downloads[0],
-                            () => resolve()
-                          );
-                          })
-                        );
-                    }
-
+                        modFilesToDownload.push(modpack.files[i]);
+                      }
                     }
                     //don't scan/filter mods or hand back control until every mod
                     //download above has actually finished writing to disk
-                    //(allSettled so one bad/malformed entry can't skip this step)
-                    Promise.allSettled(modDownloads).then(() => {
+                    runLimited(modFilesToDownload, concurrency, (file) => new Promise((resolve) => {
+                      files.downloadAsync(
+                              folder +
+                                  "/mods/lr_" +
+                                  file.downloads[0].split("data/")[1].split("/versions")[0] + "_" +
+                                  file.path.split("mods/")[1].split(".jar")[0].replace("_", "-").replace(" ", "-")+".jar",
+                      file.downloads[0],
+                      () => resolve()
+                    );
+                    })).then(() => {
                     //copy override mods over one again since sometimes it doesnt work
                     execSync(
                       "cp -r " + folder + "/overrides/* " + folder + "/"
@@ -1554,45 +1578,38 @@ function downloadModpack(id, modpackURL, modpackID, versionID) {
                     modpack = JSON.parse(
                       fs.readFileSync(folder + "/curseforge.index.json")
                     );
-                    const modDownloads = [];
-                    for (let i in modpack.files) {
-                      let projectID = modpack.files[i].projectID;
-                      let fileID = modpack.files[i].fileID;
-                      console.log(projectID + " " + fileID);
-                      modDownloads.push(
-                        new Promise((resolve) => {
-                          exec(
-                            `curl -X GET "https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}/download-url" -H 'x-api-key: ${apiKey}'`,
-                            (error, stdout, stderr) => {
-                              if (stdout != undefined) {
-                                try {
-                                  files.downloadAsync(
-                                    folder +
-                                      "/mods/cf_" +
-                                      projectID +
-                                      "_CFMod.jar",
-                                    JSON.parse(stdout).data,
-                                    () => resolve()
-                                  );
-                                } catch {
-                                  console.log(
-                                    "error parsing json for " + projectID
-                                  );
-                                  resolve();
-                                }
-                              } else {
-                                resolve();
-                              }
-                            }
-                          );
-                        })
-                      );
-                    }
                     console.log("modpackID:" + modpackID);
                     //don't scan/filter mods or clean up until every mod
                     //download above has actually finished writing to disk
-                    //(allSettled so one bad/malformed entry can't skip this step)
-                    Promise.allSettled(modDownloads).then(() => {
+                    runLimited(modpack.files, concurrency, (file) => new Promise((resolve) => {
+                      let projectID = file.projectID;
+                      let fileID = file.fileID;
+                      console.log(projectID + " " + fileID);
+                      exec(
+                        `curl -X GET "https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}/download-url" -H 'x-api-key: ${apiKey}'`,
+                        (error, stdout, stderr) => {
+                          if (stdout != undefined) {
+                            try {
+                              files.downloadAsync(
+                                folder +
+                                  "/mods/cf_" +
+                                  projectID +
+                                  "_CFMod.jar",
+                                JSON.parse(stdout).data,
+                                () => resolve()
+                              );
+                            } catch {
+                              console.log(
+                                "error parsing json for " + projectID
+                              );
+                              resolve();
+                            }
+                          } else {
+                            resolve();
+                          }
+                        }
+                      );
+                    })).then(() => {
                     //add in modpackID so that it frontends can check for updates later
                     modpack.projectID = modpackID;
                     modpack.platform = "cf";

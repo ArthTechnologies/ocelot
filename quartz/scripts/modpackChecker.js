@@ -62,6 +62,13 @@ const POLL_MS = 2000;
 // so wait slightly longer than that before deleting the slot out from under a
 // container that's still shutting down.
 const KILL_SETTLE_MS = 3000;
+// downloadModpack() fires every mod's download unbounded by default, which for
+// a few-hundred-mod pack means that many simultaneous CurseForge API calls on
+// one shared key — the checker runs two packs at once on top of that, so
+// without a cap the burst is large enough to get rate-limited/dropped mid-pack,
+// leaving a pack looking broken when it isn't. Customer-triggered installs
+// don't pass this and stay unbounded.
+const MOD_DOWNLOAD_CONCURRENCY = Number(config.modpackCheckDownloadConcurrency) || 8;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -494,7 +501,7 @@ async function runAttempt(pack, id) {
     // Install first, boot second — see waitForModpackInstall for why these
     // can't be left to overlap the way run() would do it.
     progress.phase = "downloading";
-    mc().downloadModpack(id, pack.downloadUrl, pack.projectId, pack.versionId);
+    mc().downloadModpack(id, pack.downloadUrl, pack.projectId, pack.versionId, MOD_DOWNLOAD_CONCURRENCY);
     const installed = await waitForModpackInstall(id, pack);
 
     if (!installed.ok) {
