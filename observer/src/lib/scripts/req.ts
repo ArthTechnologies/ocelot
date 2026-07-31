@@ -468,6 +468,27 @@ export function getModpackChecks() {
     .catch(() => null);
 }
 
+// Curated list of Forge-only CurseForge modpacks, keyed by numeric CF mod id.
+// The version picker uses this to treat a version with no loader tag as Forge
+// when the pack itself is known Forge-only (RLCraft's newest release does
+// this). Public endpoint, cached for the session since the list is static.
+let forgeOnlyModpackIds: number[] | null = null;
+export function getForgeOnlyModpackIds() {
+  if (!browser) return Promise.resolve([]);
+  if (forgeOnlyModpackIds) return Promise.resolve(forgeOnlyModpackIds);
+
+  return fetch(apiurl + "curseforge/forgeonly", {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  })
+    .then((res) => (res.ok ? res.json() : []))
+    .then((data) => {
+      forgeOnlyModpackIds = Array.isArray(data) ? data.map((pack) => pack.id) : [];
+      return forgeOnlyModpackIds;
+    })
+    .catch(() => []);
+}
+
 export function getServers(em: string) {
   if(browser) {
   let url =

@@ -59,6 +59,16 @@ Router.get("/search", (req, res) => {
   }
 });
 
+// Curated list of Forge-only modpacks (see modpackChecker.js) — the frontend's
+// version picker uses this to treat an untagged file as Forge-compatible when
+// the pack itself is known Forge-only, instead of shunting it into the
+// "no software specified" section. Not behind verifyAdmin: every user picking
+// a modpack version needs this, not just admins.
+Router.get("/forgeonly", (req, res) => {
+  const modpackChecker = require("../scripts/modpackChecker.js");
+  res.json(modpackChecker.getForgeOnlyModpacks());
+});
+
 Router.get("/:id", (req, res) => {
   if (apiKey != "") {
     let id = req.params.id;

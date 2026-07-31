@@ -30,6 +30,26 @@ const CF_MODPACK_CLASS = 4471;
 const CF_LOADER_FORGE = 1;
 const CF_SORT_DOWNLOADS = 6;
 
+// Curated list of packs independently confirmed to be Forge-only (see
+// scripts/cf_forge_only generation notes) — CurseForge doesn't always tag a
+// pack's newest file with a loader (RLCraft's latest release has shipped
+// without one), which both this discovery step and the frontend's version
+// picker rely on. Used as a trusted override wherever that tag is missing.
+const FORGE_ONLY_PATH = "assets/forgeonlymodpacks.json";
+
+function getForgeOnlyModpacks() {
+  try {
+    const data = JSON.parse(fs.readFileSync(FORGE_ONLY_PATH, "utf8"));
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function isForgeOnlyModpack(cfId) {
+  return getForgeOnlyModpacks().some((pack) => pack.id === cfId);
+}
+
 // A pack has to install a loader, generate a world and reach "Done" — slow
 // packs on a cold cache genuinely take this long.
 const START_TIMEOUT_MS = Number(config.modpackCheckTimeoutMs) || 8 * 60 * 1000;
@@ -165,13 +185,24 @@ async function topForgeModpacks(gameVersion) {
   const packs = [];
   for (const mod of search.data || []) {
     try {
-      const filesResponse = await fetchJson(
+      let filesResponse = await fetchJson(
         `https://api.curseforge.com/v1/mods/${mod.id}/files` +
           `?gameVersion=${gameVersion}&modLoaderType=${CF_LOADER_FORGE}&pageSize=10`,
         { "x-api-key": apiKey }
       );
 
-      const file = (filesResponse.data || [])[0];
+      let file = (filesResponse.data || [])[0];
+      // The loader filter above depends on the file being tagged with a
+      // loader, which isn't guaranteed (see FORGE_ONLY_PATH comment above) —
+      // for packs we've confirmed are Forge-only, fall back to the newest
+      // file for the version instead of reporting the pack unavailable.
+      if (!file && isForgeOnlyModpack(mod.id)) {
+        filesResponse = await fetchJson(
+          `https://api.curseforge.com/v1/mods/${mod.id}/files?gameVersion=${gameVersion}&pageSize=1`,
+          { "x-api-key": apiKey }
+        );
+        file = (filesResponse.data || [])[0];
+      }
       if (!file) {
         packs.push(
           unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
@@ -704,4 +735,6 @@ module.exports = {
   LOG_PATH,
   GAME_VERSION,
   FORGE_GAME_VERSIONS,
+  getForgeOnlyModpacks,
+  isForgeOnlyModpack,
 };

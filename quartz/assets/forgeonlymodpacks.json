@@ -1,0 +1,429 @@
+[
+  {
+    "id": 285109,
+    "slug": "rlcraft",
+    "name": "RLCraft",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 389615,
+    "slug": "the-pixelmon-modpack",
+    "name": "The Pixelmon Modpack",
+    "gameVersions": [
+      "1.20.1",
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 876781,
+    "slug": "better-mc-forge-bmc4",
+    "name": "Better MC [FORGE] BMC4",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 715572,
+    "slug": "all-the-mods-9",
+    "name": "All the Mods 9 - ATM9",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 829758,
+    "slug": "dawn-craft",
+    "name": "DawnCraft - Echoes of Legends",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 490660,
+    "slug": "deceasedcraft",
+    "name": "DeceasedCraft - Urban Zombie Apocalypse",
+    "gameVersions": [
+      "1.18.2",
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 682001,
+    "slug": "cursed-walking-a-modern-zombie-apocalypse",
+    "name": "Cursed Walking - A Modern Zombie Apocalypse",
+    "gameVersions": [
+      "1.18.2",
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 289267,
+    "slug": "roguelike-adventures-and-dungeons",
+    "name": "Roguelike Adventures and Dungeons",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 268208,
+    "slug": "sevtech-ages",
+    "name": "SevTech: Ages",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 952976,
+    "slug": "cave-horror-project",
+    "name": "Cave Horror Project 1 - Best Horror Modpack with Quests!",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 711537,
+    "slug": "vault-hunters-1-18-2",
+    "name": "Vault Hunters Third Edition",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 349129,
+    "slug": "minecraft-eternal",
+    "name": "MC  Eternal",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 445369,
+    "slug": "zombie-apocalypse-slow-zombies-by-forge-labs",
+    "name": "Mustard Virus by Forge Labs",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 256289,
+    "slug": "project-ozone-3-a-new-way-forward",
+    "name": "Project Ozone 3 A New Way Forward",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 269708,
+    "slug": "all-the-mods-3",
+    "name": "All the Mods 3 - ATM3",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 1134605,
+    "slug": "beyond-depth",
+    "name": "Beyond Depth",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 426926,
+    "slug": "all-the-mods-7",
+    "name": "All the Mods 7 - ATM7",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 967745,
+    "slug": "all-the-mods-9-to-the-sky",
+    "name": "All the Mods 9 - To the Sky - atm9sky",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 643605,
+    "slug": "steam-punk",
+    "name": "SteamPunk [LPS]",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 887839,
+    "slug": "fear-nightfall",
+    "name": "Fear Nightfall: Remains of Chaos",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 936875,
+    "slug": "craft-to-exile-2",
+    "name": "Craft to Exile 2 (VR Support)",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 482878,
+    "slug": "better-mc-forge-bmc2",
+    "name": "Better MC [FORGE] BMC2",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 281999,
+    "slug": "ftb-presents-direwolf20-1-12",
+    "name": "FTB Presents Direwolf20 1.12",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 527180,
+    "slug": "insanecraft-modpack",
+    "name": "InsaneCraft Modpack",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 655739,
+    "slug": "all-the-mods-7-to-the-sky",
+    "name": "All the Mods 7 - To the Sky - atm7sky",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 274563,
+    "slug": "hexxit-updated",
+    "name": "Hexxit Updated",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 1040332,
+    "slug": "lucky-world-invasion",
+    "name": "Lucky World Invasion",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 407010,
+    "slug": "pokehaan-craft",
+    "name": "Pokehaan Craft",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 1003933,
+    "slug": "rlcraft-dregora",
+    "name": "RLCraft Dregora",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 913090,
+    "slug": "zjjk",
+    "name": "Zeefski Jujutsu Kaisen Craft",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 1354886,
+    "slug": "nightfallcraft-the-casket-of-reveries",
+    "name": "NightfallCraft - The Casket of Reveries",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 486883,
+    "slug": "kimetsu-no-yaiba-demon-slayer-mod-pack",
+    "name": "Kimetsu no Yaiba (Demon-Slayer) ModPack",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 878495,
+    "slug": "valhelsia-6",
+    "name": "Valhelsia 6",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 663737,
+    "slug": "integrated-minecraft",
+    "name": "Integrated MC",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 1243287,
+    "slug": "mc-eternal-2",
+    "name": "MC Eternal 2",
+    "gameVersions": [
+      "1.20.1"
+    ]
+  },
+  {
+    "id": 282744,
+    "slug": "enigmatica2expert",
+    "name": "Enigmatica 2: Expert - E2E",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 293902,
+    "slug": "life-in-the-village",
+    "name": "Life in the village",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 618253,
+    "slug": "astrids-fnaf-pack",
+    "name": "Astrid's FNAF Pack",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 403521,
+    "slug": "sevtech-ages-of-the-sky",
+    "name": "SevTech: Ages of the Sky",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 1091305,
+    "slug": "ftb-stoneblock-3",
+    "name": "FTB StoneBlock 3",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 653683,
+    "slug": "play-as-dragon",
+    "name": "Play as Dragon [Abandoned]",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 313956,
+    "slug": "ftb-ultimate-reloaded",
+    "name": "FTB Ultimate Reloaded",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 489929,
+    "slug": "last-days-of-humanity",
+    "name": "Last Days of Humanity",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 270244,
+    "slug": "world-of-dragons",
+    "name": "World of Dragons (wod)",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 338901,
+    "slug": "rebirth-of-the-night",
+    "name": "Rebirth of the Night (RotN)",
+    "gameVersions": [
+      "1.12.2"
+    ]
+  },
+  {
+    "id": 852146,
+    "slug": "minecolonies-dimensional-adventure",
+    "name": "MineColonies: Dimensional Adventure",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 1010000,
+    "slug": "new-berks-dawn",
+    "name": "Isle of Berk (Claws of Berk)",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 574291,
+    "slug": "prominence-2-classic",
+    "name": "Prominence™ Classic",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 558187,
+    "slug": "new-game-modpack-release",
+    "name": "New Game - An Improved Experience | 26.1.2 UPDATE!",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 573731,
+    "slug": "life-in-the-village-3",
+    "name": "Life in the village 3",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 351508,
+    "slug": "terrafirmacraft-hardrock",
+    "name": "HardRock TerraFirmaCraft 3 - extreme realistic survival",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 594950,
+    "slug": "boosted-fps-forge",
+    "name": "Boosted FPS (Performance Optimized) (FG)",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  },
+  {
+    "id": 662191,
+    "slug": "create-arcane-engineering",
+    "name": "Create: Arcane Engineering",
+    "gameVersions": [
+      "1.18.2"
+    ]
+  }
+]

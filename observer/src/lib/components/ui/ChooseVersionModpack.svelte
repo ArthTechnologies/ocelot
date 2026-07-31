@@ -1,6 +1,6 @@
 <script lang="ts">
   import ModpackVersion from "./ModpackVersion.svelte";
-  import { apiurl, getVersions, lrurl } from "$lib/scripts/req";
+  import { apiurl, getForgeOnlyModpackIds, getVersions, lrurl } from "$lib/scripts/req";
   import { browser } from "$app/environment";
   import {
     AlertTriangle,
@@ -185,15 +185,18 @@
       });
     } else if (platform == "cf") {
       document.getElementById("list" + buttonType).innerHTML = "";
-      fetch(apiurl + "curseforge/" + id + "/versions", {
-        method: "GET",
+      Promise.all([
+        fetch(apiurl + "curseforge/" + id + "/versions", {
+          method: "GET",
 
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-        .then((response) => response.json())
-        .then((data) => {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }).then((response) => response.json()),
+        getForgeOnlyModpackIds(),
+      ])
+        .then(([data, forgeOnlyIds]) => {
+          const isForgeOnly = forgeOnlyIds.includes(Number(id));
           document
             .getElementById("noSoftwareSpecifiedWarning")
             .classList.add("hidden");
@@ -208,7 +211,12 @@
               ) ||
                 version.displayName
                   .toLowerCase()
-                  .includes(software.toLowerCase())) &&
+                  .includes(software.toLowerCase()) ||
+                // No loader tagged on this file (RLCraft's newest release does
+                // this) but the pack itself is confirmed Forge-only — treat it
+                // as a Forge match instead of losing it to the "no software
+                // specified" section below.
+                (software == "forge" && isForgeOnly)) &&
               version.gameVersions.includes(sVersion)
             ) {
               let type = "release";
