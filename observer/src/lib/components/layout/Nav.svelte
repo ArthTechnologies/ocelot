@@ -200,7 +200,7 @@
               });
             });
         }
-      } else if (servers.length > 0 && !servers[0].isStandard && servers[0].error?.code === 101) {
+      } else if (servers.length > 0 && !servers[0].isStandard && servers[0].error?.code === 101 && !isViewingExistingServer(servers)) {
          createServer(parseInt(servers[0].id))
       } else {
         const conflicted = servers.find(s => !s.isStandard && s.error?.code === 103);
@@ -214,6 +214,14 @@
     }
     });
   }
+
+   function isViewingExistingServer(serversList) {
+     if (!browser) return false;
+     const path = window.location.pathname;
+     if (!path.startsWith("/server/")) return false;
+     const viewedId = parseInt(path.split("/")[2]) - 10000;
+     return serversList.some(s => s.isStandard && parseInt(s.id) === viewedId);
+   }
 
    function getSlug() {
            if (window.location.pathname.includes("/server")) {
