@@ -355,6 +355,8 @@ async function prepareSlot(id, pack) {
     // and binning it mid-check.
     adminServer: true,
     modpackCheck: true,
+    // Big modded packs OOM at the 4GB a plain server.json falls back to.
+    ramOverrideGB: 6,
   });
 }
 

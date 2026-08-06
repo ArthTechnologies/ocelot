@@ -306,7 +306,12 @@ function run(
     
 
     let allocatedRAM;
-    if (config.basic == server.productID) {
+    // Explicit override, independent of the Stripe productID tiers below —
+    // used by the modpack checker so its throwaway slot gets more headroom
+    // than a basic customer server without touching billing config.
+    if (server.ramOverrideGB) {
+      allocatedRAM = server.ramOverrideGB;
+    } else if (config.basic == server.productID) {
       allocatedRAM = 4;
     } else if (config.plus == server.productID) {
       allocatedRAM = 6;
