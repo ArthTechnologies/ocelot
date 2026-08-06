@@ -1438,6 +1438,63 @@ function runLimited(items, limit, worker) {
   });
 }
 
+// Looks up the real download URL for one CurseForge mod file, with a couple
+// retries. A 429/5xx here is CurseForge asking us to back off, not the mod
+// being unavailable - blindly treating it the same as a clean "no data"
+// response (an author who disabled third-party downloads) turns transient
+// rate-limit noise into a permanent "mod failed" result, which is exactly
+// what made the modpack checker's throttled, multi-minute download runs
+// (see MOD_DOWNLOAD_CONCURRENCY in modpackChecker.js) shed far more mods
+// than a customer's install, which fires every lookup at once and clears in
+// a couple of seconds. Only the transient cases are retried; a real "no
+// data" 200 is never retried since asking again won't change the answer.
+function fetchCurseForgeDownloadUrl(projectID, fileID, apiKey, attempt = 1) {
+  const MAX_ATTEMPTS = 3;
+  const BACKOFF_MS = [1500, 4000];
+  const STATUS_MARKER = "HTTPSTATUS:";
+
+  return new Promise((resolve) => {
+    exec(
+      `curl -s -w '\\n${STATUS_MARKER}%{http_code}' -X GET "https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}/download-url" -H 'x-api-key: ${apiKey}'`,
+      (error, stdout) => {
+        stdout = stdout || "";
+        const markerIndex = stdout.lastIndexOf(STATUS_MARKER);
+        const status = markerIndex !== -1 ? parseInt(stdout.slice(markerIndex + STATUS_MARKER.length)) : null;
+        const body = markerIndex !== -1 ? stdout.slice(0, markerIndex) : stdout;
+
+        let url = null;
+        try {
+          url = JSON.parse(body).data || null;
+        } catch (e) {
+          // Not JSON (an HTML error page, a truncated body, ...) - url stays null.
+        }
+
+        if (url) return resolve(url);
+
+        const transient = !!error || status === 429 || (status >= 500 && status < 600);
+        if (transient && attempt < MAX_ATTEMPTS) {
+          const delay = BACKOFF_MS[attempt - 1] || 4000;
+          console.log(
+            `CurseForge download-url lookup for mod ${projectID} file ${fileID} got ` +
+              `${error ? "an exec error (" + error.message + ")" : "HTTP " + status} - ` +
+              `retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS}).`
+          );
+          setTimeout(() => {
+            fetchCurseForgeDownloadUrl(projectID, fileID, apiKey, attempt + 1).then(resolve);
+          }, delay);
+          return;
+        }
+
+        console.log(
+          `CurseForge has no usable download for mod ${projectID} file ${fileID}: ` +
+            `HTTP ${status === null ? "?" : status} - ${(body || "(empty body)").slice(0, 200).trim()}`
+        );
+        resolve(null);
+      }
+    );
+  });
+}
+
 function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Infinity) {
   const folder = "servers/" + id;
   resetDownloadProgress(id);
@@ -1638,27 +1695,10 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                         else downloadProgress[id].failed++;
                         resolve();
                       };
-                      exec(
-                        `curl -X GET "https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}/download-url" -H 'x-api-key: ${apiKey}'`,
-                        (error, stdout, stderr) => {
-                          if (stdout != undefined) {
-                            try {
-                              files.downloadAsync(
-                                destPath,
-                                JSON.parse(stdout).data,
-                                () => finishMod()
-                              );
-                            } catch {
-                              console.log(
-                                "error parsing json for " + projectID
-                              );
-                              finishMod();
-                            }
-                          } else {
-                            finishMod();
-                          }
-                        }
-                      );
+                      fetchCurseForgeDownloadUrl(projectID, fileID, apiKey).then((url) => {
+                        if (!url) return finishMod();
+                        files.downloadAsync(destPath, url, () => finishMod());
+                      });
                     })).then(() => {
                     //add in modpackID so that it frontends can check for updates later
                     modpack.projectID = modpackID;
