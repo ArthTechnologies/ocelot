@@ -1019,6 +1019,62 @@ export function getServerNode(id: number) {
 //check if stripe is enabled
 getSettings();
 
+// Mods whose CurseForge authors disabled third-party downloads. The panel
+// can't fetch these, so a modpack install containing any holds the server
+// before boot until the user supplies the jars themselves.
+export function getManualMods(serverId: string) {
+  if (browser) {
+    let baseurl = apiurl;
+    if (usingOcelot) baseurl = getServerNode(parseInt(serverId));
+    const url = baseurl + "server/" + serverId + "/manual-mods";
+    return fetch(url, GET)
+      .then((res) => res.json())
+      .then((data) => data.mods || [])
+      .catch((err) => {
+        console.error("Error fetching manual mods:", err);
+        return [];
+      });
+  }
+}
+
+// Sends the jars the user collected and releases the startup hold. An empty
+// list is allowed — that's the user choosing to start without a mod they
+// couldn't get — so the button stays usable either way.
+export function uploadManualMods(serverId: string, mods: File[]) {
+  if (browser) {
+    let baseurl = apiurl;
+    if (usingOcelot) baseurl = getServerNode(parseInt(serverId));
+    const url = baseurl + "server/" + serverId + "/manual-mods";
+
+    const body = new FormData();
+    for (const mod of mods) body.append("files", mod, mod.name);
+
+    return fetch(url, {
+      method: "POST",
+      // No Content-Type here on purpose — the browser has to set the
+      // multipart boundary itself or multer sees no files.
+      headers: {
+        token: localStorage.getItem("token"),
+        username: localStorage.getItem("accountEmail"),
+      },
+      body,
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          alert(data.msg || "Couldn't upload those mods.", "error");
+          return null;
+        }
+        return data;
+      })
+      .catch((err) => {
+        console.error("Error uploading manual mods:", err);
+        alert("Failed to upload mods", "error");
+        return null;
+      });
+  }
+}
+
 // Scheduler API Functions
 export function getSchedulerTasks(serverId: string) {
   if (browser) {

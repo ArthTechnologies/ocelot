@@ -613,6 +613,122 @@ router.post(`/:id/modpack`, function (req, res) {
   }
 });
 
+// Mods whose authors turned off third-party downloads can't be fetched by the
+// panel at all, so a modpack install that hits one parks the server before boot
+// (see whenClearToBoot in mc.js) and waits for the user to supply the jars.
+// This is the list the upload modal renders; an empty array means nothing is
+// being held.
+router.get(`/:id/manual-mods`, function (req, res) {
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON("accounts/" + email + ".json");
+  if (utils.hasAccess(token, account, req.params.id)) {
+    res.status(200).json({ mods: f.getPendingManualMods(req.params.id) });
+  } else {
+    res.status(401).json({ msg: `Invalid credentials.` });
+  }
+});
+
+// Drops the uploaded jars into the server's mods folder and releases the hold,
+// which lets the boot that's already waiting in run() carry on. Accepts zero
+// files too — that's the user deciding to start without a mod they couldn't
+// get, and refusing would leave them with no way off the hold but stopping.
+router.post(`/:id/manual-mods`, upload.array("files"), function (req, res) {
+  //virus scanning a batch of jars can outlast the default socket timeout
+  req.setTimeout(0);
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON("accounts/" + email + ".json");
+  const uploaded = req.files || [];
+
+  const discardTemp = () => {
+    for (const file of uploaded) {
+      try {
+        fs.unlinkSync(file.path);
+      } catch (e) {}
+    }
+  };
+
+  if (!utils.hasAccess(token, account, req.params.id)) {
+    discardTemp();
+    return res.status(401).json({ msg: `Invalid credentials.` });
+  }
+
+  const id = req.params.id;
+  const modsFolder = `servers/${id}/mods`;
+  try {
+    fs.mkdirSync(modsFolder, { recursive: true });
+  } catch (e) {
+    discardTemp();
+    console.log("Could not create mods folder for server " + id + ": " + e.message);
+    return res.status(500).json({ msg: "Couldn't open the server's mods folder." });
+  }
+
+  // The name comes from the user's own file picker, so it decides nothing but
+  // the leaf name — anything that could climb out of mods/ is rejected rather
+  // than rewritten, so a mangled name can't quietly land somewhere else.
+  const named = [];
+  for (const file of uploaded) {
+    const name = file.originalname || "";
+    if (
+      name === "" ||
+      name.includes("/") ||
+      name.includes("\\") ||
+      name.includes("..") ||
+      !name.toLowerCase().endsWith(".jar")
+    ) {
+      discardTemp();
+      return res
+        .status(400)
+        .json({ msg: `"${name}" isn't a valid mod file name — mods must be .jar files.` });
+    }
+    named.push({ file, name });
+  }
+
+  const saveAll = () => {
+    const saved = [];
+    for (const { file, name } of named) {
+      try {
+        fs.copyFileSync(file.path, modsFolder + "/" + name);
+        saved.push(name);
+      } catch (e) {
+        discardTemp();
+        console.log("Manual mod upload failed for server " + id + ": " + e.message);
+        return res.status(500).json({ msg: `Couldn't save ${name}.` });
+      }
+    }
+    discardTemp();
+    // Only the hold is cleared here — the server was already mid-startup
+    // waiting on it, so there's no run() call to make.
+    const resumed = f.resumeManualMods(id);
+    console.log(
+      "Server " + id + " received " + saved.length + " manual mod(s); " +
+        (resumed ? "startup released." : "no hold was active.")
+    );
+    res.status(200).json({ saved, resumed });
+  };
+
+  if (enableVirusScan && named.length > 0) {
+    const paths = named.map((n) => `"${n.file.path}"`).join(" ");
+    exec(`clamdscan --multiscan --fdpass ${paths}`, {}, (err, stdout, stderr) => {
+      if (stdout && stdout.indexOf("Infected files: 0") != -1) {
+        return saveAll();
+      }
+      discardTemp();
+      // Same split as the files-tab upload: exit 1 is a real detection, exit 2
+      // is the scanner not being up, and telling a user their mod has a virus
+      // because clamd is down is worse than telling them to try again.
+      if (err && err.code !== 1) {
+        console.error("clamdscan unavailable:", stderr || err);
+        return res.status(503).json({ msg: "Upload blocked: virus scan couldn't run." });
+      }
+      return res.status(422).json({ msg: "Virus Detected." });
+    });
+  } else {
+    saveAll();
+  }
+});
+
 router.post(
   `/:id/toggleDisable/:modtype(plugin|datapack|mod)`,
   function (req, res) {

@@ -190,10 +190,46 @@ send(input);
     terminal.innerHTML = html;
   }
 
+  // Quartz parks a modded server before boot when its modpack contains mods
+  // CurseForge won't hand over, and says so on this exact line with the list
+  // as JSON. Picking it up here means the modal opens the moment the console
+  // does, with no extra request.
+  const MANUAL_MODS_MARKER =
+    "[Arth Hosting] This server has the following mods that need to be downloaded manually:";
+  let announcedManualMods = "";
+
+  function detectManualMods(output: string) {
+    const at = output.lastIndexOf(MANUAL_MODS_MARKER);
+    if (at === -1) {
+      // The console is wiped when the hold is released, so losing the line is
+      // the signal to close the modal again.
+      if (announcedManualMods !== "") {
+        announcedManualMods = "";
+        window.dispatchEvent(new CustomEvent("manualModsResolved"));
+      }
+      return;
+    }
+
+    const rest = output.slice(at + MANUAL_MODS_MARKER.length);
+    const line = rest.split("\n")[0].trim();
+    if (line === announcedManualMods) return;
+
+    try {
+      const mods = JSON.parse(line).mods;
+      if (!Array.isArray(mods) || mods.length === 0) return;
+      announcedManualMods = line;
+      window.dispatchEvent(new CustomEvent("manualModsRequired", { detail: mods }));
+    } catch (e) {
+      // A half-written line on a poll that caught the append mid-flight —
+      // the next poll gets the whole thing.
+    }
+  }
+
   export function readCmd() {
     if (browser) {
       readTerminal(id).then((response) => {
         let difference = 0;
+        detectManualMods(response);
 
         const terminalContainer = document.getElementById("terminalContainer");
         const terminal = document.getElementById("terminal");

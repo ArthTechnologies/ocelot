@@ -10,7 +10,8 @@
     apiurl,
     usingOcelot,
   } from "$lib/scripts/req";
-  import { getServer } from "$lib/scripts/req";
+  import { getServer, getManualMods } from "$lib/scripts/req";
+  import ManualModsModal from "$lib/components/ui/ManualModsModal.svelte";
 
   import { t, locale, locales } from "$lib/scripts/i18n";
 
@@ -103,6 +104,13 @@
   let subdomain = undefined;
   let memoryStats = [];
   let memoryReq = null;
+
+  // Mods CurseForge won't let the panel download. The server is parked before
+  // boot until these are uploaded, so the modal opens on its own rather than
+  // waiting for the user to notice a console line.
+  let manualMods: any[] = [];
+  let manualModsOpen = false;
+  let manualModsDismissed = false;
 
   if (browser) {
 
@@ -276,7 +284,48 @@
     changeServerState("kill", id, email);
   }
 
+  // The console line Quartz prints is the primary signal (Terminal.svelte
+  // parses it and fires this), but it only arrives while the terminal tab is
+  // being polled — so the endpoint below is also checked on a slow timer,
+  // which covers the other tabs and a page opened after the line was printed.
+  function openManualMods(mods: any[]) {
+    if (!mods || mods.length === 0) return;
+    manualMods = mods;
+    if (!manualModsDismissed) manualModsOpen = true;
+  }
+
+  function clearManualMods() {
+    manualMods = [];
+    manualModsOpen = false;
+    manualModsDismissed = false;
+  }
+
   onMount(() => {
+    const onRequired = (e: any) => openManualMods(e.detail);
+    window.addEventListener("manualModsRequired", onRequired);
+    window.addEventListener("manualModsResolved", clearManualMods);
+
+    // Slow on purpose: this is the backstop, not the trigger, and a held
+    // server sits there for as long as the user needs.
+    const manualModsPoll = setInterval(async () => {
+      // Anything other than "starting" means the hold is gone — the server
+      // either got its mods or was stopped — so drop the badge with it.
+      if (state !== "starting") {
+        if (manualMods.length > 0) clearManualMods();
+        return;
+      }
+      if (manualModsOpen) return;
+      const mods = await getManualMods(String(id));
+      if (mods && mods.length > 0) openManualMods(mods);
+      else if (manualMods.length > 0) clearManualMods();
+    }, 10000);
+
+    const cleanupManualMods = () => {
+      window.removeEventListener("manualModsRequired", onRequired);
+      window.removeEventListener("manualModsResolved", clearManualMods);
+      clearInterval(manualModsPoll);
+    };
+
     setTimeout(() => {
       getStatus();
       if (tab == "terminal") {
@@ -322,6 +371,7 @@
       }
     }
     getStatus();
+    return cleanupManualMods;
   });
 
   if (tab == "terminal") {
@@ -408,6 +458,20 @@
   }
 </script>
 
+{#if manualModsOpen && manualMods.length > 0}
+  <ManualModsModal
+    {id}
+    mods={manualMods}
+    on:close={() => {
+      manualModsOpen = false;
+      // Stays dismissed until the hold actually clears, so the backstop poll
+      // doesn't reopen it on someone who wanted to read the console first.
+      manualModsDismissed = true;
+    }}
+    on:done={clearManualMods}
+  />
+{/if}
+
 <div class="lg:-mt-5">
   <!-- Start Top Section-->
   <div class="flex justify-between mb-2 items-center">
@@ -420,7 +484,16 @@
         
 
 <div>
-  {#if state == "true" }
+  {#if manualMods.length > 0}
+<!-- A held server sits in "starting" forever, which on its own reads as a
+     hang. This says why, and gets the modal back after a dismissal. -->
+<button
+  class="badge badge-warning gap-1 font-ubuntu text-[.8rem] flex items-center mb-0.5"
+  on:click={() => (manualModsOpen = true)}
+>
+  <span class="mb-[0.2rem]">●</span> Waiting on {manualMods.length} mod{manualMods.length === 1 ? "" : "s"}
+</button>
+  {:else if state == "true" }
 <div class="badge badge-neutral gap-1 font-ubuntu text-[.8rem] flex items-center mb-0.5">
   <span class="mb-[0.2rem] text-success">●</span> Online
 </div>

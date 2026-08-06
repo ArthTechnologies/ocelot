@@ -854,9 +854,14 @@ function run(
 
     let ls;
     let interval = 0;
+    // Only a run() that kicks off its own download gates on one. A restart, or
+    // the modpack checker (which downloads separately and then calls us with
+    // no URL), must never inherit a stale hold from an earlier install.
+    let heldForModpack = false;
     if (c == "modded" && isNew) {
       if (modpackURL != undefined) {
         downloadModpack(id, modpackURL, modpackID, modpackVersionID);
+        heldForModpack = true;
       }
     }
     if (installer) {
@@ -939,6 +944,10 @@ function run(
       setInterval(() => {
         if (doneInstallingServer && timeToLoad) {
           timeToLoad = false;
+          // The loader is installed, but a modpack install may still be
+          // fetching mods — and if the pack contains any CurseForge won't
+          // serve, this parks the server here until the user uploads them.
+          whenClearToBoot(id, heldForModpack, () => {
           states[id] = "starting";
           terminalOutput[id] = "";
 
@@ -1089,9 +1098,14 @@ function run(
             console.log("setting status of " + id + " to false on line #7");
             clearInterval(intervalID);
           });
+          }); //whenClearToBoot
         }
       }, interval);
     } else {
+      // Fabric packs have no installer step to hide the download behind, so
+      // without this the server would boot against a half-populated mods
+      // folder. Starts synchronously when nothing is being downloaded.
+      whenClearToBoot(id, heldForModpack, () => {
       let count = 0;
       let timestamp = new Date().toLocaleTimeString();
       console.log(timestamp + " :t starting server " + id + " with:\n" + prefix + " " + args);
@@ -1175,11 +1189,15 @@ ls.stderr.on("data", data => {
         }
         clearInterval(intervalID);
       });
+      }); //whenClearToBoot
     }
 
     //for every item in the cmd array, run the command
+    //`ls` is only set here when the spawn happened synchronously above - the
+    //installer path (and now a held modpack install) assigns it later, so this
+    //has always been a no-op for those and must not throw for them either
     for (let i in cmd) {
-      if (cmd[i] != undefined && cmd[i] != "op") {
+      if (ls && cmd[i] != undefined && cmd[i] != "op") {
         ls.stdin.write(cmd[i] + "\n");
       }
     }
@@ -1292,12 +1310,27 @@ ls.stderr.on("data", data => {
     states[id] = "false";
   }
 }
+// A server held for manual mods has no process to send `stop` to, so its state
+// would never settle back to "false" on its own. Dropping the hold is the stop.
+function isHeldForManualMods(id) {
+  return getPendingManualMods(id).length > 0;
+}
+
 function stop(id) {
+  if (isHeldForManualMods(id)) {
+    releaseManualModsHold(id);
+    states[id] = "false";
+    return;
+  }
   states[id] = "stopping";
 }
 
 function stopAsync(id, callback) {
   if (states[id] == "false") {
+    callback();
+  } else if (isHeldForManualMods(id)) {
+    releaseManualModsHold(id);
+    states[id] = "false";
     callback();
   } else {
     states[id] = "stopping";
@@ -1314,6 +1347,7 @@ function killAsync(id, callback) {
   if (states[id] == "false") {
     callback();
   } else {
+    releaseManualModsHold(id);
     killObstructingProcess(parseInt(id));
     states[id] = "false";
     callback();
@@ -1321,6 +1355,7 @@ function killAsync(id, callback) {
 }
 
 function kill(id) {
+  releaseManualModsHold(id);
   killObstructingProcess(parseInt(id));
   states[id] = "false";
 }
@@ -1556,9 +1591,272 @@ function downloadModFileWithRetry(destPath, url, attempt = 1) {
   });
 }
 
+// CurseForge exposes, per mod project, whether its author lets third-party
+// launchers download it (`allowModDistribution`). A false there means every
+// download-url lookup for that mod comes back empty no matter how often we
+// ask, so the pack cannot be installed unattended - somebody has to fetch
+// those jars from the website by hand.
+//
+// Looked up in bulk via POST /v1/mods rather than per mod, so a 200-mod pack
+// costs one or two extra requests instead of 200 on top of the download-url
+// calls the install already makes. CurseForge doesn't document a cap on
+// modIds.length, so this chunks conservatively rather than assuming one -
+// a request that's too large should degrade to several smaller ones, not
+// silently drop mods off the end of an untested limit. This is only ever an
+// optimization: fetchCurseForgeDownloadUrl() below still catches a mod this
+// call misses (a false negative here just costs one wasted lookup, not a
+// missed detection).
+function fetchCurseForgeModMeta(projectIDs, apiKey) {
+  const CHUNK = 100;
+  const unique = [
+    ...new Set(projectIDs.map(Number).filter((n) => !Number.isNaN(n))),
+  ];
+  const meta = new Map();
+
+  const fetchChunk = (chunk) =>
+    new Promise((resolve) => {
+      //single-quoted for the shell, so any quote inside the JSON has to be escaped
+      const body = JSON.stringify({ modIds: chunk }).replace(/'/g, "'\\''");
+      exec(
+        `curl -s -X POST "https://api.curseforge.com/v1/mods" ` +
+          `-H 'x-api-key: ${apiKey}' -H 'Content-Type: application/json' ` +
+          `-H 'Accept: application/json' --data '${body}'`,
+        { maxBuffer: 64 * 1024 * 1024 },
+        (error, stdout) => {
+          if (error) {
+            console.log("CurseForge bulk mod lookup failed: " + error.message);
+            return resolve();
+          }
+          try {
+            const mods = JSON.parse(stdout).data || [];
+            for (const mod of mods) {
+              meta.set(mod.id, {
+                name: mod.name,
+                slug: mod.slug,
+                websiteUrl: (mod.links && mod.links.websiteUrl) || null,
+                logoUrl: (mod.logo && mod.logo.thumbnailUrl) || null,
+                // Only an explicit false counts as blocked - a missing field
+                // (an older or partial response) must not park a whole server.
+                allowModDistribution: mod.allowModDistribution,
+              });
+            }
+          } catch (e) {
+            console.log("CurseForge bulk mod lookup returned unparseable JSON.");
+          }
+          resolve();
+        }
+      );
+    });
+
+  const chunks = [];
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    chunks.push(unique.slice(i, i + CHUNK));
+  }
+  return chunks
+    .reduce((chain, chunk) => chain.then(() => fetchChunk(chunk)), Promise.resolve())
+    .then(() => meta);
+}
+
+// The jar's own file name, so the upload modal can tell the user exactly which
+// file the server is waiting for. Only called for mods already known to be
+// blocked, so this is a handful of requests per pack rather than one per mod.
+// The file endpoint still serves metadata when `downloadUrl` is null, which is
+// the whole reason it's usable here.
+function fetchCurseForgeFileName(projectID, fileID, apiKey) {
+  return new Promise((resolve) => {
+    exec(
+      `curl -s -X GET "https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}" -H 'x-api-key: ${apiKey}'`,
+      (error, stdout) => {
+        if (error) return resolve(null);
+        try {
+          const data = JSON.parse(stdout).data || {};
+          resolve(data.fileName || data.displayName || null);
+        } catch (e) {
+          resolve(null);
+        }
+      }
+    );
+  });
+}
+
+function isThirdPartyBlockedReason(reason) {
+  return (
+    typeof reason === "string" &&
+    reason.toLowerCase().includes("third-party downloads")
+  );
+}
+
+// deleteClientSideMods() bins anything on this list right after an install, so
+// there's no point sending the user off to CurseForge for one - the jar would
+// be deleted the moment it landed. Same normalisation as the deleter itself.
+function isClientSideModName(fileName) {
+  if (!fileName) return false;
+  let list;
+  try {
+    list = fs.readFileSync("assets/clientsidemods.txt", "utf8").split("\n");
+  } catch (e) {
+    return false;
+  }
+  const normalized = fileName.toLowerCase().replace(/[-_]/g, "");
+  return list.some((entry) => {
+    const match = entry.toLowerCase().replace(/[-_]/g, "").trim();
+    return match && normalized.includes(match);
+  });
+}
+
+// Turns the raw blocked-mod records into what the panel shows the user: a real
+// mod name, the CurseForge pages to grab the jar from, and the file name the
+// server expects.
+function buildManualModList(id, blocked, apiKey) {
+  return Promise.all(
+    blocked.map(({ projectID, fileID, info }) =>
+      fetchCurseForgeFileName(projectID, fileID, apiKey).then((fileName) => ({
+        projectId: projectID,
+        fileId: fileID,
+        name: info.name || "CurseForge mod " + projectID,
+        fileName: fileName || null,
+        logoUrl: info.logoUrl || null,
+        //  /files/<id> is the page with the changelog and the button;
+        //  /download/<id> starts the download straight away.
+        pageUrl: info.websiteUrl ? info.websiteUrl + "/files/" + fileID : null,
+        downloadUrl: info.websiteUrl
+          ? info.websiteUrl + "/download/" + fileID
+          : null,
+      }))
+    )
+  ).then((mods) => mods.filter((m) => !isClientSideModName(m.fileName || m.name)));
+}
+
+// Per-server record of an in-flight (or finished) modpack install. run() uses
+// this to hold a server back from booting while its mods are still landing,
+// and to park it indefinitely when the pack contains mods CurseForge won't
+// serve - see whenClearToBoot().
+const modpackDownloads = {};
+
+function beginModpackDownload(id) {
+  modpackDownloads[id] = {
+    done: false,
+    startedAt: Date.now(),
+    manualMods: [],
+    announced: false,
+    waitAnnounced: false,
+    released: false,
+    cancelled: false,
+  };
+}
+
+function finishModpackDownload(id, manualMods) {
+  if (!modpackDownloads[id]) beginModpackDownload(id);
+  modpackDownloads[id].manualMods = manualMods || [];
+  modpackDownloads[id].done = true;
+}
+
+// The mods this server is still waiting on. Empty once the user has supplied
+// them (or gave up and stopped the server), so this doubles as "is this server
+// currently held?".
+//
+// Gated on `announced`, not just `done` - a modpack can be (re)installed on an
+// already-running server via POST /:id/modpack, which calls downloadModpack()
+// directly without going through run(). That path never engages
+// whenClearToBoot (see heldForModpack in run()), so it never actually holds a
+// boot - the next Start is a normal, ungated one. Without this check, this
+// function would still report the blocked mods from that install, and the
+// frontend would show a "server is waiting on mods" modal for a server that
+// isn't waiting on anything - it already started (or will) regardless.
+function getPendingManualMods(id) {
+  const d = modpackDownloads[id];
+  if (!d || !d.done || !d.announced || d.released || d.cancelled) return [];
+  return d.manualMods.map((mod) => ({ ...mod }));
+}
+
+// Called by POST /server/:id/manual-mods once the uploaded jars are on disk.
+function resumeManualMods(id) {
+  const d = modpackDownloads[id];
+  if (!d) return false;
+  d.released = true;
+  d.manualMods = [];
+  if (typeof terminalOutput[id] === "string") {
+    terminalOutput[id] +=
+      "\n[Arth Hosting] Manual mods received — starting the server.";
+  }
+  console.log("Server " + id + " released from its manual-mod hold.");
+  return true;
+}
+
+// A held server has no process to send `stop` to, so stopping one means
+// dropping the hold itself - otherwise whenClearToBoot() would boot it later.
+function releaseManualModsHold(id) {
+  if (modpackDownloads[id]) modpackDownloads[id].cancelled = true;
+}
+
+function announceManualMods(id) {
+  const d = modpackDownloads[id];
+  if (!d || d.announced) return;
+  d.announced = true;
+  states[id] = "starting";
+  if (typeof terminalOutput[id] !== "string") terminalOutput[id] = "";
+  // The frontend watches for this exact prefix and opens the upload modal with
+  // the JSON that follows it, so keep the wording stable and keep it one line.
+  terminalOutput[id] +=
+    "\n[Arth Hosting] This server has the following mods that need to be downloaded manually: " +
+    JSON.stringify({ mods: d.manualMods });
+  console.log(
+    "Server " +
+      id +
+      " is holding startup for " +
+      d.manualMods.length +
+      " mod(s) CurseForge won't serve."
+  );
+}
+
+// Give up waiting on a download that never settled rather than parking the
+// server forever - something upstream broke, and a stuck "starting" with no
+// console is worse than a server that boots with mods missing.
+const MAX_DOWNLOAD_HOLD_MS = 30 * 60 * 1000;
+
+// Calls `start` as soon as this server is clear to boot. `engaged` is false for
+// every server that didn't kick off a modpack download in this run() call
+// (restarts, and the modpack checker, which downloads separately and would
+// otherwise inherit a stale hold) - those start synchronously, exactly as
+// before.
+function whenClearToBoot(id, engaged, start) {
+  if (!engaged) return start();
+
+  const check = () => {
+    const d = modpackDownloads[id];
+    if (!d) return start();
+    if (d.cancelled) return;
+
+    if (!d.done) {
+      if (Date.now() - d.startedAt > MAX_DOWNLOAD_HOLD_MS) {
+        console.log(
+          "Modpack download for server " + id + " never finished — booting anyway."
+        );
+        return start();
+      }
+      if (!d.waitAnnounced) {
+        d.waitAnnounced = true;
+        if (typeof terminalOutput[id] !== "string") terminalOutput[id] = "";
+        terminalOutput[id] += "\n[Arth Hosting] Downloading modpack mods…";
+      }
+      return setTimeout(check, 1000);
+    }
+
+    if (!d.released && d.manualMods.length > 0) {
+      announceManualMods(id);
+      return setTimeout(check, 1000);
+    }
+
+    start();
+  };
+
+  check();
+}
+
 function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Infinity) {
   const folder = "servers/" + id;
   resetDownloadProgress(id);
+  beginModpackDownload(id);
 
   // Every mod below is fetched with `curl -o <folder>/mods/<name>.jar`, and
   // curl won't create the directory — it just fails, silently, for every mod.
@@ -1649,6 +1947,10 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     writeJSON(folder + "/modrinth.index.json", modpack);
                     deleteClientSideMods(id);
                     resolveModConflicts(id);
+                    // Modrinth serves every file from its own CDN, so there's
+                    // no equivalent of CurseForge's per-author distribution
+                    // opt-out and nothing can ever need a manual upload here.
+                    finishModpackDownload(id, []);
                     // Cosmetic, so it runs alongside rather than blocking.
                     setModpackIcon(id, "mr", modpackID).catch((e) =>
                       console.log("Modpack icon failed for " + id + ": " + e.message)
@@ -1656,6 +1958,11 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     return utils.refreshPermissions();
                     });
                   });
+                } else {
+                  // No index file means the download or unzip fell over. Let
+                  // the server through rather than parking it on a hold that
+                  // will never resolve.
+                  finishModpackDownload(id, []);
                 }
               }
             );
@@ -1735,7 +2042,27 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     //don't scan/filter mods or clean up until every mod
                     //download above has actually finished writing to disk
                     downloadProgress[id].total = modpack.files.length;
-                    runLimited(modpack.files, concurrency, (file) => new Promise((resolve) => {
+                    // Mods CurseForge won't hand over, collected as the loop
+                    // runs and handed to run() at the end so it can park the
+                    // server until the user uploads them.
+                    const blocked = [];
+                    fetchCurseForgeModMeta(
+                      modpack.files.map((f) => f.projectID),
+                      apiKey
+                    ).then((modMeta) => {
+                      const blockedUpFront = modpack.files.filter(
+                        (f) =>
+                          (modMeta.get(Number(f.projectID)) || {})
+                            .allowModDistribution === false
+                      ).length;
+                      if (blockedUpFront > 0) {
+                        console.log(
+                          "Modpack for server " + id + ": " + blockedUpFront + " of " +
+                            modpack.files.length +
+                            " mods have third-party downloads disabled and will need uploading by hand."
+                        );
+                      }
+                      return runLimited(modpack.files, concurrency, (file) => new Promise((resolve) => {
                       let projectID = file.projectID;
                       let fileID = file.fileID;
                       console.log(projectID + " " + fileID);
@@ -1767,16 +2094,35 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                             platform: "cf",
                             projectId: projectID,
                           });
+                          // Only a distribution block is worth stopping the
+                          // server for - it's the one failure retrying the
+                          // install can never fix. Rate limits and CDN blips
+                          // stay ordinary failures so a flaky run doesn't
+                          // demand a manual upload the user doesn't owe.
+                          if (
+                            isThirdPartyBlockedReason(failureReason) ||
+                            modInfo.allowModDistribution === false
+                          ) {
+                            blocked.push({ projectID, fileID, info: modInfo });
+                          }
                         }
                         resolve();
                       };
+                      const modInfo = modMeta.get(Number(projectID)) || {};
+                      // CurseForge has already told us this one is off limits,
+                      // so skip the lookup instead of spending a request to be
+                      // told 403.
+                      if (modInfo.allowModDistribution === false) {
+                        return finishMod("Author disabled third-party downloads");
+                      }
                       fetchCurseForgeDownloadUrl(projectID, fileID, apiKey).then(({ url, reason }) => {
                         if (!url) return finishMod(reason);
                         downloadModFileWithRetry(destPath, url).then(({ reason: dlReason }) =>
                           finishMod(dlReason)
                         );
                       });
-                    })).then(() => {
+                    }));
+                    }).then(() => {
                     //add in modpackID so that it frontends can check for updates later
                     modpack.projectID = modpackID;
                     modpack.platform = "cf";
@@ -1785,14 +2131,38 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     writeJSON(folder + "/curseforge.index.json", modpack);
                     deleteClientSideMods(id);
                     resolveModConflicts(id);
+                    // Naming the blocked mods needs one request each, so it
+                    // runs after the filters rather than before - the index
+                    // file above is the modpack checker's completion signal
+                    // and mustn't wait on the network. With nothing blocked
+                    // this resolves on the next tick and costs the boot
+                    // nothing.
+                    buildManualModList(id, blocked, apiKey)
+                      .then((manualMods) => finishModpackDownload(id, manualMods))
+                      .catch((e) => {
+                        console.log(
+                          "Could not describe blocked mods for server " + id + ": " + e.message
+                        );
+                        finishModpackDownload(id, []);
+                      });
                     // Cosmetic, so it runs alongside rather than blocking.
                     setModpackIcon(id, "cf", modpackID).catch((e) =>
                       console.log("Modpack icon failed for " + id + ": " + e.message)
                     );
                     //remove temp folder
                     exec("rm -r " + folder + "/temp");
+                    }).catch((e) => {
+                      // Anything thrown above would otherwise leave run()
+                      // waiting on a download that never reports back.
+                      console.log("Modpack install for server " + id + " failed: " + e.message);
+                      finishModpackDownload(id, []);
                     });
                   });
+                } else {
+                  // No manifest means the download or unzip fell over. Let the
+                  // server through rather than parking it on a hold that will
+                  // never resolve.
+                  finishModpackDownload(id, []);
                 }
               }
             );
@@ -1800,6 +2170,11 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
         );
       }
     );
+  } else {
+    // A URL from neither host means nothing will be downloaded, so settle the
+    // record immediately - run() waits on it before booting.
+    console.log("Unrecognised modpack URL for server " + id + ": " + modpackURL);
+    finishModpackDownload(id, []);
   }
 }
 
@@ -2159,4 +2534,7 @@ module.exports = {
   resetModFilterStats,
   getDownloadProgress,
   resetDownloadProgress,
+  getPendingManualMods,
+  resumeManualMods,
+  releaseManualModsHold,
 };
