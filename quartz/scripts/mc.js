@@ -597,16 +597,23 @@ function run(
       }
       let result = data;
       if (!server.adminServer) {
-        //find the server-port line 
-        let a = result.split("\n").findIndex((line) => {
-          return line.includes("server-port");
+        //find every server-port line (exact key match, so "management-server-port" etc are left alone)
+        let lines = result.split("\n");
+        let serverPortIndices = [];
+        lines.forEach((line, idx) => {
+          if (/^\s*server-port\s*=/.test(line)) {
+            serverPortIndices.push(idx);
+          }
         });
-        //replace the line with the new port
-        let resultssplit = result.split("\n");
-        resultssplit[a] = "server-port=" + port;
-        result = resultssplit.join("\n");
-        
 
+        //replace the first occurrence with the new port, and drop any duplicates
+        if (serverPortIndices.length > 0) {
+          lines[serverPortIndices[0]] = "server-port=" + port;
+          for (let i = serverPortIndices.length - 1; i >= 1; i--) {
+            lines.splice(serverPortIndices[i], 1);
+          }
+        }
+        result = lines.join("\n");
       }
 
       fs.writeFileSync(folder + "/server.properties", result, "utf8");
