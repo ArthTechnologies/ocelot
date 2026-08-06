@@ -134,21 +134,16 @@
     { value: "skipped", label: "Skipped", count: counts.skipped },
   ];
 
-  // One section per loader + game version, in the order the checker ran them.
-  $: groups = (() => {
-    const shown = results.filter((r) => filter === "all" || r.status === filter);
-    const map = new Map<string, any[]>();
-    for (const r of shown) {
-      const key = `${r.loader || "?"} ${r.gameVersion || data?.gameVersion || "?"}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(r);
-    }
-    return [...map.entries()].map(([key, rows]) => ({
-      key,
-      rows,
-      passed: rows.filter((r) => r.status === "passed").length,
-    }));
-  })();
+  // Flat list, sorted by loader + game version so similar packs still land
+  // near each other without needing a dedicated group section per version.
+  $: rows = results
+    .filter((r) => filter === "all" || r.status === filter)
+    .slice()
+    .sort((a, b) => {
+      const av = `${a.loader || ""} ${a.gameVersion || ""}`;
+      const bv = `${b.loader || ""} ${b.gameVersion || ""}`;
+      return av.localeCompare(bv) || (a.name || "").localeCompare(b.name || "");
+    });
 
   $: progress = data?.progress || null;
   $: percent =
@@ -158,17 +153,18 @@
 <svelte:window on:keydown={(e) => e.key === "Escape" && dispatch("close")} />
 
 <div
-  class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  class="fixed inset-0 z-50 overflow-y-auto p-4"
   style="background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);"
   role="presentation"
   on:click|self={() => dispatch("close")}
   on:keydown={(e) => e.key === "Escape" && dispatch("close")}
 >
-  <div
-    class="bg-base-100 border border-base-300/40 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[88vh] flex flex-col overflow-hidden"
-  >
+  <div class="mx-auto max-w-6xl">
+    <div
+      class="bg-base-100 border border-base-300/40 rounded-2xl shadow-2xl w-full"
+    >
     <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-base-300/50">
+    <div class="sticky top-0 z-10 bg-base-100 rounded-t-2xl flex items-center justify-between px-6 py-4 border-b border-base-300/50">
       <div>
         <h2 class="text-xl font-bold flex items-center gap-2">
           Modpack Checker
@@ -214,7 +210,7 @@
     </div>
 
     <!-- Body -->
-    <div class="overflow-y-auto px-6 py-5 flex flex-col gap-5">
+    <div class="px-6 py-5 flex flex-col gap-5">
       {#if actionError}
         <div class="alert alert-error bg-error/10 border border-error/30 text-sm">{actionError}</div>
       {/if}
@@ -281,22 +277,14 @@
             {/each}
           </div>
 
-          <!-- Results, one section per loader + version -->
-          {#each groups as group}
-            <div class="rounded-xl border border-base-300/40 overflow-hidden">
-              <div
-                class="px-4 py-2.5 bg-base-200/60 flex items-center justify-between text-sm font-semibold"
-              >
-                <span class="capitalize">{group.key}</span>
-                <span class="text-base-content/50 font-normal text-xs">
-                  {group.passed}/{group.rows.length} passed
-                </span>
-              </div>
+          <!-- Results, flat list with a version badge per row -->
+          <div class="rounded-xl border border-base-300/40 overflow-hidden">
               <table class="table table-sm">
                 <thead>
                   <tr class="text-xs">
                     <th class="w-8"></th>
                     <th>Pack</th>
+                    <th class="w-32">Version</th>
                     <th class="w-24">Status</th>
                     <th class="w-24">Mods</th>
                     <th class="w-20">Time</th>
@@ -304,7 +292,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {#each group.rows as row}
+                  {#each rows as row}
                     <tr
                       class="hover cursor-pointer align-top"
                       on:click={() =>
@@ -323,6 +311,11 @@
                           {row.versionName || "—"}
                           {#if row.attempts > 1}· {row.attempts} attempts{/if}
                         </div>
+                      </td>
+                      <td class="text-xs">
+                        <span class="badge badge-ghost badge-sm capitalize">
+                          {row.loader || "?"} {row.gameVersion || data?.gameVersion || "?"}
+                        </span>
                       </td>
                       <td>
                         {#if row.status === "passed"}
@@ -355,7 +348,7 @@
                     </tr>
                     {#if expanded === rowKey(row)}
                       <tr>
-                        <td colspan="6" class="bg-base-200/40">
+                        <td colspan="7" class="bg-base-200/40">
                           <div class="text-xs space-y-2 py-1">
                             <div class="flex items-center justify-between gap-3 flex-wrap">
                               <div class="flex flex-wrap gap-x-6 gap-y-1 text-base-content/60">
@@ -408,10 +401,10 @@
                   {/each}
                 </tbody>
               </table>
-            </div>
-          {/each}
+          </div>
         {/if}
       {/if}
+    </div>
     </div>
   </div>
 </div>
