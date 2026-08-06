@@ -512,6 +512,49 @@ export function runOneModpackCheck(pack: {
     .catch(() => null);
 }
 
+// Live view of whichever modpack check is currently in flight (either the
+// single-pack recheck or a full batch run) — streams newline-delimited JSON
+// roughly once a second with each active slot's console tail and per-mod
+// download progress. `onEvent` is called with each parsed line; the promise
+// resolves once the backend closes the stream (check finished, or nothing
+// was running) or `signal` is aborted.
+export function streamModpackCheck(onEvent: (data: any) => void, signal?: AbortSignal) {
+  if (!browser) return Promise.resolve();
+
+  return fetch(apiurl + "admin/modpack-checks/stream", {
+    method: "GET",
+    headers: {
+      token: localStorage.getItem("token") || "",
+      username: localStorage.getItem("accountEmail") || "",
+    },
+    signal,
+  }).then(async (res) => {
+    if (!res.ok || !res.body) return;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, nl);
+        buffer = buffer.slice(nl + 1);
+        if (!line.trim()) continue;
+        try {
+          onEvent(JSON.parse(line));
+        } catch {
+          // ignore malformed lines
+        }
+      }
+    }
+  }).catch(() => {
+    // Connection dropped/aborted — the caller's UI just stops updating.
+  });
+}
+
 // Curated list of Forge-only CurseForge modpacks, keyed by numeric CF mod id.
 // The version picker uses this to treat a version with no loader tag as Forge
 // when the pack itself is known Forge-only (RLCraft's newest release does

@@ -1435,6 +1435,7 @@ function runLimited(items, limit, worker) {
 
 function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Infinity) {
   const folder = "servers/" + id;
+  resetDownloadProgress(id);
 
   // Every mod below is fetched with `curl -o <folder>/mods/<name>.jar`, and
   // curl won't create the directory — it just fails, silently, for every mod.
@@ -1481,14 +1482,22 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     }
                     //don't scan/filter mods or hand back control until every mod
                     //download above has actually finished writing to disk
+                    downloadProgress[id].total = modFilesToDownload.length;
                     runLimited(modFilesToDownload, concurrency, (file) => new Promise((resolve) => {
+                      const displayName = file.path.split("mods/")[1] || file.path;
+                      downloadProgress[id].inFlight.push(displayName);
                       files.downloadAsync(
                               folder +
                                   "/mods/lr_" +
                                   file.downloads[0].split("data/")[1].split("/versions")[0] + "_" +
                                   file.path.split("mods/")[1].split(".jar")[0].replace("_", "-").replace(" ", "-")+".jar",
                       file.downloads[0],
-                      () => resolve()
+                      () => {
+                        const idx = downloadProgress[id].inFlight.indexOf(displayName);
+                        if (idx !== -1) downloadProgress[id].inFlight.splice(idx, 1);
+                        downloadProgress[id].completed++;
+                        resolve();
+                      }
                     );
                     })).then(() => {
                     //copy override mods over one again since sometimes it doesnt work
@@ -1588,10 +1597,19 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     console.log("modpackID:" + modpackID);
                     //don't scan/filter mods or clean up until every mod
                     //download above has actually finished writing to disk
+                    downloadProgress[id].total = modpack.files.length;
                     runLimited(modpack.files, concurrency, (file) => new Promise((resolve) => {
                       let projectID = file.projectID;
                       let fileID = file.fileID;
                       console.log(projectID + " " + fileID);
+                      const displayName = "CF mod " + projectID;
+                      downloadProgress[id].inFlight.push(displayName);
+                      const finishMod = () => {
+                        const idx = downloadProgress[id].inFlight.indexOf(displayName);
+                        if (idx !== -1) downloadProgress[id].inFlight.splice(idx, 1);
+                        downloadProgress[id].completed++;
+                        resolve();
+                      };
                       exec(
                         `curl -X GET "https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}/download-url" -H 'x-api-key: ${apiKey}'`,
                         (error, stdout, stderr) => {
@@ -1603,16 +1621,16 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                                   projectID +
                                   "_CFMod.jar",
                                 JSON.parse(stdout).data,
-                                () => resolve()
+                                () => finishMod()
                               );
                             } catch {
                               console.log(
                                 "error parsing json for " + projectID
                               );
-                              resolve();
+                              finishMod();
                             }
                           } else {
-                            resolve();
+                            finishMod();
                           }
                         }
                       );
@@ -1811,6 +1829,25 @@ function getModFilterStats(id) {
   };
 }
 
+// Live per-mod download progress, keyed by server id. Read by the modpack
+// checker's stream endpoint so the admin dashboard can show a real "X/Y mods,
+// N downloading right now" panel instead of a spinner for the several minutes
+// a big pack takes to fetch.
+const downloadProgress = {};
+
+function emptyDownloadProgress() {
+  return { total: 0, completed: 0, inFlight: [] };
+}
+
+function resetDownloadProgress(id) {
+  downloadProgress[id] = emptyDownloadProgress();
+}
+
+function getDownloadProgress(id) {
+  const progress = downloadProgress[id] || emptyDownloadProgress();
+  return { ...progress, inFlight: [...progress.inFlight] };
+}
+
 // Returns the file names it deleted. Always runs before resolveModConflicts on
 // an install, so it resets the whole record for this server.
 function deleteClientSideMods(id) {
@@ -1978,4 +2015,6 @@ module.exports = {
   getPlayerList,
   getModFilterStats,
   resetModFilterStats,
+  getDownloadProgress,
+  resetDownloadProgress,
 };

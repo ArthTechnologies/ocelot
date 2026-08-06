@@ -93,6 +93,74 @@ router.post("/modpack-checks/run-one", (req, res) => {
   res.json({ started: true });
 });
 
+// Live view of a check in flight: streams newline-delimited JSON roughly once
+// a second with the console output and per-mod download progress of
+// whichever reserved slot(s) are active, so the admin dashboard can render a
+// real terminal + download panel instead of just the coarse index/total from
+// GET /modpack-checks. Works for both the single-pack recheck (one slot) and,
+// incidentally, a full batch run (up to two slots) since both share the same
+// `progress` state.
+router.get("/modpack-checks/stream", (req, res) => {
+  const modpackChecker = require("../scripts/modpackChecker.js");
+
+  res.setHeader("Content-Type", "application/x-ndjson");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no"); // don't let a proxy buffer the stream
+
+  let sawRunning = false;
+  let idleTicks = 0;
+  let timer = null;
+  const IDLE_LIMIT_TICKS = 15; // ~15s grace in case the run hasn't started yet
+
+  function finish() {
+    clearInterval(timer);
+    if (!res.writableEnded) res.end();
+  }
+
+  function tick() {
+    const progress = modpackChecker.getProgress();
+
+    if (!progress.running) {
+      // Give a just-started check a moment to flip `running` before we give
+      // up on a connection that arrived a beat early.
+      if (!sawRunning && ++idleTicks < IDLE_LIMIT_TICKS) return;
+      if (!res.writableEnded) {
+        res.write(JSON.stringify({ running: false, done: sawRunning }) + "\n");
+      }
+      return finish();
+    }
+    sawRunning = true;
+
+    const slotIds = modpackChecker.checkServerIds();
+    const slots = progress.currentPacks.map((pack, i) => ({
+      id: slotIds[i],
+      pack,
+      terminal: mc.getTerminalTail(slotIds[i], 6000),
+      download: mc.getDownloadProgress(slotIds[i]),
+    }));
+
+    if (!res.writableEnded) {
+      res.write(
+        JSON.stringify({
+          running: true,
+          phase: progress.phase,
+          index: progress.index,
+          total: progress.total,
+          passed: progress.passed,
+          failed: progress.failed,
+          skipped: progress.skipped,
+          startedAt: progress.startedAt,
+          slots,
+        }) + "\n"
+      );
+    }
+  }
+
+  tick();
+  timer = setInterval(tick, 1000);
+  req.on("close", () => clearInterval(timer));
+});
+
 // Get system tasks
 router.get("/system-tasks", (req, res) => {
   try {

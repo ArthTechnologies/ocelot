@@ -498,9 +498,11 @@ async function runAttempt(pack, id) {
 
   try {
     await prepareSlot(id, pack);
-    // The filters set this on every install, but a retry reusing the slot must
-    // never be able to read the previous attempt's numbers.
+    // The filters/download tracker set these on every install, but a retry
+    // reusing the slot must never be able to read the previous attempt's
+    // numbers.
     mc().resetModFilterStats(id);
+    mc().resetDownloadProgress(id);
 
     // Install first, boot second — see waitForModpackInstall for why these
     // can't be left to overlap the way run() would do it.
@@ -814,6 +816,8 @@ module.exports = {
   readLog,
   isRunning,
   getProgress,
+  checkServerId,
+  checkServerIds,
   LOG_PATH,
   GAME_VERSION,
   FORGE_GAME_VERSIONS,

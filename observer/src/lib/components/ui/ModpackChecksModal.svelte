@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import { getModpackChecks, runModpackCheck, runOneModpackCheck } from "$lib/scripts/req";
+  import ModpackCheckStream from "$lib/components/ui/ModpackCheckStream.svelte";
   import {
     X,
     RefreshCw,
@@ -12,6 +13,7 @@
     Loader,
     Play,
     RotateCw,
+    TerminalSquare,
   } from "lucide-svelte";
 
   const dispatch = createEventDispatcher();
@@ -25,6 +27,7 @@
   let starting = false; // "Run Check" clicked, waiting on the start response
   let recheckingKey: string | null = null; // rowKey mid single-pack recheck
   let actionError = "";
+  let showLiveView = false;
 
   // While a run is in flight the endpoint is the only window into it, so poll.
   // A run takes hours, so 5s is plenty.
@@ -61,6 +64,7 @@
       starting = false;
       return;
     }
+    showLiveView = true;
     load();
   }
 
@@ -81,6 +85,13 @@
       recheckingKey = null;
       return;
     }
+    showLiveView = true;
+    load();
+  }
+
+  // Fired by the live view once its stream reports the check has finished -
+  // the row it was watching just changed, so refresh the table underneath it.
+  function onLiveFinished() {
     load();
   }
 
@@ -183,6 +194,16 @@
         </p>
       </div>
       <div class="flex items-center gap-1">
+        {#if data?.running}
+          <button
+            class="btn btn-warning btn-sm gap-1.5"
+            on:click={() => (showLiveView = true)}
+            title="Watch the live console + download progress"
+          >
+            <TerminalSquare size={14} />
+            Watch Live
+          </button>
+        {/if}
         <button
           class="btn btn-primary btn-sm gap-1.5"
           disabled={starting || data?.running}
@@ -408,3 +429,10 @@
     </div>
   </div>
 </div>
+
+{#if showLiveView}
+  <ModpackCheckStream
+    on:close={() => (showLiveView = false)}
+    on:finished={onLiveFinished}
+  />
+{/if}
