@@ -11,6 +11,7 @@
     PackageOpen,
     Rocket,
     Trash2,
+    AlertTriangle,
   } from "lucide-svelte";
 
   const dispatch = createEventDispatcher();
@@ -168,14 +169,19 @@
                   on:scroll={() => handleScroll(slot.id)}
                 >{slot.terminal || "…"}</div>
 
-                <div class="lg:w-64 shrink-0 border-t lg:border-t-0 lg:border-l border-base-300/40 p-3 flex flex-col gap-3">
+                <div class="lg:w-64 shrink-0 border-t lg:border-t-0 lg:border-l border-base-300/40 p-3 flex flex-col gap-3 lg:h-72">
                   <div>
                     <div class="flex items-center justify-between text-xs mb-1">
                       <span class="flex items-center gap-1.5 text-base-content/60">
                         <Download size={12} /> Mods
                       </span>
-                      <span class="font-medium">
+                      <span class="font-medium flex items-center gap-1.5">
                         {slot.download?.completed || 0}/{slot.download?.total || "?"}
+                        {#if slot.download?.failed}
+                          <span class="badge badge-warning badge-xs gap-1 font-normal">
+                            {slot.download.failed} failed
+                          </span>
+                        {/if}
                       </span>
                     </div>
                     <!-- Tracks settled (completed+failed) so the bar keeps
@@ -186,14 +192,9 @@
                       value={slot.download?.total ? (slot.download.completed || 0) + (slot.download.failed || 0) : 0}
                       max={slot.download?.total || 1}
                     ></progress>
-                    {#if slot.download?.failed}
-                      <p class="text-[11px] text-warning mt-1">
-                        {slot.download.failed} failed to download (locked by author, or a bad file)
-                      </p>
-                    {/if}
                   </div>
 
-                  <div class="flex-1 overflow-y-auto flex flex-col gap-1.5 min-h-0">
+                  <div class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1.5">
                     {#if slot.download?.inFlight?.length}
                       {#each slot.download.inFlight as file (file)}
                         <div class="flex items-center gap-1.5 text-[11px] text-base-content/70 truncate">
@@ -210,6 +211,22 @@
                       </p>
                     {/if}
                   </div>
+
+                  {#if slot.download?.failedMods?.length}
+                    <div class="border-t border-base-300/40 pt-2 flex flex-col gap-1 min-h-0 shrink-0">
+                      <p class="text-[11px] font-medium text-warning flex items-center gap-1">
+                        <AlertTriangle size={11} /> Failed downloads
+                      </p>
+                      <div class="max-h-28 overflow-y-auto flex flex-col gap-1.5 pr-1">
+                        {#each slot.download.failedMods as mod (mod.name)}
+                          <div class="text-[10px] leading-tight">
+                            <div class="text-base-content/80 font-medium truncate" title={mod.name}>{mod.name}</div>
+                            <div class="text-warning/80">{mod.reason}</div>
+                          </div>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
                 </div>
               </div>
             </div>

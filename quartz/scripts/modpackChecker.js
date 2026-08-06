@@ -440,7 +440,13 @@ function modInstallStats(id, pack, index) {
   const disabledByConflict = filtered.disabledByConflict.length;
   const expected = Math.max(0, manifest - removedClientSide - disabledByConflict);
 
-  return { expected, installed, manifest, removedClientSide, disabledByConflict };
+  // Why installed < expected: per-mod reasons (rate limited, author blocked
+  // the download, a bad file, ...) captured live during the download phase —
+  // see fetchCurseForgeDownloadUrl in mc.js. Snapshotting them here means a
+  // refresh after the run still shows why, not just the bare counts.
+  const failedMods = mc().getDownloadProgress(id).failedMods;
+
+  return { expected, installed, manifest, removedClientSide, disabledByConflict, failedMods };
 }
 
 // Poll until the server is online, gives up, or dies.

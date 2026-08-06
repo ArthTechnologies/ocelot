@@ -406,6 +406,21 @@
                                 {row.firstFailure}
                               </div>
                             {/if}
+                            {#if row.mods?.failedMods?.length}
+                              <div>
+                                <p class="font-semibold mb-1">
+                                  {row.mods.failedMods.length} mod{row.mods.failedMods.length === 1 ? "" : "s"} failed to download
+                                </p>
+                                <div class="bg-base-300/50 rounded-lg p-3 max-h-48 overflow-y-auto flex flex-col gap-1.5">
+                                  {#each row.mods.failedMods as mod (mod.name)}
+                                    <div>
+                                      <span class="font-medium">{mod.name}</span>
+                                      <span class="text-base-content/50"> — {mod.reason}</span>
+                                    </div>
+                                  {/each}
+                                </div>
+                              </div>
+                            {/if}
                             {#if row.consoleTail}
                               <div>
                                 <p class="font-semibold mb-1">Console tail</p>

@@ -1448,6 +1448,18 @@ function runLimited(items, limit, worker) {
 // than a customer's install, which fires every lookup at once and clears in
 // a couple of seconds. Only the transient cases are retried; a real "no
 // data" 200 is never retried since asking again won't change the answer.
+// Turns a curl outcome into the kind of sentence a human reading the admin
+// dashboard actually wants, instead of a bare status code.
+function describeCurseForgeFailure(status, error) {
+  if (error) return `Request failed (${error.message})`;
+  if (status === 429) return "Rate limited by CurseForge";
+  if (status === 403) return "Forbidden (blocked download, or the API key lacks access)";
+  if (status === 404) return "File not found on CurseForge";
+  if (status >= 500 && status < 600) return `CurseForge server error (HTTP ${status})`;
+  if (status === 200) return "Author disabled third-party downloads";
+  return `HTTP ${status === null || Number.isNaN(status) ? "unknown" : status}`;
+}
+
 function fetchCurseForgeDownloadUrl(projectID, fileID, apiKey, attempt = 1) {
   const MAX_ATTEMPTS = 3;
   const BACKOFF_MS = [1500, 4000];
@@ -1469,7 +1481,7 @@ function fetchCurseForgeDownloadUrl(projectID, fileID, apiKey, attempt = 1) {
           // Not JSON (an HTML error page, a truncated body, ...) - url stays null.
         }
 
-        if (url) return resolve(url);
+        if (url) return resolve({ url, reason: null });
 
         const transient = !!error || status === 429 || (status >= 500 && status < 600);
         if (transient && attempt < MAX_ATTEMPTS) {
@@ -1485,11 +1497,12 @@ function fetchCurseForgeDownloadUrl(projectID, fileID, apiKey, attempt = 1) {
           return;
         }
 
+        const reason = describeCurseForgeFailure(status, error);
         console.log(
           `CurseForge has no usable download for mod ${projectID} file ${fileID}: ` +
-            `HTTP ${status === null ? "?" : status} - ${(body || "(empty body)").slice(0, 200).trim()}`
+            `${reason} - ${(body || "(empty body)").slice(0, 200).trim()}`
         );
-        resolve(null);
+        resolve({ url: null, reason });
       }
     );
   });
@@ -1568,8 +1581,15 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                         try {
                           ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
                         } catch (e) {}
-                        if (ok) downloadProgress[id].completed++;
-                        else downloadProgress[id].failed++;
+                        if (ok) {
+                          downloadProgress[id].completed++;
+                        } else {
+                          downloadProgress[id].failed++;
+                          downloadProgress[id].failedMods.push({
+                            name: displayName,
+                            reason: "Download failed (bad file, or Modrinth/CDN error)",
+                          });
+                        }
                         resolve();
                       }
                     );
@@ -1684,19 +1704,26 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                       // author disabled third-party downloads finishes exactly
                       // like a real one. Only count it once the jar is actually
                       // on disk, or "completed" lies the way the live view did.
-                      const finishMod = () => {
+                      const finishMod = (failureReason) => {
                         const idx = downloadProgress[id].inFlight.indexOf(displayName);
                         if (idx !== -1) downloadProgress[id].inFlight.splice(idx, 1);
                         let ok = false;
                         try {
                           ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
                         } catch (e) {}
-                        if (ok) downloadProgress[id].completed++;
-                        else downloadProgress[id].failed++;
+                        if (ok) {
+                          downloadProgress[id].completed++;
+                        } else {
+                          downloadProgress[id].failed++;
+                          downloadProgress[id].failedMods.push({
+                            name: displayName,
+                            reason: failureReason || "File never landed on disk after the download reported success",
+                          });
+                        }
                         resolve();
                       };
-                      fetchCurseForgeDownloadUrl(projectID, fileID, apiKey).then((url) => {
-                        if (!url) return finishMod();
+                      fetchCurseForgeDownloadUrl(projectID, fileID, apiKey).then(({ url, reason }) => {
+                        if (!url) return finishMod(reason);
                         files.downloadAsync(destPath, url, () => finishMod());
                       });
                     })).then(() => {
@@ -1901,7 +1928,7 @@ function getModFilterStats(id) {
 const downloadProgress = {};
 
 function emptyDownloadProgress() {
-  return { total: 0, completed: 0, failed: 0, inFlight: [] };
+  return { total: 0, completed: 0, failed: 0, inFlight: [], failedMods: [] };
 }
 
 function resetDownloadProgress(id) {
@@ -1910,7 +1937,7 @@ function resetDownloadProgress(id) {
 
 function getDownloadProgress(id) {
   const progress = downloadProgress[id] || emptyDownloadProgress();
-  return { ...progress, inFlight: [...progress.inFlight] };
+  return { ...progress, inFlight: [...progress.inFlight], failedMods: [...progress.failedMods] };
 }
 
 // Returns the file names it deleted. Always runs before resolveModConflicts on
