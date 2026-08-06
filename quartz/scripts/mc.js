@@ -1453,7 +1453,10 @@ function runLimited(items, limit, worker) {
 function describeCurseForgeFailure(status, error) {
   if (error) return `Request failed (${error.message})`;
   if (status === 429) return "Rate limited by CurseForge";
-  if (status === 403) return "Forbidden (blocked download, or the API key lacks access)";
+  // CurseForge's own documented behavior for this endpoint: a 403 here means
+  // the author turned off third-party download hosting for this file, not
+  // that our key is bad (a bad key would 403 every mod, not a handful).
+  if (status === 403) return "Author disabled third-party downloads (403)";
   if (status === 404) return "File not found on CurseForge";
   if (status >= 500 && status < 600) return `CurseForge server error (HTTP ${status})`;
   if (status === 200) return "Author disabled third-party downloads";
@@ -1505,6 +1508,51 @@ function fetchCurseForgeDownloadUrl(projectID, fileID, apiKey, attempt = 1) {
         resolve({ url: null, reason });
       }
     );
+  });
+}
+
+// Downloads one mod file with a couple of retries. A valid download URL
+// doesn't guarantee the transfer itself succeeds - a CDN edge hiccup or a
+// dropped connection leaves an empty/missing file with no explanation, which
+// is exactly what showed up as "File never landed on disk" with zero detail
+// once the lookup-step retry above started actually distinguishing real
+// blocks (403s) from transient ones. `files.downloadAsync` (used elsewhere
+// for one-off downloads) doesn't check the result or report why, so this
+// runs its own curl instead of reusing it, keeping that shared helper's
+// behavior untouched for its other callers.
+function downloadModFileWithRetry(destPath, url, attempt = 1) {
+  const MAX_ATTEMPTS = 3;
+  const BACKOFF_MS = [1500, 4000];
+
+  return new Promise((resolve) => {
+    exec(`curl -sS --max-time 60 -o "${destPath}" -L "${url}"`, (error) => {
+      let ok = false;
+      try {
+        ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
+      } catch (e) {}
+
+      if (ok) return resolve({ ok: true, reason: null });
+
+      if (attempt < MAX_ATTEMPTS) {
+        const delay = BACKOFF_MS[attempt - 1] || 4000;
+        console.log(
+          `Downloading ${destPath} failed` +
+            (error ? ` (${error.message})` : " (empty file)") +
+            ` - retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS}).`
+        );
+        setTimeout(() => {
+          downloadModFileWithRetry(destPath, url, attempt + 1).then(resolve);
+        }, delay);
+        return;
+      }
+
+      resolve({
+        ok: false,
+        reason: error
+          ? `Download failed after ${MAX_ATTEMPTS} attempts (${error.message})`
+          : `Download produced an empty file after ${MAX_ATTEMPTS} attempts`,
+      });
+    });
   });
 }
 
@@ -1566,33 +1614,28 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                           "/mods/lr_" +
                           file.downloads[0].split("data/")[1].split("/versions")[0] + "_" +
                           file.path.split("mods/")[1].split(".jar")[0].replace("_", "-").replace(" ", "-")+".jar";
-                      files.downloadAsync(
-                      destPath,
-                      file.downloads[0],
-                      () => {
+                      // downloadModFileWithRetry retries transient CDN blips on
+                      // its own, and only reports back once it's given up - so
+                      // "not ok" here means the file genuinely never landed.
+                      downloadModFileWithRetry(destPath, file.downloads[0]).then(({ ok, reason }) => {
                         const idx = downloadProgress[id].inFlight.indexOf(displayName);
                         if (idx !== -1) downloadProgress[id].inFlight.splice(idx, 1);
-                        // downloadAsync's callback fires once curl exits, win or
-                        // lose - it never checks the response, so a 403/404 for a
-                        // mod the author locked down finishes exactly like a real
-                        // download. Only count it once the jar is actually on
-                        // disk, or "completed" lies the way the live view did.
-                        let ok = false;
-                        try {
-                          ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
-                        } catch (e) {}
                         if (ok) {
                           downloadProgress[id].completed++;
                         } else {
                           downloadProgress[id].failed++;
                           downloadProgress[id].failedMods.push({
                             name: displayName,
-                            reason: "Download failed (bad file, or Modrinth/CDN error)",
+                            reason: reason || "Download failed for an unknown reason",
+                            // No per-file project id in modrinth.index.json to
+                            // look a real mod name up by - displayName is
+                            // already the real filename, unlike the CF branch.
+                            platform: "mr",
+                            projectId: null,
                           });
                         }
                         resolve();
-                      }
-                    );
+                      });
                     })).then(() => {
                     //copy override mods over one again since sometimes it doesnt work
                     execSync(
@@ -1699,11 +1742,11 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                       const displayName = "CF mod " + projectID;
                       const destPath = folder + "/mods/cf_" + projectID + "_CFMod.jar";
                       downloadProgress[id].inFlight.push(displayName);
-                      // downloadAsync's callback fires once curl exits, win or
-                      // lose - it never checks the response, so a mod whose
-                      // author disabled third-party downloads finishes exactly
-                      // like a real one. Only count it once the jar is actually
-                      // on disk, or "completed" lies the way the live view did.
+                      // fetchCurseForgeDownloadUrl and downloadModFileWithRetry
+                      // both retry transient failures themselves, but this is
+                      // still the final say on success - only count a mod once
+                      // its jar is actually on disk, not just because neither
+                      // helper reported an error.
                       const finishMod = (failureReason) => {
                         const idx = downloadProgress[id].inFlight.indexOf(displayName);
                         if (idx !== -1) downloadProgress[id].inFlight.splice(idx, 1);
@@ -1717,14 +1760,21 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                           downloadProgress[id].failed++;
                           downloadProgress[id].failedMods.push({
                             name: displayName,
-                            reason: failureReason || "File never landed on disk after the download reported success",
+                            reason: failureReason || "Download failed for an unknown reason",
+                            // displayName is just "CF mod <id>" - the manifest
+                            // never carries a real name, so the frontend looks
+                            // it up from this on click.
+                            platform: "cf",
+                            projectId: projectID,
                           });
                         }
                         resolve();
                       };
                       fetchCurseForgeDownloadUrl(projectID, fileID, apiKey).then(({ url, reason }) => {
                         if (!url) return finishMod(reason);
-                        files.downloadAsync(destPath, url, () => finishMod());
+                        downloadModFileWithRetry(destPath, url).then(({ reason: dlReason }) =>
+                          finishMod(dlReason)
+                        );
                       });
                     })).then(() => {
                     //add in modpackID so that it frontends can check for updates later

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy, tick as svelteTick } from "svelte";
   import { streamModpackCheck } from "$lib/scripts/req";
+  import CurseForgeModInfoModal from "$lib/components/ui/CurseForgeModInfoModal.svelte";
   import {
     X,
     Loader,
@@ -18,6 +19,7 @@
 
   let controller = new AbortController();
   let finished = false;
+  let inspectingProjectId: string | number | null = null;
   let sawAnything = false;
   let event: any = null;
   let termRefs: Record<number, HTMLDivElement> = {};
@@ -219,10 +221,24 @@
                       </p>
                       <div class="max-h-28 overflow-y-auto flex flex-col gap-1.5 pr-1">
                         {#each slot.download.failedMods as mod (mod.name)}
-                          <div class="text-[10px] leading-tight">
-                            <div class="text-base-content/80 font-medium truncate" title={mod.name}>{mod.name}</div>
-                            <div class="text-warning/80">{mod.reason}</div>
-                          </div>
+                          {#if mod.platform === "cf" && mod.projectId}
+                            <button
+                              type="button"
+                              class="text-[10px] leading-tight text-left hover:bg-base-200/60 rounded px-1 -mx-1 py-0.5 transition-colors"
+                              on:click={() => (inspectingProjectId = mod.projectId)}
+                              title="Click to look up this mod's real name"
+                            >
+                              <div class="text-base-content/80 font-medium truncate underline decoration-dotted underline-offset-2">
+                                {mod.name}
+                              </div>
+                              <div class="text-warning/80">{mod.reason}</div>
+                            </button>
+                          {:else}
+                            <div class="text-[10px] leading-tight">
+                              <div class="text-base-content/80 font-medium truncate" title={mod.name}>{mod.name}</div>
+                              <div class="text-warning/80">{mod.reason}</div>
+                            </div>
+                          {/if}
                         {/each}
                       </div>
                     </div>
@@ -236,3 +252,10 @@
     </div>
   </div>
 </div>
+
+{#if inspectingProjectId}
+  <CurseForgeModInfoModal
+    projectId={inspectingProjectId}
+    on:close={() => (inspectingProjectId = null)}
+  />
+{/if}

@@ -576,6 +576,20 @@ export function getForgeOnlyModpackIds() {
     .catch(() => []);
 }
 
+// A single CurseForge mod's public info (name, author, logo, summary, ...) by
+// project id — used to turn "CF mod 244849" (all a modpack manifest ever
+// carries) into a real name the admin dashboard can show.
+export function getCurseForgeModInfo(projectId: string | number) {
+  if (!browser) return Promise.resolve(null);
+
+  return fetch(apiurl + "curseforge/" + projectId, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .catch(() => null);
+}
+
 export function getServers(em: string) {
   if(browser) {
   let url =
