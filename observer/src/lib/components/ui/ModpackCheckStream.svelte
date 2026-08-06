@@ -178,11 +178,19 @@
                         {slot.download?.completed || 0}/{slot.download?.total || "?"}
                       </span>
                     </div>
+                    <!-- Tracks settled (completed+failed) so the bar keeps
+                    moving even on a pack that's shedding mods CurseForge won't
+                    serve - "completed" alone would look stalled. -->
                     <progress
-                      class="progress progress-primary w-full h-1.5"
-                      value={slot.download?.total ? slot.download.completed : 0}
+                      class="progress {slot.download?.failed ? 'progress-warning' : 'progress-primary'} w-full h-1.5"
+                      value={slot.download?.total ? (slot.download.completed || 0) + (slot.download.failed || 0) : 0}
                       max={slot.download?.total || 1}
                     ></progress>
+                    {#if slot.download?.failed}
+                      <p class="text-[11px] text-warning mt-1">
+                        {slot.download.failed} failed to download (locked by author, or a bad file)
+                      </p>
+                    {/if}
                   </div>
 
                   <div class="flex-1 overflow-y-auto flex flex-col gap-1.5 min-h-0">

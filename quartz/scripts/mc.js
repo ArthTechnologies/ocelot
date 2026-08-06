@@ -1491,16 +1491,28 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     runLimited(modFilesToDownload, concurrency, (file) => new Promise((resolve) => {
                       const displayName = file.path.split("mods/")[1] || file.path;
                       downloadProgress[id].inFlight.push(displayName);
+                      const destPath =
+                        folder +
+                          "/mods/lr_" +
+                          file.downloads[0].split("data/")[1].split("/versions")[0] + "_" +
+                          file.path.split("mods/")[1].split(".jar")[0].replace("_", "-").replace(" ", "-")+".jar";
                       files.downloadAsync(
-                              folder +
-                                  "/mods/lr_" +
-                                  file.downloads[0].split("data/")[1].split("/versions")[0] + "_" +
-                                  file.path.split("mods/")[1].split(".jar")[0].replace("_", "-").replace(" ", "-")+".jar",
+                      destPath,
                       file.downloads[0],
                       () => {
                         const idx = downloadProgress[id].inFlight.indexOf(displayName);
                         if (idx !== -1) downloadProgress[id].inFlight.splice(idx, 1);
-                        downloadProgress[id].completed++;
+                        // downloadAsync's callback fires once curl exits, win or
+                        // lose - it never checks the response, so a 403/404 for a
+                        // mod the author locked down finishes exactly like a real
+                        // download. Only count it once the jar is actually on
+                        // disk, or "completed" lies the way the live view did.
+                        let ok = false;
+                        try {
+                          ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
+                        } catch (e) {}
+                        if (ok) downloadProgress[id].completed++;
+                        else downloadProgress[id].failed++;
                         resolve();
                       }
                     );
@@ -1608,11 +1620,22 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                       let fileID = file.fileID;
                       console.log(projectID + " " + fileID);
                       const displayName = "CF mod " + projectID;
+                      const destPath = folder + "/mods/cf_" + projectID + "_CFMod.jar";
                       downloadProgress[id].inFlight.push(displayName);
+                      // downloadAsync's callback fires once curl exits, win or
+                      // lose - it never checks the response, so a mod whose
+                      // author disabled third-party downloads finishes exactly
+                      // like a real one. Only count it once the jar is actually
+                      // on disk, or "completed" lies the way the live view did.
                       const finishMod = () => {
                         const idx = downloadProgress[id].inFlight.indexOf(displayName);
                         if (idx !== -1) downloadProgress[id].inFlight.splice(idx, 1);
-                        downloadProgress[id].completed++;
+                        let ok = false;
+                        try {
+                          ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
+                        } catch (e) {}
+                        if (ok) downloadProgress[id].completed++;
+                        else downloadProgress[id].failed++;
                         resolve();
                       };
                       exec(
@@ -1621,10 +1644,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                           if (stdout != undefined) {
                             try {
                               files.downloadAsync(
-                                folder +
-                                  "/mods/cf_" +
-                                  projectID +
-                                  "_CFMod.jar",
+                                destPath,
                                 JSON.parse(stdout).data,
                                 () => finishMod()
                               );
@@ -1841,7 +1861,7 @@ function getModFilterStats(id) {
 const downloadProgress = {};
 
 function emptyDownloadProgress() {
-  return { total: 0, completed: 0, inFlight: [] };
+  return { total: 0, completed: 0, failed: 0, inFlight: [] };
 }
 
 function resetDownloadProgress(id) {
