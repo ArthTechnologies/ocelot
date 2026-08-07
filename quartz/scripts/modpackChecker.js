@@ -101,6 +101,18 @@ function getProgress() {
   return { ...progress };
 }
 
+// Phase of the check running on `slotId`. With the two slots draining a shared
+// queue they genuinely diverge (one downloading while the other boots), so the
+// phase lives on the slot's currentPacks entry; the legacy global
+// progress.phase is still mirrored (last writer wins) for the console command
+// and any old readers.
+function setSlotPhase(slotId, phase) {
+  progress.phase = phase;
+  const idx = checkServerIds().indexOf(slotId);
+  const current = idx !== -1 ? progress.currentPacks[idx] : null;
+  if (current) current.phase = phase;
+}
+
 // mc.js is required lazily: it starts timers and reads state on load, and this
 // module is pulled in by run.js before that is wanted.
 function mc() {
@@ -556,7 +568,7 @@ async function runAttempt(pack, id) {
 
     // Install first, boot second — see waitForModpackInstall for why these
     // can't be left to overlap the way run() would do it.
-    progress.phase = "downloading";
+    setSlotPhase(id, "downloading");
     mc().downloadModpack(id, pack.downloadUrl, pack.projectId, pack.versionId, MOD_DOWNLOAD_CONCURRENCY);
     const installed = await waitForModpackInstall(id, pack);
 
@@ -583,7 +595,7 @@ async function runAttempt(pack, id) {
           reason: "Server pack extracted no mods — the download or unzip fell over.",
         };
       } else {
-        progress.phase = "booting";
+        setSlotPhase(id, "booting");
         // modpackURL is deliberately undefined: the pack is already on disk and
         // passing it would make run() download it a second time.
         mc().run(id, pack.software, pack.gameVersion || GAME_VERSION, [], [], undefined, true, undefined);
@@ -604,7 +616,7 @@ async function runAttempt(pack, id) {
     }
   }
 
-  progress.phase = "cleaning up";
+  setSlotPhase(id, "cleaning up");
   try {
     // No-op if it already died; otherwise this is what stops a container that
     // is still up after a failed boot.
@@ -733,36 +745,41 @@ async function checkModpacks() {
 
     const packs = discovered.flat();
     progress.total = packs.length;
+    progress.phase = "checking";
+    // Slot-indexed: currentPacks[i] is what slot i is checking right now,
+    // null while that slot is idle. The stream endpoint pairs entries with
+    // checkServerIds() positionally, so the positions must stay stable.
+    const slotIds = [id1, id2];
+    progress.currentPacks = slotIds.map(() => null);
 
-    const results = [];
-    // Process packs in parallel pairs: 2 at a time using separate slots.
-    // Split packs into pairs and check each pair concurrently.
-    for (let i = 0; i < packs.length; i += 2) {
-      const pair = [packs[i], packs[i + 1]].filter(Boolean);
-      progress.phase = "checking";
-      progress.currentPacks = pair.map(p => ({
-        name: p.name,
-        gameVersion: p.gameVersion || GAME_VERSION,
-        loader: p.loader,
-        startedAt: Date.now()
-      }));
-      progress.index = i + 1;
-
-      // Run both packs in parallel using different slots
-      const checkPromises = pair.map((pack, idx) => {
-        const slotId = idx === 0 ? id1 : id2;
-        return checkOne(pack, slotId);
-      });
-
-      const pairResults = await Promise.all(checkPromises);
-      results.push(...pairResults);
-
-      pairResults.forEach(result => {
-        if (result.status === "passed") progress.passed++;
-        else if (result.status === "failed") progress.failed++;
+    // Two workers, each pinned to its own reserved slot, pulling the next
+    // pack off the shared list the moment their current one settles — a slow
+    // pack no longer stalls the other slot the way fixed pairs did.
+    const results = new Array(packs.length);
+    let nextIndex = 0;
+    const worker = async (slotIndex) => {
+      while (nextIndex < packs.length) {
+        const packIndex = nextIndex++;
+        const pack = packs[packIndex];
+        progress.index = packIndex + 1;
+        progress.currentPacks[slotIndex] = {
+          name: pack.name,
+          gameVersion: pack.gameVersion || GAME_VERSION,
+          loader: pack.loader,
+          startedAt: Date.now(),
+          phase: "checking",
+        };
+        // Results land at the pack's discovery position so the log keeps
+        // ranking order no matter which slot finishes first.
+        results[packIndex] = await checkOne(pack, slotIds[slotIndex]);
+        const status = results[packIndex].status;
+        if (status === "passed") progress.passed++;
+        else if (status === "failed") progress.failed++;
         else progress.skipped++;
-      });
-    }
+      }
+      progress.currentPacks[slotIndex] = null;
+    };
+    await Promise.all(slotIds.map((_, i) => worker(i)));
 
     const data = {
       lastRun: startedAt,

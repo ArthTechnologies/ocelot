@@ -739,16 +739,19 @@ Type a command and press Enter. For commands that prompt (e.g. getServerOwner, b
         }
         break;
       }
+      const activePacks = (p.currentPacks || []).filter(Boolean);
       console.log(
         `Modpack check: ${p.phase}` +
           (p.total ? ` — pack ${p.index}/${p.total}` : "") +
-          (p.current ? ` (${p.current})` : "") +
-          (p.attempt > 1 ? `, attempt ${p.attempt}` : "")
+          (activePacks.length
+            ? ` (${activePacks
+                .map((c) => `${c.name}: ${c.phase || "checking"}`)
+                .join(", ")})`
+            : "")
       );
       console.log(
         `  ${p.passed} passed, ${p.failed} failed, ${p.skipped} skipped` +
-          ` — running for ${elapsedSince(p.startedAt)}` +
-          (p.currentStartedAt ? `, this pack ${elapsedSince(p.currentStartedAt)}` : "")
+          ` — running for ${elapsedSince(p.startedAt)}`
       );
       break;
     }

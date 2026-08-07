@@ -132,12 +132,19 @@ router.get("/modpack-checks/stream", (req, res) => {
     sawRunning = true;
 
     const slotIds = modpackChecker.checkServerIds();
-    const slots = progress.currentPacks.map((pack, i) => ({
-      id: slotIds[i],
-      pack,
-      terminal: mc.getTerminalTail(slotIds[i], 6000),
-      download: mc.getDownloadProgress(slotIds[i]),
-    }));
+    // currentPacks is slot-indexed with null for an idle slot (the queue has
+    // drained past it) — those are skipped rather than streaming a stale
+    // terminal for a slot that isn't checking anything.
+    const slots = [];
+    progress.currentPacks.forEach((pack, i) => {
+      if (!pack) return;
+      slots.push({
+        id: slotIds[i],
+        pack,
+        terminal: mc.getTerminalTail(slotIds[i], 6000),
+        download: mc.getDownloadProgress(slotIds[i]),
+      });
+    });
 
     if (!res.writableEnded) {
       res.write(

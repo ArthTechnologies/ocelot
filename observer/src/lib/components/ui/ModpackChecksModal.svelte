@@ -157,6 +157,9 @@
     });
 
   $: progress = data?.progress || null;
+  // currentPacks is slot-indexed and holds null for a slot the work queue has
+  // drained past, so the actually-active packs are the non-null entries.
+  $: activePacks = (progress?.currentPacks || []).filter(Boolean);
   $: percent =
     progress && progress.total ? Math.round((progress.index / progress.total) * 100) : 0;
 </script>
@@ -249,13 +252,13 @@
             <div class="flex items-center justify-between mb-2">
               <p class="font-semibold text-sm flex items-center gap-2 flex-wrap">
                 <Loader size={14} class="animate-spin text-warning" />
-                {#if progress.currentPacks && progress.currentPacks.length > 0}
+                {#if activePacks.length > 0}
                   <span>
-                    {progress.currentPacks.map(p => p.name).join(", ")}
+                    {activePacks.map(p => p.name).join(", ")}
                   </span>
-                  {#each progress.currentPacks as pack}
+                  {#each activePacks as pack}
                     <span class="badge badge-ghost badge-sm">
-                      {pack.loader} {pack.gameVersion}
+                      {pack.loader} {pack.gameVersion}{#if pack.phase} · {pack.phase}{/if}
                     </span>
                   {/each}
                 {:else}
@@ -264,7 +267,10 @@
               </p>
               <p class="text-xs text-base-content/60">
                 {progress.index}/{progress.total || "?"}
-                {#if progress.phase}· {progress.phase}{/if}
+                <!-- With two slots the global phase is whichever wrote last;
+                     the per-pack badges carry the real phases, so it only
+                     shows when nothing is active yet (discovering). -->
+                {#if progress.phase && activePacks.length === 0}· {progress.phase}{/if}
               </p>
             </div>
             <progress class="progress progress-warning w-full" value={percent} max="100"></progress>

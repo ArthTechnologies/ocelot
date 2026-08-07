@@ -149,7 +149,7 @@
           </div>
         {:else}
           {#each event.slots as slot (slot.id)}
-            {@const meta = phaseMeta(event.phase)}
+            {@const meta = phaseMeta(slot.pack?.phase || event.phase)}
             <div class="rounded-xl border border-base-300/40 overflow-hidden">
               <!-- Slot header -->
               <div class="flex items-center justify-between px-4 py-2.5 bg-base-200/50 border-b border-base-300/40">
@@ -209,7 +209,7 @@
                       {/each}
                     {:else}
                       <p class="text-[11px] text-base-content/40">
-                        {event.phase === "downloading" ? "Waiting on downloads…" : "Not downloading right now."}
+                        {(slot.pack?.phase || event.phase) === "downloading" ? "Waiting on downloads…" : "Not downloading right now."}
                       </p>
                     {/if}
                   </div>
