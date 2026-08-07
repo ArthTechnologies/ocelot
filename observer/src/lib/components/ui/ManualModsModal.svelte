@@ -26,20 +26,25 @@
   const normalize = (name: string) =>
     (name || "").toLowerCase().replace(/[-_\s]/g, "");
 
-  function matchFor(mod: any): File | undefined {
+  // Takes the staged files as an argument rather than closing over `staged`:
+  // Svelte only re-runs a reactive statement when a variable referenced in the
+  // statement itself changes, so a hidden `staged` read inside this function
+  // left matchedFiles/outstanding stale after every drop - exact-name matches
+  // showed as not matching.
+  function matchFor(mod: any, files: File[]): File | undefined {
     const target = normalize(mod.fileName);
     if (!target) return undefined;
-    return staged.find((f) => normalize(f.name) === target);
+    return files.find((f) => normalize(f.name) === target);
   }
 
   // A file that doesn't line up with anything on the list still gets uploaded —
   // the file name may just have been rewritten on the way down — but it's
   // called out so a wrong download isn't mistaken for a finished one.
   $: matchedFiles = new Set(
-    mods.map((m) => matchFor(m)).filter(Boolean) as File[]
+    mods.map((m) => matchFor(m, staged)).filter(Boolean) as File[]
   );
   $: unmatched = staged.filter((f) => !matchedFiles.has(f));
-  $: outstanding = mods.filter((m) => !matchFor(m));
+  $: outstanding = mods.filter((m) => !matchFor(m, staged));
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -115,57 +120,8 @@
     </div>
 
     <div class="overflow-y-auto px-5 py-4 flex-1">
-      <ul class="flex flex-col gap-2">
-        {#each mods as mod (mod.projectId + "-" + mod.fileId)}
-          {@const match = matchFor(mod)}
-          <li
-            class="flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors {match
-              ? 'border-success/40 bg-success/5'
-              : 'border-base-300/50'}"
-          >
-            {#if mod.logoUrl}
-              <img
-                src={mod.logoUrl}
-                alt=""
-                class="w-9 h-9 rounded-lg shrink-0 object-cover"
-              />
-            {:else}
-              <div class="w-9 h-9 rounded-lg shrink-0 bg-base-300/50"></div>
-            {/if}
-
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-semibold truncate">{mod.name}</p>
-              <p class="text-xs text-base-content/50 truncate">
-                {mod.fileName || "Project " + mod.projectId}
-              </p>
-            </div>
-
-            {#if match}
-              <span
-                class="text-xs text-success flex items-center gap-1 shrink-0 font-medium"
-              >
-                <Check size={14} /> Ready
-              </span>
-            {:else if mod.downloadUrl}
-              <a
-                href={mod.downloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="btn btn-xs btn-primary gap-1 shrink-0"
-              >
-                <Download size={13} /> Download
-              </a>
-            {:else}
-              <span class="text-xs text-base-content/40 shrink-0"
-                >No link available</span
-              >
-            {/if}
-          </li>
-        {/each}
-      </ul>
-
       <label
-        class="mt-4 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 cursor-pointer transition-colors {dragging
+        class="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 cursor-pointer transition-colors {dragging
           ? 'border-primary bg-primary/5'
           : 'border-base-300/60 hover:border-base-300'}"
         on:dragover|preventDefault={() => (dragging = true)}
@@ -217,6 +173,55 @@
       {#if error}
         <p class="mt-2 text-xs text-error">{error}</p>
       {/if}
+
+      <ul class="mt-4 flex flex-col gap-2">
+        {#each mods as mod (mod.projectId + "-" + mod.fileId)}
+          {@const match = matchFor(mod, staged)}
+          <li
+            class="flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors {match
+              ? 'border-success/40 bg-success/5'
+              : 'border-base-300/50'}"
+          >
+            {#if mod.logoUrl}
+              <img
+                src={mod.logoUrl}
+                alt=""
+                class="w-9 h-9 rounded-lg shrink-0 object-cover"
+              />
+            {:else}
+              <div class="w-9 h-9 rounded-lg shrink-0 bg-base-300/50"></div>
+            {/if}
+
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold truncate">{mod.name}</p>
+              <p class="text-xs text-base-content/50 truncate">
+                {mod.fileName || "Project " + mod.projectId}
+              </p>
+            </div>
+
+            {#if match}
+              <span
+                class="text-xs text-success flex items-center gap-1 shrink-0 font-medium"
+              >
+                <Check size={14} /> Ready
+              </span>
+            {:else if mod.downloadUrl}
+              <a
+                href={mod.downloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn btn-xs btn-primary gap-1 shrink-0"
+              >
+                <Download size={13} /> Download
+              </a>
+            {:else}
+              <span class="text-xs text-base-content/40 shrink-0"
+                >No link available</span
+              >
+            {/if}
+          </li>
+        {/each}
+      </ul>
     </div>
 
     <div
