@@ -38,6 +38,10 @@
     const serverVersion = browser ? localStorage.getItem("serverVersion") : null;
     const map = {};
     for (const result of results) {
+      // The batch run no longer covers Fabric, so stale Modrinth rows still in
+      // the log shouldn't drive verified checkmarks or check badges on search
+      // results. The admin history modal still shows them for rechecking.
+      if (result.platform === "mr") continue;
       const key = result.platform + ":" + result.projectId;
       const existing = map[key];
       if (!existing) {

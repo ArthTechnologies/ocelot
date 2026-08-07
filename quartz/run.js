@@ -522,7 +522,7 @@ process.stdin.on("data", (data) => {
   runPeriodicTasks            - Run periodic maintenance tasks immediately.
   refreshFileAccess           - Refresh file access keys and restart the FTP server (if needed).
   checkSubscriptions          - Verify Stripe subscriptions for accounts.
-  checkModpacks               - Boot the top 10 most-downloaded Forge modpacks on each of 1.18.2, 1.12.2, 1.20.1, 1.16.5 and 1.19.2, plus the top 10 Fabric 1.18.2 packs, in a scratch server and record pass/fail (also runs automatically every Sunday).
+  checkModpacks               - Boot the top 10 most-downloaded Forge modpacks on each of 1.18.2, 1.12.2, 1.20.1 and 1.16.5 in a scratch server and record pass/fail (also runs automatically every Sunday).
   modpackCheckerProgress      - Show progress of the running modpack check, or the last result.
 
   numServersOnline            - Print number of servers currently online and percentage.

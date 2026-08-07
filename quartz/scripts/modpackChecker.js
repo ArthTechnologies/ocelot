@@ -13,13 +13,14 @@ const config = utils.getConfig();
 // wiped between packs. Nothing here touches customer servers.
 
 const LOG_PATH = "logs/modpackChecks.json";
-// The version Fabric is checked on, and the one anything version-less falls
-// back to (the log's `gameVersion`, the reserved slot's server.json, …).
+// The version anything version-less falls back to (the log's `gameVersion`,
+// the reserved slot's server.json, …). Also what old Fabric rows in the log
+// were checked on, back when the batch run covered Fabric.
 const GAME_VERSION = "1.18.2";
 // Forge is checked across every version people still run packs on. Top TOP_N
-// per version, so this is 5x the Forge work of a single-version run — see the
+// per version, so this is 4x the Forge work of a single-version run — see the
 // note on the weekly schedule in run.js.
-const FORGE_GAME_VERSIONS = ["1.18.2", "1.12.2", "1.20.1"];
+const FORGE_GAME_VERSIONS = ["1.18.2", "1.12.2", "1.20.1", "1.16.5"];
 const TOP_N = 10;
 
 // CurseForge magic numbers: game 432 is Minecraft, class 4471 is Modpacks,
@@ -307,8 +308,9 @@ async function topForgeModpacks(gameVersion) {
 }
 
 // Resolves one Modrinth project hit {project_id, title, slug} to a checkable
-// pack for a given game version, or an `unavailable` placeholder. Split out
-// of topFabricModpacks for the same reason as resolveForgePack above.
+// pack for a given game version, or an `unavailable` placeholder. Fabric is no
+// longer part of the batch run, but checkOneModpack still needs this to
+// recheck the "mr" rows already sitting in the log.
 async function resolveFabricPack(hit, gameVersion) {
   const base = (config.labrinthUrl || "https://api.modrinth.com/v2/").replace(/\/?$/, "/");
   try {
@@ -341,24 +343,6 @@ async function resolveFabricPack(hit, gameVersion) {
     return unavailable("mr", hit.project_id, hit.title, hit.slug, "fabric", gameVersion,
       `Lookup failed: ${err.message}`);
   }
-}
-
-// Top Fabric packs for this version on Modrinth.
-async function topFabricModpacks() {
-  const base = (config.labrinthUrl || "https://api.modrinth.com/v2/").replace(/\/?$/, "/");
-  const facets = encodeURIComponent(
-    JSON.stringify([["project_type:modpack"], ["categories:fabric"], [`versions:${GAME_VERSION}`]])
-  );
-
-  const search = await fetchJson(
-    `${base}search?facets=${facets}&index=downloads&limit=${TOP_N}&offset=0`
-  );
-
-  const packs = [];
-  for (const hit of search.hits || []) {
-    packs.push(await resolveFabricPack(hit, GAME_VERSION));
-  }
-  return packs;
 }
 
 function unavailable(platform, projectId, name, slug, loader, gameVersion, reason) {
@@ -734,22 +718,18 @@ async function checkModpacks() {
   progress.startedAt = startedAt;
   log(
     `Starting check of the top ${TOP_N} Forge modpacks by downloads on each of ` +
-      `${FORGE_GAME_VERSIONS.join(", ")}, plus the top ${TOP_N} Fabric ${GAME_VERSION} packs…`
+      `${FORGE_GAME_VERSIONS.join(", ")}…`
   );
 
   try {
-    const discovered = await Promise.all([
-      ...FORGE_GAME_VERSIONS.map((gameVersion) =>
+    const discovered = await Promise.all(
+      FORGE_GAME_VERSIONS.map((gameVersion) =>
         topForgeModpacks(gameVersion).catch((err) => {
           log(`CurseForge discovery failed for ${gameVersion}: ${err.message}`);
           return [];
         })
-      ),
-      topFabricModpacks().catch((err) => {
-        log("Modrinth discovery failed: " + err.message);
-        return [];
-      }),
-    ]);
+      )
+    );
 
     const packs = discovered.flat();
     progress.total = packs.length;
