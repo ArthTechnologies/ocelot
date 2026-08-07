@@ -468,6 +468,22 @@ export function getModpackChecks() {
     .catch(() => null);
 }
 
+// Public counterpart of getModpackChecks(): same pass/fail data trimmed down
+// to platform/projectId/gameVersion/status/checkedAt, unauthenticated, for
+// the "verified" checkmark shown to every visitor rather than just admins.
+export function getPublicModpackChecks() {
+  if (!browser) return Promise.resolve(null);
+
+  return fetch(apiurl + "modpack-checks", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .catch(() => null);
+}
+
 // Starts a full modpack check on demand (the same job the weekly cron runs).
 // Fire-and-forget on the backend — call getModpackChecks() / poll it to watch
 // progress. Resolves to the parsed error body on failure (e.g. already

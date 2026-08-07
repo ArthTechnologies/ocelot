@@ -1007,6 +1007,7 @@ app.use("/node", require("./routes/node"));
 app.use("/referrals", require("./routes/referrals"));
 app.use("/admin", require("./routes/admin.js"));
 app.use("/support", require("./routes/support.js"));
+app.use("/modpack-checks", require("./routes/modpackChecks.js"));
 app.use("/agent", require("./routes/agent.js"));
 
 //support for extensions

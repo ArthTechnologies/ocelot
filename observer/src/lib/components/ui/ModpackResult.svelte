@@ -22,15 +22,12 @@
   export let platform: string;
 
   export let slug: string;
+  // True when the automated boot check has this pack passing, from the
+  // public (unauthenticated) modpack-checks endpoint.
+  export let verified: boolean = false;
 
   let showCheckModal = false;
 
-  let verified = false;
-  switch (name) {
-    case "The Pixelmon Modpack":
-      verified = true;
-    break;
-  }
   console.log(client);
   switch (client) {
     case "required":
@@ -113,6 +110,7 @@
           {#if verified}
             <div
               class="badge badge-success w-5 p-0 text-xs ml-2 md:ml-0"
+              title="Automated check passed"
             >
               <BadgeCheck size=16 />
             </div>

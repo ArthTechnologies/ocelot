@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { getModpackChecks, searchMods, searchPlugins, usingCurseForge } from "$lib/scripts/req";
+  import { getModpackChecks, getPublicModpackChecks, searchMods, searchPlugins, usingCurseForge } from "$lib/scripts/req";
   import ModpackResult from "./ModpackResult.svelte";
   import { t } from "$lib/scripts/i18n";
   import FeaturedPlugin from "./FeaturedPlugin.svelte";
@@ -14,8 +14,12 @@
   let mrResults = [];
   let cfResults = [];
   // "platform:projectId" -> check result. Empty for non-admins, since the
-  // endpoint 403s for them, which is what keeps the badge admin-only.
+  // endpoint 403s for them, which is what keeps the detailed pass/fail button
+  // admin-only.
   let checksByPack = {};
+  // "platform:projectId" -> check result, from the public (unauthenticated)
+  // endpoint. Drives the "verified" checkmark for every visitor.
+  let verifiedByPack = {};
   let query = "";
   let tab = "cf";
   let skeletonsLength = 15;
@@ -26,32 +30,42 @@
   let modpackName = "";
   let modpackVersion = "";
   let modpackVersionName = "";
+
+  // Forge packs are checked on several game versions, so one pack can have
+  // several results. Keep the one for the version this server runs; failing
+  // that, the most recent check.
+  function buildChecksMap(results) {
+    const serverVersion = browser ? localStorage.getItem("serverVersion") : null;
+    const map = {};
+    for (const result of results) {
+      const key = result.platform + ":" + result.projectId;
+      const existing = map[key];
+      if (!existing) {
+        map[key] = result;
+        continue;
+      }
+      if (result.gameVersion === serverVersion && existing.gameVersion !== serverVersion) {
+        map[key] = result;
+      } else if (
+        existing.gameVersion !== serverVersion &&
+        (result.checkedAt || 0) > (existing.checkedAt || 0)
+      ) {
+        map[key] = result;
+      }
+    }
+    return map;
+  }
+
   onMount(() => {
     if (browser) {
       getModpackChecks().then((data) => {
         if (!data || !Array.isArray(data.results)) return;
-        // Forge packs are now checked on several game versions, so one pack can
-        // have several results. Show the one for the version this server runs;
-        // failing that, the most recent check.
-        const serverVersion = localStorage.getItem("serverVersion");
-        const map = {};
-        for (const result of data.results) {
-          const key = result.platform + ":" + result.projectId;
-          const existing = map[key];
-          if (!existing) {
-            map[key] = result;
-            continue;
-          }
-          if (result.gameVersion === serverVersion && existing.gameVersion !== serverVersion) {
-            map[key] = result;
-          } else if (
-            existing.gameVersion !== serverVersion &&
-            (result.checkedAt || 0) > (existing.checkedAt || 0)
-          ) {
-            map[key] = result;
-          }
-        }
-        checksByPack = map;
+        checksByPack = buildChecksMap(data.results);
+      });
+
+      getPublicModpackChecks().then((data) => {
+        if (!data || !Array.isArray(data.results)) return;
+        verifiedByPack = buildChecksMap(data.results);
       });
 
       search("mr");
@@ -342,6 +356,7 @@
             <ModpackResult
               {...result}
               check={checksByPack[result.platform + ":" + result.id] || null}
+              verified={verifiedByPack[result.platform + ":" + result.id]?.status === "passed"}
             />
           {/each}
         {:else if tab == "cf"}
@@ -349,6 +364,7 @@
             <ModpackResult
               {...result}
               check={checksByPack[result.platform + ":" + result.id] || null}
+              verified={verifiedByPack[result.platform + ":" + result.id]?.status === "passed"}
             />
           {/each}
         {/if}
