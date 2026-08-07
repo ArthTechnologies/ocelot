@@ -1745,10 +1745,26 @@ function beginModpackDownload(id) {
   };
 }
 
-function finishModpackDownload(id, manualMods) {
+function finishModpackDownload(id, manualMods, download) {
+  // A download abandoned by its caller (the checker moving on to the next
+  // pack, a reinstall landing mid-flight) can settle long after a newer
+  // downloadModpack() call has replaced the record for this id. Marking the
+  // new record done would let whoever is waiting on it proceed with a
+  // half-installed pack, so a finish only counts for the record it belongs to.
+  if (download && modpackDownloads[id] !== download) return;
   if (!modpackDownloads[id]) beginModpackDownload(id);
   modpackDownloads[id].manualMods = manualMods || [];
   modpackDownloads[id].done = true;
+}
+
+// True once the downloadModpack() call currently on record for this server has
+// fully settled - every download finished (or conclusively failed), filters
+// run, manual-mod list built. The modpack checker waits on this for server
+// packs, which carry their mods pre-bundled and no manifest, so the index-file
+// rewrite it watches for manifest packs never happens.
+function isModpackDownloadSettled(id) {
+  const d = modpackDownloads[id];
+  return !!(d && d.done);
 }
 
 // The mods this server is still waiting on. Empty once the user has supplied
@@ -1857,6 +1873,9 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
   const folder = "servers/" + id;
   resetDownloadProgress(id);
   beginModpackDownload(id);
+  // Every finish below names this record so a finish outliving this call
+  // can't settle a newer install's record - see finishModpackDownload.
+  const download = modpackDownloads[id];
 
   // Every mod below is fetched with `curl -o <folder>/mods/<name>.jar`, and
   // curl won't create the directory — it just fails, silently, for every mod.
@@ -1950,7 +1969,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     // Modrinth serves every file from its own CDN, so there's
                     // no equivalent of CurseForge's per-author distribution
                     // opt-out and nothing can ever need a manual upload here.
-                    finishModpackDownload(id, []);
+                    finishModpackDownload(id, [], download);
                     // Cosmetic, so it runs alongside rather than blocking.
                     setModpackIcon(id, "mr", modpackID).catch((e) =>
                       console.log("Modpack icon failed for " + id + ": " + e.message)
@@ -1962,7 +1981,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                   // No index file means the download or unzip fell over. Let
                   // the server through rather than parking it on a hold that
                   // will never resolve.
-                  finishModpackDownload(id, []);
+                  finishModpackDownload(id, [], download);
                 }
               }
             );
@@ -2138,12 +2157,12 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     // this resolves on the next tick and costs the boot
                     // nothing.
                     buildManualModList(id, blocked, apiKey)
-                      .then((manualMods) => finishModpackDownload(id, manualMods))
+                      .then((manualMods) => finishModpackDownload(id, manualMods, download))
                       .catch((e) => {
                         console.log(
                           "Could not describe blocked mods for server " + id + ": " + e.message
                         );
-                        finishModpackDownload(id, []);
+                        finishModpackDownload(id, [], download);
                       });
                     // Cosmetic, so it runs alongside rather than blocking.
                     setModpackIcon(id, "cf", modpackID).catch((e) =>
@@ -2155,14 +2174,19 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                       // Anything thrown above would otherwise leave run()
                       // waiting on a download that never reports back.
                       console.log("Modpack install for server " + id + " failed: " + e.message);
-                      finishModpackDownload(id, []);
+                      finishModpackDownload(id, [], download);
                     });
                   });
                 } else {
-                  // No manifest means the download or unzip fell over. Let the
-                  // server through rather than parking it on a hold that will
-                  // never resolve.
-                  finishModpackDownload(id, []);
+                  // No manifest usually means this is a server pack - mods
+                  // pre-bundled, nothing to download per-mod - and sometimes
+                  // that the download or unzip fell over. Either way there is
+                  // nothing to hold the server for, so settle the record and
+                  // clear the extracted copy (the manifest path does this
+                  // after its downloads; without it every server-pack install
+                  // kept a full second copy of the pack in temp/).
+                  exec("rm -r " + folder + "/temp");
+                  finishModpackDownload(id, [], download);
                 }
               }
             );
@@ -2174,7 +2198,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
     // A URL from neither host means nothing will be downloaded, so settle the
     // record immediately - run() waits on it before booting.
     console.log("Unrecognised modpack URL for server " + id + ": " + modpackURL);
-    finishModpackDownload(id, []);
+    finishModpackDownload(id, [], download);
   }
 }
 
@@ -2537,4 +2561,5 @@ module.exports = {
   getPendingManualMods,
   resumeManualMods,
   releaseManualModsHold,
+  isModpackDownloadSettled,
 };

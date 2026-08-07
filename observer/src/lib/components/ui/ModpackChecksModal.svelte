@@ -354,7 +354,11 @@
                         {/if}
                       </td>
                       <td class="text-xs">
-                        {#if row.mods?.expected}
+                        {#if row.mods?.serverPack}
+                          <span title="Installed from the server pack — mods come pre-bundled, so there is no manifest count to compare against">
+                            {row.mods.installed}
+                          </span>
+                        {:else if row.mods?.expected}
                           <span
                             class={row.mods.installed < row.mods.expected ? "text-warning" : ""}
                           >
@@ -390,7 +394,13 @@
                                 {/if}
                               </button>
                             </div>
-                            {#if row.mods?.manifest}
+                            {#if row.mods?.serverPack}
+                              <div class="text-base-content/60">
+                                Installed from the pack's server pack — same file customers get.
+                                {row.mods.installed} mods came bundled in the zip; nothing was
+                                downloaded per-mod, so there is no manifest count to compare against.
+                              </div>
+                            {:else if row.mods?.manifest}
                               <div class="text-base-content/60">
                                 Manifest lists {row.mods.manifest} mods · panel removed
                                 {row.mods.removedClientSide || 0} client-side

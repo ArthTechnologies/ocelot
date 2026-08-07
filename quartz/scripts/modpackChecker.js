@@ -200,6 +200,50 @@ async function resolveForgePack(mod, gameVersion) {
         `No ${gameVersion} Forge file published.`);
     }
 
+    // Customers never install this file when a server pack exists: the
+    // version picker (ModpackVersion.svelte) silently swaps the install over
+    // to the paired server pack via the file's alternateFileId. Server packs
+    // bundle every jar directly — including mods whose authors disabled
+    // third-party API downloads — so checking the client pack would test an
+    // artifact with failure modes customers never see (DawnCraft's client
+    // manifest has 17 such mods; its server pack ships them all). Any
+    // failure resolving the server pack falls through to the client pack
+    // rather than skipping the check.
+    if (file.alternateFileId) {
+      try {
+        const alt = await fetchJson(
+          `https://api.curseforge.com/v1/mods/${mod.id}/files/${file.alternateFileId}`,
+          { "x-api-key": apiKey }
+        );
+        const serverFile = alt.data;
+        let serverUrl = serverFile && serverFile.downloadUrl;
+        if (serverFile && !serverUrl) {
+          const direct = await fetchJson(
+            `https://api.curseforge.com/v1/mods/${mod.id}/files/${serverFile.id}/download-url`,
+            { "x-api-key": apiKey }
+          );
+          serverUrl = direct.data;
+        }
+        if (serverUrl) {
+          return {
+            platform: "cf",
+            projectId: mod.id,
+            name: mod.name,
+            slug: mod.slug,
+            loader: "forge",
+            software: "forge",
+            gameVersion,
+            versionId: serverFile.id,
+            versionName: serverFile.displayName,
+            downloadUrl: serverUrl,
+            serverPack: true,
+          };
+        }
+      } catch (err) {
+        log(`${mod.name}: server pack lookup failed (${err.message}) — using the client pack.`);
+      }
+    }
+
     // Authors can forbid third-party downloads, which blanks downloadUrl.
     let downloadUrl = file.downloadUrl;
     if (!downloadUrl) {
@@ -372,13 +416,23 @@ function modpackIndexPath(id, platform) {
 // recorded as a pass. Both download paths rewrite their index file with
 // projectID/currentVersionDateAdded only after every mod download has settled,
 // so that rewrite is the completion signal to wait on.
+//
+// Server packs are the exception: they carry no manifest, so downloadModpack
+// never writes an index file for them — the settled flag on the download
+// record (guarded in mc.js against a stale install finishing late into this
+// shared slot) is the equivalent "everything is on disk" signal.
 function waitForModpackInstall(id, pack) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
     const indexPath = modpackIndexPath(id, pack.platform);
 
     const timer = setInterval(() => {
-      if (fs.existsSync(indexPath)) {
+      if (pack.serverPack) {
+        if (mc().isModpackDownloadSettled(id)) {
+          clearInterval(timer);
+          return resolve({ ok: true, index: null });
+        }
+      } else if (fs.existsSync(indexPath)) {
         const index = readJSON(indexPath); // {} while mid-write
         // downloadModpack has no cancellation, so a download abandoned when an
         // earlier pack timed out keeps writing into this shared slot. Requiring
@@ -522,13 +576,23 @@ async function runAttempt(pack, id) {
       outcome = { status: "failed", reason: installed.reason };
     } else {
       mods = modInstallStats(id, pack, installed.index);
+      // A server pack has no manifest to count against, so expected/manifest
+      // stay 0 — the flag tells readers of the log that 0 expected is "not
+      // applicable", not "nothing was asked for".
+      if (pack.serverPack) mods.serverPack = true;
 
       // Booting a pack with none of its mods proves nothing, and burns the
-      // full start timeout doing it.
+      // full start timeout doing it. For a server pack an empty mods folder
+      // means the unzip fell over — its jars come bundled, not downloaded.
       if (mods.expected > 0 && mods.installed === 0) {
         outcome = {
           status: "failed",
           reason: `None of the ${mods.expected} mods downloaded — the pack couldn't be installed.`,
+        };
+      } else if (pack.serverPack && mods.installed === 0) {
+        outcome = {
+          status: "failed",
+          reason: "Server pack extracted no mods — the download or unzip fell over.",
         };
       } else {
         progress.phase = "booting";
@@ -621,11 +685,11 @@ async function checkOne(pack, id) {
   const filteredOut = (mods.removedClientSide || 0) + (mods.disabledByConflict || 0);
   log(
     `${pack.name}: ${outcome.status} — ${outcome.reason}` +
-      (mods.expected ? ` (${mods.installed}/${mods.expected} mods` : "") +
-      (mods.expected && filteredOut
-        ? `, ${filteredOut} filtered out by the panel)`
+      (mods.serverPack
+        ? ` (${mods.installed} mods bundled by the server pack)`
         : mods.expected
-        ? ")"
+        ? ` (${mods.installed}/${mods.expected} mods` +
+          (filteredOut ? `, ${filteredOut} filtered out by the panel)` : ")")
         : "") +
       (attempts > 1 ? ` [attempt ${attempts}]` : "")
   );
