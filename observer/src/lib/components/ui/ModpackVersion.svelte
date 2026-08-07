@@ -18,6 +18,9 @@
   export let changelog: string = "";
   export let platform: string = "cf";
   export let alternateFileId: string = "0";
+  // Server pack file resolved by the parent (ChooseVersionModpack) before this
+  // row is created - when set, the install swaps over to it
+  export let alternateFileData: any = null;
   let modpackId = id;
   console.log("modpackId", modpackId);
   let uniqueId = Math.random().toString(36).substr(2, 9);
@@ -38,35 +41,20 @@
     downloadUrl: "",
   };
 
-  if (browser) {
-    console.error("alternateVersionId", alternateFileId);
-    if (alternateFileId != "0") {
-      fetch(
-        apiurl + "curseforge/" + modpackId + "/version/" + alternateFileId,
-        {
-          method: "GET",
-          headers: {
-            token: localStorage.getItem("token"),
-            username: localStorage.getItem("accountEmail"),
-          },
-        }
-      )
-        .then((res) => res.json())
-        .then((res) => {
-          if (res.displayName.split("").length > 45) {
-            alternateFile.name =
-              res.displayName.split("").slice(0, 43).join("") + "...";
-          } else {
-            alternateFile.name = res.displayName;
-          }
-          alternateFile.downloadUrl = res.downloadUrl;
-          alternateFile.loaded = true;
-          alternateFile.enabled = true;
-          versionId = alternateFileId;
-          localStorage.setItem("modpackVersionID", alternateFileId);
-        });
+  if (alternateFileData != null && alternateFileData.downloadUrl) {
+    let displayName = alternateFileData.displayName || "";
+    if (displayName.length > 45) {
+      alternateFile.name = displayName.slice(0, 43) + "...";
+    } else {
+      alternateFile.name = displayName;
     }
+    alternateFile.downloadUrl = alternateFileData.downloadUrl;
+    alternateFile.loaded = true;
+    alternateFile.enabled = true;
+    versionId = alternateFileId;
+  }
 
+  if (browser) {
     window.addEventListener("versionSet", (e) => {
       if (e.detail.versionId != versionId) {
         let checkbox = document.getElementById("addBtn" + uniqueId);

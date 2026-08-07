@@ -185,6 +185,8 @@
       });
     } else if (platform == "cf") {
       document.getElementById("list" + buttonType).innerHTML = "";
+      document.getElementById("noSoftwareSpecifiedList" + buttonType).innerHTML =
+        "";
       Promise.all([
         fetch(apiurl + "curseforge/" + id + "/versions", {
           method: "GET",
@@ -201,9 +203,12 @@
             .getElementById("noSoftwareSpecifiedWarning")
             .classList.add("hidden");
           console.error(data);
+          let from = "modal";
+          if (buttonType == "default") from = "serverpage";
+
+          const mainVersions = [];
+          const noSoftwareVersions = [];
           data.forEach((version) => {
-            let from = "modal";
-            if (buttonType == "default") from = "serverpage";
             if (
               version.name != vname &&
               (version.gameVersions.includes(
@@ -219,75 +224,127 @@
                 (software == "forge" && isForgeOnly)) &&
               version.gameVersions.includes(sVersion)
             ) {
-              let type = "release";
-              if (version.releaseType == 1) type = "beta";
-              else if (version.releaseType == 0) type = "alpha";
-              console.log(version);
-              new ModpackVersion({
-                target: document.getElementById("list" + buttonType),
-                props: {
-                  name: version.displayName,
-                  date: version.fileDate,
-                  type: type,
-                  url: version.downloadUrl,
-                  id: id,
-                  pluginName: name,
-                  modtype: "mod",
-                  dependencies: version.dependencies,
-                  versionId: version.id,
-                  alreadyInstalled:
-                    version.id == localStorage.getItem("modpackVersionID") &&
-                    buttonType != "default",
-                  from: from,
-                  platform: "cf",
-                  alternateFileId: version.alternateFileId,
-                },
-              });
+              mainVersions.push(version);
             } else if (
               version.name != vname &&
               version.gameVersions.includes(sVersion)
             ) {
               //if there is no server software listed (rlcraft does this sometimes) put it
               //in a special section
-              if (
-                document.getElementById("noSoftwareSpecifiedWarning") != null
-              ) {
-                document
-                  .getElementById("noSoftwareSpecifiedWarning")
-                  .classList.remove("hidden");
-              }
-              let type = "release";
-              if (version.releaseType == 1) type = "beta";
-              else if (version.releaseType == 0) type = "alpha";
-              console.log(version);
-              new ModpackVersion({
-                target: document.getElementById(
-                  "noSoftwareSpecifiedList" + buttonType
-                ),
-                props: {
-                  name: version.displayName,
-                  date: version.fileDate,
-                  type: type,
-                  url: version.downloadUrl,
-                  id: id,
-                  pluginName: name,
-                  modtype: "mod",
-                  dependencies: version.dependencies,
-                  versionId: version.id,
-                  alreadyInstalled:
-                    version.id == localStorage.getItem("modpackVersionID") &&
-                    buttonType != "default",
-                  from: from,
-                  platform: "cf",
-                  alternateFileId: version.alternateFileId,
-                },
-              });
+              noSoftwareVersions.push(version);
             }
           });
-          if (document.getElementById("list" + buttonType).innerHTML == "") {
-            document.getElementById("list" + buttonType).innerHTML =
-              "<p class='text-center'>" + $t("noVersionsModpack") + "</p>";
+
+          if (
+            noSoftwareVersions.length > 0 &&
+            document.getElementById("noSoftwareSpecifiedWarning") != null
+          ) {
+            document
+              .getElementById("noSoftwareSpecifiedWarning")
+              .classList.remove("hidden");
           }
+
+          // Server pack files resolved up front, keyed by the client file id
+          const alternateFiles = {};
+
+          const render = () => {
+            // Versions with a server pack always sort above the rest
+            const serverPacksFirst = (versions) => [
+              ...versions.filter((v) => alternateFiles[v.id] != null),
+              ...versions.filter((v) => alternateFiles[v.id] == null),
+            ];
+            const spawn = (versions, targetId) => {
+              const target = document.getElementById(targetId);
+              if (target == null) return;
+              target.innerHTML = "";
+              serverPacksFirst(versions).forEach((version) => {
+                let type = "release";
+                if (version.releaseType == 1) type = "beta";
+                else if (version.releaseType == 0) type = "alpha";
+                new ModpackVersion({
+                  target,
+                  props: {
+                    name: version.displayName,
+                    date: version.fileDate,
+                    type: type,
+                    url: version.downloadUrl,
+                    id: id,
+                    pluginName: name,
+                    modtype: "mod",
+                    dependencies: version.dependencies,
+                    versionId: version.id,
+                    alreadyInstalled:
+                      version.id == localStorage.getItem("modpackVersionID") &&
+                      buttonType != "default",
+                    from: from,
+                    platform: "cf",
+                    alternateFileId: version.alternateFileId,
+                    alternateFileData: alternateFiles[version.id] || null,
+                  },
+                });
+              });
+            };
+            spawn(mainVersions, "list" + buttonType);
+            spawn(noSoftwareVersions, "noSoftwareSpecifiedList" + buttonType);
+            if (document.getElementById("list" + buttonType).innerHTML == "") {
+              document.getElementById("list" + buttonType).innerHTML =
+                "<p class='text-center'>" + $t("noVersionsModpack") + "</p>";
+            }
+          };
+
+          const withAlternates = [...mainVersions, ...noSoftwareVersions].filter(
+            (v) => v.alternateFileId && v.alternateFileId != 0
+          );
+
+          if (withAlternates.length == 0) {
+            render();
+            return;
+          }
+
+          // At least one version might have a server pack - keep every row as
+          // a skeleton until all lookups settle so the list renders once, with
+          // server packs on top
+          const skeleton = `<div class="bg-base-200 rounded-lg p-3">
+            <div class="flex justify-between place-items-center items-center">
+              <div>
+                <div class="skeleton h-7 w-48 rounded-md"></div>
+                <div class="flex gap-2 flex-wrap mt-2">
+                  <div class="skeleton h-[1.875rem] w-[13rem] rounded-md"></div>
+                </div>
+              </div>
+              <div class="flex place-items-center space-x-2">
+                <div class="skeleton w-[3rem] h-[3rem] rounded-full"></div>
+              </div>
+            </div>
+          </div>`;
+          document.getElementById("list" + buttonType).innerHTML =
+            skeleton.repeat(mainVersions.length);
+          document.getElementById(
+            "noSoftwareSpecifiedList" + buttonType
+          ).innerHTML = skeleton.repeat(noSoftwareVersions.length);
+
+          Promise.all(
+            withAlternates.map((version) =>
+              fetch(
+                apiurl + "curseforge/" + id + "/version/" + version.alternateFileId,
+                {
+                  method: "GET",
+                  headers: {
+                    token: localStorage.getItem("token"),
+                    username: localStorage.getItem("accountEmail"),
+                  },
+                }
+              )
+                .then((res) => res.json())
+                .then((file) => {
+                  if (file && file.downloadUrl) {
+                    alternateFiles[version.id] = file;
+                  }
+                })
+                // A failed lookup just leaves that row as the client pack
+                .catch(() => {})
+            )
+          ).then(render);
         });
     }
   }
