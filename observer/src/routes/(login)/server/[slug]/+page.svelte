@@ -488,10 +488,10 @@
 <!-- A held server sits in "starting" forever, which on its own reads as a
      hang. This says why, and gets the modal back after a dismissal. -->
 <button
-  class="badge badge-warning gap-1 font-ubuntu text-[.8rem] flex items-center mb-0.5"
+  class="badge badge-warning gap-1 font-ubuntu text-[.8rem] flex items-center mb-0.5 cursor-pointer hover:brightness-110"
   on:click={() => (manualModsOpen = true)}
 >
-  <span class="mb-[0.2rem]">●</span> Waiting on {manualMods.length} mod{manualMods.length === 1 ? "" : "s"}
+  <span class="mb-[0.2rem]">●</span> Waiting on you to download {manualMods.length} mod{manualMods.length === 1 ? "" : "s"}
 </button>
   {:else if state == "true" }
 <div class="badge badge-neutral gap-1 font-ubuntu text-[.8rem] flex items-center mb-0.5">

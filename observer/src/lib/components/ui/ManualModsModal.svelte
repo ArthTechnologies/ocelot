@@ -102,7 +102,7 @@
           The authors of {mods.length}
           {mods.length === 1 ? "mod" : "mods"} in this modpack don't allow other sites
           to download them, so we can't fetch them for you. Grab them from CurseForge
-          below and drop them in — your server will start as soon as you're done.
+          below and drop them in. Your server will start as soon as you're done.
         </p>
       </div>
       <button
@@ -238,7 +238,7 @@
             <Loader size={14} class="animate-spin" />
             Uploading…
           {:else}
-            Done — start server
+            Done, start server
           {/if}
         </button>
       </div>
