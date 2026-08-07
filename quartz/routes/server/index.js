@@ -629,6 +629,25 @@ router.get(`/:id/manual-mods`, function (req, res) {
   }
 });
 
+// Live per-mod download progress for a modpack install - the Mods tab polls
+// this to draw its "X of Y mods downloaded" bar while a pack is fetching.
+// `active` is true only while a downloadModpack() call is actually in flight;
+// the counts linger after an install finishes (until the next one resets
+// them), so the bar keys on `active`, not on the numbers.
+router.get(`/:id/modsDownloadProgress`, function (req, res) {
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON("accounts/" + email + ".json");
+  if (utils.hasAccess(token, account, req.params.id)) {
+    res.status(200).json({
+      ...f.getDownloadProgress(req.params.id),
+      active: f.isModpackDownloadActive(req.params.id),
+    });
+  } else {
+    res.status(401).json({ msg: `Invalid credentials.` });
+  }
+});
+
 // Drops the uploaded jars into the server's mods folder and releases the hold,
 // which lets the boot that's already waiting in run() carry on. Accepts zero
 // files too — that's the user deciding to start without a mod they couldn't

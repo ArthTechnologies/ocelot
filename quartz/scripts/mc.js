@@ -1767,6 +1767,16 @@ function isModpackDownloadSettled(id) {
   return !!(d && d.done);
 }
 
+// Whether the downloadModpack() call on record for this server is still in
+// flight. The modsDownloadProgress route keys on this rather than on
+// isModpackDownloadSettled because a server with no record at all also reads
+// as "not settled", and the progress counts linger after an install until the
+// next one resets them.
+function isModpackDownloadActive(id) {
+  const d = modpackDownloads[id];
+  return !!(d && !d.done);
+}
+
 // The mods this server is still waiting on. Empty once the user has supplied
 // them (or gave up and stopped the server), so this doubles as "is this server
 // currently held?".
@@ -2562,4 +2572,5 @@ module.exports = {
   resumeManualMods,
   releaseManualModsHold,
   isModpackDownloadSettled,
+  isModpackDownloadActive,
 };

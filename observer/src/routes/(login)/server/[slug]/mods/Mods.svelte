@@ -1,8 +1,10 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { onMount } from "svelte";
   import {
     apiurl,
     getMods,
+    getModsDownloadProgress,
     usingOcelot,
     getServerNode,
   } from "$lib/scripts/req";
@@ -23,6 +25,27 @@
   let modpackDesc = "";
   let modpackIcon = "";
   let modpackSlug = "";
+
+  // Live modpack install progress, polled from /server/:id/modsDownloadProgress.
+  // `active` only holds while a download is actually in flight, so the bar
+  // can't linger on the stale counts of a finished install.
+  let downloadProgress = null;
+  function pollDownloadProgress() {
+    let id = localStorage.getItem("serverID");
+    getModsDownloadProgress(id).then((progress) => {
+      if (progress == undefined) return;
+      const wasActive = downloadProgress != null && downloadProgress.active;
+      downloadProgress = progress;
+      // Install just finished - refresh so the new mods show up
+      if (wasActive && !progress.active) search();
+    });
+  }
+  onMount(() => {
+    pollDownloadProgress();
+    const interval = setInterval(pollDownloadProgress, 3000);
+    return () => clearInterval(interval);
+  });
+
   if (browser) {
     //run search upon the "refresh" event
     document.addEventListener("refresh", function () {
@@ -244,9 +267,38 @@
 
 <div class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradietStroke w-full space-y-2 min-h-[30rem]">
   <div class="flex justify-between items-center">
-    <p class="font-ubuntu text-gray-200 text-lg ml-1">Installed Mods</p>
+    <p class="font-ubuntu text-gray-200 text-lg ml-1">
+      {#if res.mods.length > 1}{res.mods.length} Installed Mods{:else}Installed Mods{/if}
+    </p>
     <AddMod />
-  </div>      {#if res.modpack != undefined}
+  </div>
+  {#if downloadProgress != null && downloadProgress.active}
+    <div class="bg-base-200 rounded-lg p-3">
+      {#if downloadProgress.total > 0}
+        <div class="flex justify-between items-center text-sm mb-1.5">
+          <span
+            >Downloading mods... {downloadProgress.completed +
+              downloadProgress.failed}/{downloadProgress.total}</span
+          >
+          <span class="text-gray-400"
+            >{downloadProgress.total -
+              downloadProgress.completed -
+              downloadProgress.failed} left{#if downloadProgress.failed > 0},
+              {downloadProgress.failed} failed{/if}</span
+          >
+        </div>
+        <progress
+          class="progress progress-primary w-full"
+          value={downloadProgress.completed + downloadProgress.failed}
+          max={downloadProgress.total}
+        />
+      {:else}
+        <div class="text-sm mb-1.5">Preparing modpack download...</div>
+        <progress class="progress progress-primary w-full" />
+      {/if}
+    </div>
+  {/if}
+  {#if res.modpack != undefined}
     <div class="md:flex items-center md:space-x-3 justify-between">
 
 

@@ -222,6 +222,19 @@ export function getMods(id: number, modtype: string) {
   }
 }
 
+export function getModsDownloadProgress(id: number) {
+  if (browser) {
+    let baseurl = apiurl;
+    if (usingOcelot)
+      baseurl =
+        getServerNode(id);
+    const url = baseurl + "server/" + id + "/modsDownloadProgress";
+    return fetch(url, GET)
+      .then((res) => res.json())
+      .catch((err) => console.error(err));
+  }
+}
+
 export function sendVersion(
   link: string,
   id: string,
