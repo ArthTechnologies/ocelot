@@ -65,9 +65,13 @@ if (total < 1024 * 100) { // For kilobytes (kB)
 // Drops log-level blocks from a console line for display - "[Server thread/INFO]",
 // "[main/WARN]" and friends. A trailing ":" belongs to the block rather than the
 // message ("[Server thread/INFO]: Done" -> "Done"), so it goes too, along with
-// the single space that followed it.
+// the single space that followed it. Paper puts the level inside the timestamp
+// bracket instead ("[03:07:41 INFO]"), so that level word is dropped too while
+// the timestamp itself stays.
 export function stripLogLevelBlocks(line: string) {
-  return line.replace(/\[[^[\]]*\/(?:INFO|WARN)\]:?[ \t]?/g, "");
+  return line
+    .replace(/\[[^[\]]*\/(?:INFO|WARN)\]:?[ \t]?/g, "")
+    .replace(/\[(\d{1,2}:\d{2}:\d{2}) [A-Za-z]+\]/g, "[$1]");
 }
 
 // Stack trace and known repetitive patterns that should always group

@@ -21,3 +21,5 @@ function persistedBoolean(key: string, defaultValue: boolean): Writable<boolean>
 export const condenseTimestamps = persistedBoolean("terminalCondenseTimestamps", true);
 export const groupSimilarLines = persistedBoolean("terminalGroupSimilarLines", true);
 export const showLineNumbers = persistedBoolean("terminalShowLineNumbers", false);
+// "Line Condensation" clamps every console row to two UI lines (click-to-expand)
+export const lineCondensation = persistedBoolean("terminalLineCondensation", true);
