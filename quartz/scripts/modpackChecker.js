@@ -183,36 +183,40 @@ async function resolveForgePack(mod, gameVersion) {
       { "x-api-key": apiKey }
     );
 
-    let file = (filesResponse.data || [])[0];
+    let files = filesResponse.data || [];
     // The loader filter above depends on the file being tagged with a
     // loader, which isn't guaranteed (see FORGE_ONLY_PATH comment above) —
     // for packs we've confirmed are Forge-only, fall back to the newest
-    // file for the version instead of reporting the pack unavailable.
-    if (!file && isForgeOnlyModpack(mod.id)) {
+    // files for the version instead of reporting the pack unavailable.
+    if (!files.length && isForgeOnlyModpack(mod.id)) {
       filesResponse = await fetchJson(
-        `https://api.curseforge.com/v1/mods/${mod.id}/files?gameVersion=${gameVersion}&pageSize=1`,
+        `https://api.curseforge.com/v1/mods/${mod.id}/files?gameVersion=${gameVersion}&pageSize=10`,
         { "x-api-key": apiKey }
       );
-      file = (filesResponse.data || [])[0];
+      files = filesResponse.data || [];
     }
+    const file = files[0];
     if (!file) {
       return unavailable("cf", mod.id, mod.name, mod.slug, "forge", gameVersion,
         `No ${gameVersion} Forge file published.`);
     }
 
-    // Customers never install this file when a server pack exists: the
+    // Customers never install a client file when a server pack exists: the
     // version picker (ModpackVersion.svelte) silently swaps the install over
-    // to the paired server pack via the file's alternateFileId. Server packs
+    // to the paired server pack via the file's alternateFileId, and sorts
+    // versions with a server pack above newer ones without. Server packs
     // bundle every jar directly — including mods whose authors disabled
     // third-party API downloads — so checking the client pack would test an
     // artifact with failure modes customers never see (DawnCraft's client
-    // manifest has 17 such mods; its server pack ships them all). Any
-    // failure resolving the server pack falls through to the client pack
-    // rather than skipping the check.
-    if (file.alternateFileId) {
+    // manifest has 17 such mods; its server pack ships them all). Files are
+    // newest-first, so this walks back to the newest file whose server pack
+    // resolves — even when the very latest file has none — and any failure
+    // resolving one falls through to the next candidate, then to the newest
+    // client pack, rather than skipping the check.
+    for (const candidate of files.filter((f) => f.alternateFileId)) {
       try {
         const alt = await fetchJson(
-          `https://api.curseforge.com/v1/mods/${mod.id}/files/${file.alternateFileId}`,
+          `https://api.curseforge.com/v1/mods/${mod.id}/files/${candidate.alternateFileId}`,
           { "x-api-key": apiKey }
         );
         const serverFile = alt.data;
@@ -240,7 +244,7 @@ async function resolveForgePack(mod, gameVersion) {
           };
         }
       } catch (err) {
-        log(`${mod.name}: server pack lookup failed (${err.message}) — using the client pack.`);
+        log(`${mod.name}: server pack lookup failed for file ${candidate.id} (${err.message}).`);
       }
     }
 
