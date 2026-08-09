@@ -2195,6 +2195,12 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                   // clear the extracted copy (the manifest path does this
                   // after its downloads; without it every server-pack install
                   // kept a full second copy of the pack in temp/).
+                  // The pre-bundled jars still need filtering - a server pack
+                  // ships client-only mods like NotEnoughAnimations just as a
+                  // client pack does. Both calls no-op on a missing mods/
+                  // folder, which is what a failed download/unzip leaves here.
+                  deleteClientSideMods(id);
+                  resolveModConflicts(id);
                   exec("rm -r " + folder + "/temp");
                   finishModpackDownload(id, [], download);
                 }

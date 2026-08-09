@@ -403,8 +403,15 @@
                             {#if row.mods?.serverPack}
                               <div class="text-base-content/60">
                                 Installed from the pack's server pack — same file customers get.
-                                {row.mods.installed} mods came bundled in the zip; nothing was
+                                {row.mods.installed} mods live on the server; nothing was
                                 downloaded per-mod, so there is no manifest count to compare against.
+                                {#if row.mods.removedClientSide || row.mods.disabledByConflict}
+                                  · panel removed {row.mods.removedClientSide || 0} client-side
+                                  {#if row.mods.disabledByConflict}
+                                    and disabled {row.mods.disabledByConflict} conflicting
+                                  {/if}
+                                  from the bundle
+                                {/if}
                               </div>
                             {:else if row.mods?.manifest}
                               <div class="text-base-content/60">

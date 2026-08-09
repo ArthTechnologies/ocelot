@@ -686,7 +686,8 @@ async function checkOne(pack, id) {
   log(
     `${pack.name}: ${outcome.status} — ${outcome.reason}` +
       (mods.serverPack
-        ? ` (${mods.installed} mods bundled by the server pack)`
+        ? ` (${mods.installed} mods from the server pack` +
+          (filteredOut ? `, ${filteredOut} filtered out by the panel)` : ")")
         : mods.expected
         ? ` (${mods.installed}/${mods.expected} mods` +
           (filteredOut ? `, ${filteredOut} filtered out by the panel)` : ")")
