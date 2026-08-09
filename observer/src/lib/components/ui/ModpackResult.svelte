@@ -2,17 +2,11 @@
   import { getVersions } from "$lib/scripts/req";
 
   import ChooseVersionModpack from "$lib/components/ui/ChooseVersionModpack.svelte";
-  import CheckDetailsModal from "$lib/components/ui/CheckDetailsModal.svelte";
   import { browser } from "$app/environment";
   import { t } from "$lib/scripts/i18n";
-  // lucide-svelte 0.263 names the shield-with-X icon ShieldClose; it was only
-  // renamed to ShieldX in later versions.
-  import { AlertCircle, BadgeCheck, Download, ShieldCheck, ShieldClose } from "lucide-svelte";
+  import { AlertCircle, BadgeCheck, Download } from "lucide-svelte";
   import TranslateableText from "./TranslateableText.svelte";
   export let name: string;
-  // Result of the automated boot check for this pack, or null when there isn't
-  // one / the viewer isn't an admin. Shape: { status, reason, checkedAt }.
-  export let check: { status: string; reason?: string; checkedAt?: number } | null = null;
   export let author: string;
   export let desc: string;
   export let icon: string;
@@ -25,8 +19,6 @@
   // True when the automated boot check has this pack passing, from the
   // public (unauthenticated) modpack-checks endpoint.
   export let verified: boolean = false;
-
-  let showCheckModal = false;
 
   console.log(client);
   switch (client) {
@@ -49,9 +41,6 @@
   if (browser) {
     software = localStorage.getItem("serverSoftware");
   }
-
-  const checkedWhen = (ts: number | undefined) =>
-    ts ? new Date(ts).toLocaleString() : "unknown time";
 </script>
 
 <div class="bg-base-200 rounded-lg p-3">
@@ -138,22 +127,6 @@
               {client}
             </div>
           {/if}
-          {#if check && (check.status === "passed" || check.status === "failed")}
-            <button
-              on:click={() => showCheckModal = true}
-              class="flex px-2 py-1 rounded-md place-items-center text-sm w-fit cursor-pointer transition-opacity hover:opacity-80
-                {check.status === 'passed'
-                ? 'bg-success text-success-content'
-                : 'bg-error text-error-content'}"
-            >
-              {#if check.status === "passed"}
-                <ShieldCheck class="mr-1.5 shrink-0" size="16" />
-              {:else}
-                <ShieldClose class="mr-1.5 shrink-0" size="16" />
-              {/if}
-              Automated check {check.status}
-            </button>
-          {/if}
         </div>
       </div>
     </div>
@@ -168,11 +141,3 @@
     />
   </div>
 </div>
-
-{#if showCheckModal && check}
-  <CheckDetailsModal
-    {name}
-    {check}
-    on:close={() => showCheckModal = false}
-  />
-{/if}

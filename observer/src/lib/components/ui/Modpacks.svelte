@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { getModpackChecks, getPublicModpackChecks, searchMods, searchPlugins, usingCurseForge } from "$lib/scripts/req";
+  import { getPublicModpackChecks, searchMods, searchPlugins, usingCurseForge } from "$lib/scripts/req";
   import ModpackResult from "./ModpackResult.svelte";
   import { t } from "$lib/scripts/i18n";
   import FeaturedPlugin from "./FeaturedPlugin.svelte";
@@ -13,10 +13,6 @@
   let promise;
   let mrResults = [];
   let cfResults = [];
-  // "platform:projectId" -> check result. Empty for non-admins, since the
-  // endpoint 403s for them, which is what keeps the detailed pass/fail button
-  // admin-only.
-  let checksByPack = {};
   // "platform:projectId" -> check result, from the public (unauthenticated)
   // endpoint. Drives the "verified" checkmark for every visitor.
   let verifiedByPack = {};
@@ -62,11 +58,6 @@
 
   onMount(() => {
     if (browser) {
-      getModpackChecks().then((data) => {
-        if (!data || !Array.isArray(data.results)) return;
-        checksByPack = buildChecksMap(data.results);
-      });
-
       getPublicModpackChecks().then((data) => {
         if (!data || !Array.isArray(data.results)) return;
         verifiedByPack = buildChecksMap(data.results);
@@ -359,7 +350,6 @@
           {#each mrResults as result}
             <ModpackResult
               {...result}
-              check={checksByPack[result.platform + ":" + result.id] || null}
               verified={verifiedByPack[result.platform + ":" + result.id]?.status === "passed"}
             />
           {/each}
@@ -367,7 +357,6 @@
           {#each cfResults as result}
             <ModpackResult
               {...result}
-              check={checksByPack[result.platform + ":" + result.id] || null}
               verified={verifiedByPack[result.platform + ":" + result.id]?.status === "passed"}
             />
           {/each}
