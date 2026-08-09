@@ -9,8 +9,8 @@ const config = utils.getConfig();
 // each one actually reaches an online state, so support can tell "this pack is
 // broken upstream" from "this user's server is broken" without doing it by hand.
 //
-// One pack is checked at a time in a single reserved server slot, which is
-// wiped between packs. Nothing here touches customer servers.
+// SLOT_COUNT packs are checked at a time, one reserved server slot each, wiped
+// between packs. Nothing here touches customer servers.
 
 const LOG_PATH = "logs/modpackChecks.json";
 // The version anything version-less falls back to (the log's `gameVersion`,
@@ -22,6 +22,18 @@ const GAME_VERSION = "1.18.2";
 // note on the weekly schedule in run.js.
 const FORGE_GAME_VERSIONS = ["1.18.2", "1.12.2", "1.20.1", "1.16.5"];
 const TOP_N = 10;
+
+// How many packs are checked at once, one reserved server slot each — ids
+// `modpackCheckServerId` .. `+ SLOT_COUNT - 1`. Raising this is a trade against
+// per-slot resources: each slot is pinned to CHECK_CPU_CORES core and
+// CHECK_RAM_GB of RAM (below), so three slots is roughly the footprint two
+// customer-sized servers used to have.
+const SLOT_COUNT = 3;
+// A checker slot is a throwaway world with nobody on it — it needs enough to
+// generate spawn chunks and reach "Done", not to hold players. Kept low so the
+// slots running in parallel don't starve the customer servers on the same box.
+const CHECK_RAM_GB = 5;
+const CHECK_CPU_CORES = 1;
 
 // CurseForge magic numbers: game 432 is Minecraft, class 4471 is Modpacks,
 // loader 1 is Forge, and sortField 6 is TotalDownloads (2 would be Popularity,
@@ -65,7 +77,7 @@ const POLL_MS = 2000;
 const KILL_SETTLE_MS = 3000;
 // downloadModpack() fires every mod's download unbounded by default, which for
 // a few-hundred-mod pack means that many simultaneous CurseForge API calls on
-// one shared key — the checker runs two packs at once on top of that, so
+// one shared key — the checker runs SLOT_COUNT packs at once on top of that, so
 // without a cap the burst is large enough to get rate-limited/dropped mid-pack,
 // leaving a pack looking broken when it isn't. Customer-triggered installs
 // don't pass this and stay unbounded.
@@ -84,7 +96,7 @@ function emptyProgress() {
     startedAt: null,
     index: 0,
     total: 0,
-    currentPacks: [], // Array of up to 2 concurrent packs
+    currentPacks: [], // Slot-indexed, up to SLOT_COUNT concurrent packs
     passed: 0,
     failed: 0,
     skipped: 0,
@@ -101,8 +113,8 @@ function getProgress() {
   return { ...progress };
 }
 
-// Phase of the check running on `slotId`. With the two slots draining a shared
-// queue they genuinely diverge (one downloading while the other boots), so the
+// Phase of the check running on `slotId`. With the slots draining a shared
+// queue they genuinely diverge (one downloading while another boots), so the
 // phase lives on the slot's currentPacks entry; the legacy global
 // progress.phase is still mirrored (last writer wins) for the console command
 // and any old readers.
@@ -123,7 +135,7 @@ function log(message) {
   console.log("[ModpackCheck] " + message);
 }
 
-// The reserved slots (two for parallel checking). Kept clear of [idOffset, idOffset + maxServers), which is
+// The reserved slots. Kept clear of [idOffset, idOffset + maxServers), which is
 // the range /server/reserve hands out to customers.
 function checkServerId() {
   const configured = parseInt(config.modpackCheckServerId);
@@ -132,7 +144,7 @@ function checkServerId() {
 
 function checkServerIds() {
   const primary = checkServerId();
-  return [primary, primary + 1];
+  return Array.from({ length: SLOT_COUNT }, (_, i) => primary + i);
 }
 
 function slotIsSafe(id) {
@@ -400,7 +412,12 @@ async function prepareSlot(id, pack) {
     adminServer: true,
     modpackCheck: true,
     // Big modded packs OOM at the 4GB a plain server.json falls back to.
-    ramOverrideGB: 6,
+    ramOverrideGB: CHECK_RAM_GB,
+    // A slot gets a single core rather than the default four — with several
+    // checks in flight at once, handing each one four would oversubscribe the
+    // box against the customer servers sharing it. Slower boots, so this
+    // trades against START_TIMEOUT_MS.
+    cpuCoresOverride: CHECK_CPU_CORES,
   });
 }
 
@@ -714,11 +731,13 @@ async function checkModpacks() {
     return readLog();
   }
 
-  const [id1, id2] = checkServerIds();
-  if (!slotIsSafe(id1) || !slotIsSafe(id2)) {
+  const slotIds = checkServerIds();
+  const unsafeSlots = slotIds.filter((id) => !slotIsSafe(id));
+  if (unsafeSlots.length > 0) {
     log(
-      `Refusing to run: slots ${id1} and ${id2} overlap the customer id range or map to ` +
-        `invalid ports. Set modpackCheckServerId in config.txt to a free id.`
+      `Refusing to run: slot(s) ${unsafeSlots.join(", ")} overlap the customer id range or map to ` +
+        `invalid ports. Set modpackCheckServerId in config.txt to a free id with ` +
+        `${SLOT_COUNT} consecutive ids free above it.`
     );
     return readLog();
   }
@@ -750,12 +769,11 @@ async function checkModpacks() {
     // Slot-indexed: currentPacks[i] is what slot i is checking right now,
     // null while that slot is idle. The stream endpoint pairs entries with
     // checkServerIds() positionally, so the positions must stay stable.
-    const slotIds = [id1, id2];
     progress.currentPacks = slotIds.map(() => null);
 
-    // Two workers, each pinned to its own reserved slot, pulling the next
-    // pack off the shared list the moment their current one settles — a slow
-    // pack no longer stalls the other slot the way fixed pairs did.
+    // One worker per reserved slot, each pulling the next pack off the shared
+    // list the moment their current one settles — a slow pack no longer stalls
+    // the other slots the way fixed pairs did.
     const results = new Array(packs.length);
     let nextIndex = 0;
     const worker = async (slotIndex) => {

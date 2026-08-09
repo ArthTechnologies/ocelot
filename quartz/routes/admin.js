@@ -98,8 +98,8 @@ router.post("/modpack-checks/run-one", (req, res) => {
 // whichever reserved slot(s) are active, so the admin dashboard can render a
 // real terminal + download panel instead of just the coarse index/total from
 // GET /modpack-checks. Works for both the single-pack recheck (one slot) and,
-// incidentally, a full batch run (up to two slots) since both share the same
-// `progress` state.
+// incidentally, a full batch run (one slot per concurrent check) since both
+// share the same `progress` state.
 router.get("/modpack-checks/stream", (req, res) => {
   const modpackChecker = require("../scripts/modpackChecker.js");
 

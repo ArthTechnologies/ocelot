@@ -249,27 +249,34 @@
         <!-- Live progress -->
         {#if data?.running && progress}
           <div class="rounded-xl border border-warning/30 bg-warning/5 p-4">
-            <div class="flex items-center justify-between mb-2">
-              <p class="font-semibold text-sm flex items-center gap-2 flex-wrap">
-                <Loader size={14} class="animate-spin text-warning" />
+            <div class="flex items-start justify-between gap-3 mb-2">
+              <!-- One line per slot. Joining the names and listing the badges
+                   separately stopped working once more than a couple of packs
+                   ran at once — there was no telling which phase belonged to
+                   which pack. -->
+              <div class="font-semibold text-sm min-w-0">
                 {#if activePacks.length > 0}
-                  <span>
-                    {activePacks.map(p => p.name).join(", ")}
-                  </span>
                   {#each activePacks as pack}
-                    <span class="badge badge-ghost badge-sm">
-                      {pack.loader} {pack.gameVersion}{#if pack.phase} · {pack.phase}{/if}
-                    </span>
+                    <p class="flex items-center gap-2 flex-wrap py-0.5">
+                      <Loader size={14} class="animate-spin text-warning shrink-0" />
+                      <span class="truncate">{pack.name}</span>
+                      <span class="badge badge-ghost badge-sm">
+                        {pack.loader} {pack.gameVersion}{#if pack.phase} · {pack.phase}{/if}
+                      </span>
+                    </p>
                   {/each}
                 {:else}
-                  <span>Discovering packs…</span>
+                  <p class="flex items-center gap-2">
+                    <Loader size={14} class="animate-spin text-warning shrink-0" />
+                    <span>Discovering packs…</span>
+                  </p>
                 {/if}
-              </p>
-              <p class="text-xs text-base-content/60">
+              </div>
+              <p class="text-xs text-base-content/60 whitespace-nowrap">
                 {progress.index}/{progress.total || "?"}
-                <!-- With two slots the global phase is whichever wrote last;
-                     the per-pack badges carry the real phases, so it only
-                     shows when nothing is active yet (discovering). -->
+                <!-- The global phase is whichever slot wrote last; the per-pack
+                     badges carry the real phases, so it only shows when nothing
+                     is active yet (discovering). -->
                 {#if progress.phase && activePacks.length === 0}· {progress.phase}{/if}
               </p>
             </div>

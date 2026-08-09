@@ -412,20 +412,22 @@ function run(
     }
 
     let port = portOffset + parseInt(id);
-    let thread1 = threads[0]
-    let thread2 = threads[1]; 
-    let thread3 = threads[2];
-    let thread4 = threads[3];
-    //removes those threads from the array
-    threads.splice(0, 3);
-    
-    //adds those threads to the end of the array
-    threads.push(thread1);
-    threads.push(thread2);
-    threads.push(thread3);
-    threads.push(thread4);
+    //servers get four threads unless server.json asks for fewer - the modpack
+    //checker pins its slots to one so several parallel checks don't
+    //oversubscribe the box against the customers sharing it. Clamped to what
+    //the machine actually has, otherwise a box with fewer than four threads
+    //builds a cpuset string containing "undefined" and docker refuses to run.
+    const requestedCores = parseInt(server.cpuCoresOverride);
+    const coreCount = Math.max(
+      1,
+      Math.min(Number.isFinite(requestedCores) ? requestedCores : 4, threads.length)
+    );
+    //take the next `coreCount` threads off the front and put them back on the
+    //end, so consecutive servers land on different cores
+    const assigned = threads.splice(0, coreCount);
+    threads.push(...assigned);
 
-    let threadsString = thread1 + "," + thread2 + "," + thread3 + "," + thread4;
+    let threadsString = assigned.join(",");
 
     //clear any existing items with the same id
     for (let i = 0; i < serversOnThreads.length; i++) {

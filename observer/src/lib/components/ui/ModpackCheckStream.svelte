@@ -25,6 +25,16 @@
   let termRefs: Record<number, HTMLDivElement> = {};
   let stuckToBottom: Record<number, boolean> = {};
 
+  // Slot cards stack vertically inside an 80vh body. Three full-height
+  // terminals overflow that on most screens, so they shrink once there are
+  // more than two — better to see every slot at once than to scroll for the
+  // third. Every class is spelled out in full here rather than built up by
+  // interpolation, because Tailwind only emits classes it can find literally
+  // in the source.
+  $: threeUp = (event?.slots?.length || 0) > 2;
+  $: termHeight = threeUp ? "h-56" : "h-72";
+  $: panelHeight = threeUp ? "lg:h-56" : "lg:h-72";
+
   const PHASE_META: Record<string, { label: string; icon: any }> = {
     discovering: { label: "Discovering packs", icon: Search },
     checking: { label: "Checking", icon: Loader },
@@ -166,12 +176,12 @@
               <!-- Terminal + download progress, side by side -->
               <div class="flex flex-col lg:flex-row">
                 <div
-                  class="flex-1 bg-black/90 text-gray-200 font-mono text-[12px] leading-relaxed p-3 h-72 overflow-y-auto whitespace-pre-wrap break-words"
+                  class="flex-1 bg-black/90 text-gray-200 font-mono text-[12px] leading-relaxed p-3 {termHeight} overflow-y-auto whitespace-pre-wrap break-words"
                   bind:this={termRefs[slot.id]}
                   on:scroll={() => handleScroll(slot.id)}
                 >{slot.terminal || "…"}</div>
 
-                <div class="lg:w-64 shrink-0 border-t lg:border-t-0 lg:border-l border-base-300/40 p-3 flex flex-col gap-3 lg:h-72">
+                <div class="lg:w-64 shrink-0 border-t lg:border-t-0 lg:border-l border-base-300/40 p-3 flex flex-col gap-3 {panelHeight}">
                   <div>
                     <div class="flex items-center justify-between text-xs mb-1">
                       <span class="flex items-center gap-1.5 text-base-content/60">
