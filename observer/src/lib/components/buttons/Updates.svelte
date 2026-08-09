@@ -24,6 +24,15 @@
   // /info/jars normalises every filename to software-version-variant.ext
   const JAR_NAME = /^([a-zA-Z]+)-(\d+(?:\.\d+)*)-(\w+)\.(jar|zip)$/;
 
+  // Changing the game version of a Forge/NeoForge server means reinstalling the
+  // loader against a mod set built for the old one, so there's no one-click
+  // update for them at all. server.software reaches localStorage with
+  // inconsistent casing depending on which path wrote it, so match lowercased.
+  const NO_UPDATE_SOFTWARE = ["forge", "neoforge"];
+  $: unsupportedSoftware = NO_UPDATE_SOFTWARE.includes(
+    (serverSoftware || "").toLowerCase()
+  );
+
   // A stored server version can carry a variant suffix ("1.20.1*pre",
   // "1.20.1 Experimental") — compare on the numeric part only.
   function cleanVersion(v: string) {
@@ -59,6 +68,7 @@
     addonReady = {};
 
     if (!serverSoftware || !serverVersion || jarsList.length == 0) return;
+    if (NO_UPDATE_SOFTWARE.includes(serverSoftware.toLowerCase())) return;
 
     const current = cleanVersion(serverVersion);
     if (pendingVersion) {
@@ -190,7 +200,7 @@
   }
 </script>
 
-{#if newerVersionAvailable && serverSoftware != "Forge"}
+{#if newerVersionAvailable && !unsupportedSoftware}
   <label for="updates" class="btn btn-neutral btn-sm" on:click={onclick}
     ><ArrowDownCircle class="mr-1.5" size="18" />
     {$t("button.update")}</label
@@ -208,7 +218,7 @@
         {latestUpdate}{variantLabel(latestVariant)}
         {$t("update")}
       </h3>
-      {#if serverSoftware == "Quilt" || serverSoftware == "Fabric" || serverSoftware == "NeoForge"}
+      {#if ["quilt", "fabric"].includes(serverSoftware.toLowerCase())}
         <div
           class="bg-warning w-86 rounded-lg text-black p-2 py-0.5 flex items-center space-x-2"
         >
