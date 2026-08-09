@@ -851,6 +851,15 @@ function getServerStates() {
   data.serverStates = [];
   
   fs.readdirSync("servers").forEach((file) => {
+    // The modpack checker owns reserved slots (see scripts/modpackChecker.js)
+    // that it boots and kills on its own schedule as part of a normal check —
+    // a true->false transition there isn't a failure, and the slot's folder
+    // gets wiped and rewritten between packs, so treating it like a customer
+    // server races this watchdog's delayed restart against that rewrite and
+    // can catch the folder with a missing/partial server.json.
+    const serverJson = readJSON("servers/" + file + "/server.json");
+    if (serverJson.modpackCheck === true) return;
+
     const currentState = f.getState(file);
     data.serverStates.push(file + ":" + currentState);
 
