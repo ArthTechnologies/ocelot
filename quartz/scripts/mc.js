@@ -1884,6 +1884,7 @@ function whenClearToBoot(id, engaged, start) {
 function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Infinity) {
   const folder = "servers/" + id;
   resetDownloadProgress(id);
+  resetModFilterStats(id);
   beginModpackDownload(id);
   // Every finish below names this record so a finish outliving this call
   // can't settle a newer install's record - see finishModpackDownload.
@@ -2077,6 +2078,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     // runs and handed to run() at the end so it can park the
                     // server until the user uploads them.
                     const blocked = [];
+                    const clientSideModProjectIds = loadClientSideModProjectIds();
                     fetchCurseForgeModMeta(
                       modpack.files.map((f) => f.projectID),
                       apiKey
@@ -2099,6 +2101,18 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                       console.log(projectID + " " + fileID);
                       const displayName = "CF mod " + projectID;
                       const destPath = folder + "/mods/cf_" + projectID + "_CFMod.jar";
+                      // Known client-side mod - skip the download entirely
+                      // rather than fetch a jar deleteClientSideMods would
+                      // only bin a moment later. That filename match can't
+                      // see this one anyway: files here are always saved as
+                      // cf_<projectID>_CFMod.jar, never the mod's real name.
+                      if (clientSideModProjectIds.has(Number(projectID))) {
+                        downloadProgress[id].completed++;
+                        modFilterStats[id].removedClientSide.push(
+                          displayName + " (client-side, not downloaded)"
+                        );
+                        return resolve();
+                      }
                       downloadProgress[id].inFlight.push(displayName);
                       // fetchCurseForgeDownloadUrl and downloadModFileWithRetry
                       // both retry transient failures themselves, but this is
@@ -2407,8 +2421,32 @@ function getDownloadProgress(id) {
   return { ...progress, inFlight: [...progress.inFlight], failedMods: [...progress.failedMods] };
 }
 
-// Returns the file names it deleted. Always runs before resolveModConflicts on
-// an install, so it resets the whole record for this server.
+// Project IDs already known to be client-side, sourced from
+// assets/clientsidemodids.txt (each entry in clientsidemods.txt looked up on
+// CurseForge). The CurseForge manifest branch of downloadModpack() saves every
+// mod as cf_<projectID>_CFMod.jar, so deleteClientSideMods' filename match
+// below never sees the mod's real name for that path - checking the project
+// ID up front means the client-side mod is never downloaded in the first
+// place, rather than fetched only to be deleted a moment later.
+function loadClientSideModProjectIds() {
+  const ids = new Set();
+  let raw;
+  try {
+    raw = fs.readFileSync("assets/clientsidemodids.txt", "utf8");
+  } catch (e) {
+    return ids;
+  }
+  for (const line of raw.split("\n")) {
+    const id = Number(line.trim().split("\t")[1]);
+    if (!Number.isNaN(id)) ids.add(id);
+  }
+  return ids;
+}
+
+// Returns the file names it deleted. Runs before resolveModConflicts on an
+// install; modFilterStats for this server is reset once at the top of
+// downloadModpack(), not here, so project-ID skips recorded during the
+// download loop survive into this call.
 function deleteClientSideMods(id) {
   // NOTE: `id` here is already the full server folder name (e.g. "128"),
   // same as everywhere else in this file (see `folder = "servers/" + id` in
@@ -2422,7 +2460,9 @@ function deleteClientSideMods(id) {
   // the server folder itself may have been removed by the time this runs —
   // downloadModpack calls us from a promise chain nobody awaits, so throwing
   // here surfaces as an unhandled rejection rather than being caught.
-  resetModFilterStats(id);
+  // Don't reset if the CurseForge download loop already recorded project-ID
+  // skips into this record - see loadClientSideModProjectIds().
+  if (!modFilterStats[id]) resetModFilterStats(id);
   const removed = modFilterStats[id].removedClientSide;
 
   if (!fs.existsSync(modsFolder)) {

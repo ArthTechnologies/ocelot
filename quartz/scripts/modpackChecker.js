@@ -665,7 +665,7 @@ async function runAttempt(pack, id) {
       } else if (pack.serverPack && mods.installed === 0) {
         outcome = {
           status: "failed",
-          reason: "Server pack extracted no mods — the download or unzip fell over.",
+          reason: `Server pack extracted no mods — the download or unzip fell over. (${pack.downloadUrl})`,
         };
       } else {
         setSlotPhase(id, "booting");
