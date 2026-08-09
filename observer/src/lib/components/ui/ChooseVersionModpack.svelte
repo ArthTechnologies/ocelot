@@ -247,6 +247,15 @@
           // Server pack files resolved up front, keyed by the client file id
           const alternateFiles = {};
 
+          // CurseForge exposes two separate pointers to a server pack:
+          // `serverPackFileId` (dedicated field) and the older
+          // `alternateFileId`, which can still be set even when a distinct,
+          // more complete server pack also exists via `serverPackFileId`.
+          // Prefer `serverPackFileId`; fall back to `alternateFileId` only
+          // when a version has no `serverPackFileId`.
+          const serverPackId = (version) =>
+            version.serverPackFileId || version.alternateFileId || 0;
+
           const render = () => {
             // Versions with a server pack always sort above the rest
             const serverPacksFirst = (versions) => [
@@ -278,7 +287,7 @@
                       buttonType != "default",
                     from: from,
                     platform: "cf",
-                    alternateFileId: version.alternateFileId,
+                    alternateFileId: serverPackId(version),
                     alternateFileData: alternateFiles[version.id] || null,
                   },
                 });
@@ -293,7 +302,7 @@
           };
 
           const withAlternates = [...mainVersions, ...noSoftwareVersions].filter(
-            (v) => v.alternateFileId && v.alternateFileId != 0
+            (v) => serverPackId(v) != 0
           );
 
           if (withAlternates.length == 0) {
@@ -326,7 +335,7 @@
           Promise.all(
             withAlternates.map((version) =>
               fetch(
-                apiurl + "curseforge/" + id + "/version/" + version.alternateFileId,
+                apiurl + "curseforge/" + id + "/version/" + serverPackId(version),
                 {
                   method: "GET",
                   headers: {
