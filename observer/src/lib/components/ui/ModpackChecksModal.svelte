@@ -14,6 +14,7 @@
     Play,
     RotateCw,
     TerminalSquare,
+    Clock,
   } from "lucide-svelte";
 
   const dispatch = createEventDispatcher();
@@ -28,6 +29,10 @@
   let recheckingKey: string | null = null; // rowKey mid single-pack recheck
   let actionError = "";
   let showLiveView = false;
+  // "last" = the completed-run table (unchanged behavior); "ongoing" = the
+  // full worklist for the run currently in flight. Tabs only appear while
+  // running, so this only matters then — reset below once a run ends.
+  let view: "last" | "ongoing" = "last";
 
   // While a run is in flight the endpoint is the only window into it, so poll.
   // A run takes hours, so 5s is plenty.
@@ -48,6 +53,7 @@
     if (!data?.running) {
       recheckingKey = null;
       starting = false;
+      view = "last";
     }
 
     clearTimeout(pollTimer);
@@ -162,6 +168,15 @@
   $: activePacks = (progress?.currentPacks || []).filter(Boolean);
   $: percent =
     progress && progress.total ? Math.round((progress.index / progress.total) * 100) : 0;
+
+  // Full worklist for the run currently in flight — every pack the backend
+  // decided to check this run, in discovery order, each carrying its own
+  // status so "Ongoing" can show what's left without waiting for the whole
+  // batch to finish and land in `results`.
+  $: plannedPacks = (progress?.plannedPacks || []) as any[];
+  $: plannedDone = plannedPacks.filter(
+    (p) => p.status !== "pending" && p.status !== "checking"
+  ).length;
 </script>
 
 <svelte:window on:keydown={(e) => e.key === "Escape" && dispatch("close")} />
@@ -290,7 +305,92 @@
           </div>
         {/if}
 
-        {#if counts.all === 0}
+        <!-- Last-run / ongoing-run tabs: only meaningful while a check is
+             actually in flight, so hidden otherwise. Doesn't touch the live
+             progress panel above, or the "Watch Live" stream modal. -->
+        {#if data?.running}
+          <div class="flex flex-wrap gap-2">
+            <button
+              class="btn btn-sm {view === 'last' ? 'btn-primary' : 'btn-ghost bg-base-200'}"
+              on:click={() => (view = "last")}
+            >
+              Last
+            </button>
+            <button
+              class="btn btn-sm {view === 'ongoing' ? 'btn-primary' : 'btn-ghost bg-base-200'}"
+              on:click={() => (view = "ongoing")}
+            >
+              Ongoing
+              {#if plannedPacks.length}
+                <span class="badge badge-sm ml-1.5">{plannedDone}/{plannedPacks.length}</span>
+              {/if}
+            </button>
+          </div>
+        {/if}
+
+        {#if data?.running && view === "ongoing"}
+          <!-- Full worklist for the run in flight, independent of the
+               completed-run table below — statuses update live as packs
+               settle, sourced from progress.plannedPacks. -->
+          <div class="rounded-xl border border-base-300/40 overflow-hidden">
+            <div class="px-4 py-2.5 bg-base-200/50 border-b border-base-300/40 text-xs text-base-content/60 flex items-center justify-between">
+              <span>Full worklist for this run</span>
+              <span>{plannedDone}/{plannedPacks.length} checked</span>
+            </div>
+            {#if plannedPacks.length === 0}
+              <div class="text-base-content/50 text-sm py-8 text-center">
+                Still discovering packs…
+              </div>
+            {:else}
+              <table class="table table-sm">
+                <thead>
+                  <tr class="text-xs">
+                    <th class="w-8"></th>
+                    <th>Pack</th>
+                    <th class="w-32">Version</th>
+                    <th class="w-28">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each plannedPacks as pack, i (pack.platform + ":" + pack.projectId + ":" + pack.gameVersion + ":" + i)}
+                    <tr>
+                      <td class="text-base-content/40 text-xs">{i + 1}</td>
+                      <td class="font-medium text-sm">{pack.name}</td>
+                      <td class="text-xs">
+                        <span class="badge badge-ghost badge-sm capitalize">
+                          {pack.loader || "?"} {pack.gameVersion || "?"}
+                        </span>
+                      </td>
+                      <td>
+                        {#if pack.status === "passed"}
+                          <span class="badge badge-success badge-sm gap-1">
+                            <ShieldCheck size={11} /> passed
+                          </span>
+                        {:else if pack.status === "failed"}
+                          <span class="badge badge-error badge-sm gap-1">
+                            <ShieldClose size={11} /> failed
+                          </span>
+                        {:else if pack.status === "skipped"}
+                          <span class="badge badge-ghost badge-sm gap-1">
+                            <MinusCircle size={11} /> skipped
+                          </span>
+                        {:else if pack.status === "checking"}
+                          <span class="badge badge-warning badge-sm gap-1">
+                            <Loader size={11} class="animate-spin" /> checking
+                          </span>
+                        {:else}
+                          <span class="badge badge-ghost badge-sm gap-1 opacity-60">
+                            <Clock size={11} /> pending
+                          </span>
+                        {/if}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            {/if}
+          </div>
+        {:else if counts.all === 0}
           <div class="text-base-content/60 text-sm py-8 text-center">
             No checks have completed yet.
             {#if !data?.running}

@@ -118,6 +118,13 @@ function emptyProgress() {
     index: 0,
     total: 0,
     currentPacks: [], // Slot-indexed, up to SLOT_COUNT concurrent packs
+    // Every pack discovery decided to check this run, in discovery order, each
+    // carrying its own status ("pending" | "checking" | "passed" | "failed" |
+    // "skipped") — lets the admin dashboard show the full worklist mid-run
+    // instead of just the coarse index/total count. Built once discovery
+    // finishes (checkModpacks) or immediately for a single recheck
+    // (checkOneModpack), then updated in place as each pack settles.
+    plannedPacks: [],
     passed: 0,
     failed: 0,
     skipped: 0,
@@ -812,6 +819,19 @@ async function checkModpacks() {
     // null while that slot is idle. The stream endpoint pairs entries with
     // checkServerIds() positionally, so the positions must stay stable.
     progress.currentPacks = slotIds.map(() => null);
+    // Full worklist in discovery order — the "Ongoing" admin view walks this
+    // to show every pack this run decided to check, not just the ones
+    // actively occupying a slot right now. Indices line up 1:1 with `packs`/
+    // `results` below, so the worker can update an entry in place by index.
+    progress.plannedPacks = packs.map((pack) => ({
+      platform: pack.platform,
+      projectId: pack.projectId,
+      name: pack.name,
+      slug: pack.slug,
+      loader: pack.loader,
+      gameVersion: pack.gameVersion || GAME_VERSION,
+      status: "pending",
+    }));
 
     // One worker per reserved slot, each pulling the next pack off the shared
     // list the moment their current one settles — a slow pack no longer stalls
@@ -830,10 +850,12 @@ async function checkModpacks() {
           startedAt: Date.now(),
           phase: "checking",
         };
+        progress.plannedPacks[packIndex].status = "checking";
         // Results land at the pack's discovery position so the log keeps
         // ranking order no matter which slot finishes first.
         results[packIndex] = await checkOne(pack, slotIds[slotIndex]);
         const status = results[packIndex].status;
+        progress.plannedPacks[packIndex].status = status;
         if (status === "passed") progress.passed++;
         else if (status === "failed") progress.failed++;
         else progress.skipped++;
@@ -903,6 +925,9 @@ async function checkOneModpack({ platform, projectId, gameVersion, loader, name,
   progress.startedAt = Date.now();
   progress.total = 1;
   progress.currentPacks = [{ name, gameVersion, loader, startedAt: Date.now() }];
+  progress.plannedPacks = [
+    { platform, projectId, name, slug, loader, gameVersion, status: "checking" },
+  ];
 
   try {
     let pack;
@@ -915,6 +940,7 @@ async function checkOneModpack({ platform, projectId, gameVersion, loader, name,
     }
 
     const result = await checkOne(pack, id);
+    progress.plannedPacks[0].status = result.status;
 
     const data = readLog();
     const existingIndex = data.results.findIndex(
