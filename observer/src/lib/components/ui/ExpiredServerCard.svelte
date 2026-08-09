@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, src_url_equal } from "svelte/internal";
+  import { createEventDispatcher } from "svelte";
   import { changeServerState } from "$lib/scripts/req";
 
   import { getServer } from "$lib/scripts/req";
@@ -7,6 +8,27 @@
   import { browser } from "$app/environment";
   import { AlertOctagon, ArrowRight, Loader, Plus, PlusIcon } from "lucide-svelte";
   //Status variables
+
+  const dispatch = createEventDispatcher();
+
+  export let unlocked: boolean = false;
+
+  let holdTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function startHold() {
+    if (unlocked) return;
+    holdTimer = setTimeout(() => {
+      holdTimer = null;
+      dispatch("unlock");
+    }, 5000);
+  }
+
+  function cancelHold() {
+    if (holdTimer) {
+      clearTimeout(holdTimer);
+      holdTimer = null;
+    }
+  }
 
   let startcolor = "accent";
   let starttext = "Start";
@@ -52,6 +74,12 @@
 <div
 
   class="bg-base-300 w-[3.75rem] h-[3.75rem] rounded-lg max-lg:hidden flex justify-center items-center"
+  on:mousedown={startHold}
+  on:mouseup={cancelHold}
+  on:mouseleave={cancelHold}
+  on:touchstart={startHold}
+  on:touchend={cancelHold}
+  on:touchcancel={cancelHold}
 ><AlertOctagon size=32/></div>
 <div class="-mt-1">
   <p class="font-poppins-bold text-gray-200 text-sm truncate max-md:hidden">
@@ -64,25 +92,9 @@
   <div class="md:hidden flex items-center justify-center"><PlusIcon size=20/></div>
   <!-- Only shows in sidebar mode-->
   <div class="max-md:hidden">
-    {#if errorCode === 100}
+    {#if errorCode === 100 || errorCode === 103 || errorCode === 104 || errorCode === 105 || errorCode === 106}
       <p class="font-poppins text-xs mb-0.5 -mt-1">
-        Your subscription has expired. Your data is still there but may be deleted soon.
-      </p>
-    {:else if errorCode === 103}
-      <p class="font-poppins text-xs mb-0.5 -mt-1">
-        This is a complicated error stemming from a possible expired subscription that is no longer expired. Please contact support.
-      </p>
-    {:else if errorCode === 104}
-      <p class="font-poppins text-xs mb-0.5 -mt-1">
-        Your subscription has expired. It looks like your data has been deleted, but you can contact support to double-check.
-      </p>
-    {:else if errorCode === 105}
-      <p class="font-poppins text-xs mb-0.5 -mt-1">
-        This is a complicated error stemming from a possible expired subscription that is no longer expired. Please contact support.
-      </p>
-    {:else if errorCode === 106}
-      <p class="font-poppins text-xs mb-0.5 -mt-1">
-        Your subscription has expired. Your server data is still intact — renew to restore access.
+        {unlocked ? "Click here for details." : "Try subscriptions page to resolve."}
       </p>
     {:else}
       <p class="font-poppins text-xs mb-0.5 -mt-1">

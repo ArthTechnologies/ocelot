@@ -47,6 +47,12 @@
 
   let slug = 0;
   let email: string = "";
+  let newExpiredTest = false;
+
+  function unlockNewExpired() {
+    newExpiredTest = true;
+    if (browser) localStorage.setItem("newExpiredTest", "true");
+  }
   onMount(() => {
     if (browser) {
       // Fetch admin access status from info route
@@ -77,6 +83,7 @@
       console.log("dev mode");
       devMode = true;
     }
+    newExpiredTest = localStorage.getItem("newExpiredTest") === "true";
   }
 
   // getServers and store "amount" given in the response in a variable
@@ -350,19 +357,20 @@
     {/if}
   {:else if server.error.code === 103}
     <button
-      on:click={() => bugResolverServerId = parseInt(server.id)}
+      on:click={() => { if (newExpiredTest) bugResolverServerId = parseInt(server.id); }}
       id="serverCard{parseInt(server.id)}"
-      class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 overflow-hidden md:w-full md:min-h-[5.5rem] rounded-lg bg-base-200 cursor-pointer text-left"
+      class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 overflow-hidden md:w-full md:min-h-[5.5rem] rounded-lg bg-base-200 {newExpiredTest ? 'cursor-pointer' : 'cursor-default'} text-left"
     >
-    <ExpiredServerCard id={parseInt(server.id)} timestamp={-1} cause="freed" errorCode={103}/>
+    <ExpiredServerCard id={parseInt(server.id)} timestamp={-1} cause="freed" errorCode={103} unlocked={newExpiredTest} on:unlock={unlockNewExpired}/>
     </button>
   {:else if server.error.code === 100 || server.error.code === 104 || server.error.code === 105 || server.error.code === 106}
     <a
-      href="/billing"
+      href="/expired/{parseInt(server.id)}"
+      on:click={(e) => { if (!newExpiredTest) e.preventDefault(); }}
       id="serverCard{parseInt(server.id)}"
-      class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 overflow-hidden md:w-full md:min-h-[5.5rem] rounded-lg bg-base-200 cursor-pointer"
+      class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 overflow-hidden md:w-full md:min-h-[5.5rem] rounded-lg bg-base-200 {newExpiredTest ? 'cursor-pointer' : 'cursor-default'}"
     >
-    <ExpiredServerCard id={parseInt(server.id)} timestamp={server.error.resetDate || -1} cause={server.error.subscriptionCause || "unknown"} errorCode={server.error.code}/>
+    <ExpiredServerCard id={parseInt(server.id)} timestamp={server.error.resetDate || -1} cause={server.error.subscriptionCause || "unknown"} errorCode={server.error.code} unlocked={newExpiredTest} on:unlock={unlockNewExpired}/>
     </a>
   {:else}
     <a

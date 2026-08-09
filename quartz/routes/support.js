@@ -517,4 +517,111 @@ router.post('/bug-resolver/:id/resolve', function (req, res) {
   }
 });
 
+// World data for an expired server, tolerant of any combination of live/trashbin presence
+// (unlike bug-resolver, which requires both to exist since it's only for the :freed conflict state)
+router.get('/world-info/:id', async function (req, res) {
+  const email = req.headers.username;
+  const token = req.headers.token;
+  if (!email || !fs.existsSync(`accounts/${email}.json`)) {
+    return res.status(401).json({ msg: 'Unauthorized' });
+  }
+  const account = readJSON(`accounts/${email}.json`);
+  if (token !== account.token) return res.status(401).json({ msg: 'Unauthorized' });
+
+  const rawId = req.params.id;
+  const ownsServer = account.servers.includes(rawId) || account.servers.includes(`${rawId}:freed`);
+  if (!ownsServer) return res.status(403).json({ msg: 'Server not found on this account.' });
+
+  const livePath = `servers/${rawId}`;
+  const trashPath = `trashbin/${rawId}-${email}`;
+
+  const hasLive = fs.existsSync(`${livePath}/server.json`);
+  const hasTrashbin = fs.existsSync(trashPath);
+
+  function worldSize(dir) {
+    const worldPath = `${dir}/world`;
+    return fs.existsSync(worldPath) ? files.folderSizeRecursiveAsync(worldPath) : Promise.resolve(0);
+  }
+
+  function countFolder(dir, folder) {
+    const p = `${dir}/${folder}`;
+    if (!fs.existsSync(p)) return 0;
+    try { return fs.readdirSync(p).filter(f => !f.startsWith('.')).length; } catch (e) { return 0; }
+  }
+
+  async function buildInfo(dir) {
+    const size = await worldSize(dir);
+    let server = { name: `Server ${rawId}`, software: 'unknown', version: 'unknown' };
+    try { server = readJSON(`${dir}/server.json`); } catch (e) {}
+
+    return {
+      name: server.name || `Server ${rawId}`,
+      software: server.software || 'unknown',
+      version: server.version || 'unknown',
+      worldSize: formatBytes(size),
+      mods: countFolder(dir, 'mods'),
+      plugins: countFolder(dir, 'plugins'),
+      lastModified: getLastModified(dir),
+      playerCount: getPlayerCount(dir),
+      warnings: getWarnings(dir)
+    };
+  }
+
+  try {
+    const [live, trashbin] = await Promise.all([
+      hasLive ? buildInfo(livePath) : Promise.resolve(null),
+      hasTrashbin ? buildInfo(trashPath) : Promise.resolve(null)
+    ]);
+
+    res.status(200).json({ hasLive, hasTrashbin, live, trashbin });
+  } catch (e) {
+    console.error('World info error:', e);
+    res.status(500).json({ msg: 'Error gathering server data.' });
+  }
+});
+
+// Read-only lookup for an unused slot id. An id with no servers/{id} folder
+// isn't necessarily free — an account may have already claimed it via
+// /server/reserve and just not created the server yet (pending creation), so
+// every account's `servers` list is cross-referenced before an id counts as
+// available. Does not reserve or claim anything.
+router.get('/available-slot', function (req, res) {
+  const email = req.headers.username;
+  const token = req.headers.token;
+  if (!email || !fs.existsSync(`accounts/${email}.json`)) {
+    return res.status(401).json({ msg: 'Unauthorized' });
+  }
+  const account = readJSON(`accounts/${email}.json`);
+  if (token !== account.token) return res.status(401).json({ msg: 'Unauthorized' });
+
+  const idOffset = parseInt(config.idOffset);
+  const maxServers = parseInt(config.maxServers);
+
+  const claimedIds = new Set();
+  for (const file of fs.readdirSync('accounts')) {
+    if (file.includes('swp')) continue;
+    try {
+      const acc = readJSON(`accounts/${file}`);
+      for (const entry of acc.servers || []) {
+        // A ":freed" entry means the id was explicitly released for reuse
+        // (see mergeDuplicateEmailAccounts / bug-resolver) — only a plain
+        // id entry means the slot is still actively claimed.
+        if (typeof entry === 'string' && !entry.includes(':freed')) {
+          claimedIds.add(entry);
+        }
+      }
+    } catch (e) {}
+  }
+
+  let id = null;
+  for (let i = idOffset; i < idOffset + maxServers; i++) {
+    if (fs.existsSync(`servers/${i}`)) continue;
+    if (claimedIds.has(String(i))) continue;
+    id = i;
+    break;
+  }
+
+  res.status(200).json({ available: id !== null, id });
+});
+
 module.exports = router;
