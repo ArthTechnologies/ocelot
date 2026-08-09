@@ -127,3 +127,4 @@ shouldersurfing
 travelerstitles
 unilib
 xaerozoomout
+enhancedbossbars
