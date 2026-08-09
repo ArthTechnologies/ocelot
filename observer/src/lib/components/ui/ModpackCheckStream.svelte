@@ -13,6 +13,7 @@
     Rocket,
     Trash2,
     AlertTriangle,
+    RefreshCw,
   } from "lucide-svelte";
 
   const dispatch = createEventDispatcher();
@@ -21,9 +22,36 @@
   let finished = false;
   let inspectingProjectId: string | number | null = null;
   let sawAnything = false;
+  let streamError = false;
   let event: any = null;
   let termRefs: Record<number, HTMLDivElement> = {};
   let stuckToBottom: Record<number, boolean> = {};
+
+  // The backend writes its first NDJSON line within ~15s even when idle (see
+  // IDLE_LIMIT_TICKS in the stream route) and roughly once a second after
+  // that while running. A connection that's accepted but then never
+  // delivers a byte - a stalled write, a proxy that swallows the response,
+  // the backend hanging - leaves fetch()'s reader.read() pending forever:
+  // it neither resolves nor rejects, so streamModpackCheck's onEvent is
+  // never called and the UI is stuck showing "waiting" with no way to tell
+  // that apart from a connection that's actually dead. This watchdog is the
+  // client-side backstop for that: armed on connect and re-armed on every
+  // real event, it flips into the same error state a failed fetch would.
+  const STREAM_TIMEOUT_MS = 20000;
+  let watchdog: ReturnType<typeof setTimeout> | null = null;
+
+  function armWatchdog() {
+    clearWatchdog();
+    watchdog = setTimeout(() => {
+      streamError = true;
+      controller.abort(); // stop waiting on whatever's stuck
+    }, STREAM_TIMEOUT_MS);
+  }
+
+  function clearWatchdog() {
+    if (watchdog) clearTimeout(watchdog);
+    watchdog = null;
+  }
 
   // Slot cards stack vertically inside an 80vh body. Three full-height
   // terminals overflow that on most screens, so they shrink once there are
@@ -57,9 +85,19 @@
   }
 
   async function handleEvent(data: any) {
+    if (data.streamError) {
+      clearWatchdog();
+      streamError = true;
+      return;
+    }
+    // A real line arrived, so the connection is proven alive - reset the
+    // clock before doing anything else with it.
+    armWatchdog();
+
     sawAnything = true;
     event = data;
     if (!data.running) {
+      clearWatchdog();
       finished = true;
       dispatch("finished");
       return;
@@ -81,13 +119,21 @@
     stuckToBottom[id] = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
   }
 
+  function connect() {
+    streamError = false;
+    controller = new AbortController();
+    armWatchdog();
+    streamModpackCheck(handleEvent, controller.signal);
+  }
+
   onMount(() => {
     document.body.style.overflow = "hidden";
-    streamModpackCheck(handleEvent, controller.signal);
+    connect();
   });
 
   onDestroy(() => {
     document.body.style.overflow = "";
+    clearWatchdog();
     controller.abort();
   });
 
@@ -112,7 +158,11 @@
           <h2 class="text-xl font-bold flex items-center gap-2">
             <TerminalSquare size={20} class="text-primary" />
             Live Check
-            {#if !finished}
+            {#if streamError}
+              <span class="badge badge-error gap-1 text-xs">
+                <AlertTriangle size={12} /> disconnected
+              </span>
+            {:else if !finished}
               <span class="badge badge-warning gap-1 text-xs">
                 <Loader size={12} class="animate-spin" /> live
               </span>
@@ -122,7 +172,12 @@
               </span>
             {/if}
           </h2>
-          {#if event?.running}
+          {#if streamError}
+            <p class="text-error text-xs mt-0.5">
+              Lost connection to the live stream. The check itself keeps running on the
+              server — this view just isn't watching it anymore.
+            </p>
+          {:else if event?.running}
             <p class="text-base-content/50 text-xs mt-0.5">
               Started {elapsed(event.startedAt)} ago
               {#if event.total > 1}· pack {event.index}/{event.total}{/if}
@@ -147,7 +202,15 @@
 
       <!-- Body -->
       <div class="px-6 py-5 flex flex-col gap-5 max-h-[80vh] overflow-y-auto">
-        {#if !event?.running}
+        {#if streamError}
+          <div class="flex flex-col items-center justify-center gap-3 text-base-content/60 py-16">
+            <AlertTriangle size={32} class="text-error" />
+            <p>Couldn't reach the live stream.</p>
+            <button class="btn btn-sm btn-error btn-outline gap-1.5" on:click={connect}>
+              <RefreshCw size={14} /> Retry
+            </button>
+          </div>
+        {:else if !event?.running}
           <div class="flex flex-col items-center justify-center gap-3 text-base-content/60 py-16">
             {#if finished}
               <CheckCircle2 size={32} class="text-success" />
@@ -156,6 +219,11 @@
               <span class="loading loading-spinner loading-md text-primary"></span>
               <p>Waiting for the run to report in…</p>
             {/if}
+          </div>
+        {:else if !event.slots?.length}
+          <div class="flex flex-col items-center justify-center gap-3 text-base-content/60 py-16">
+            <Search size={32} class="text-primary animate-pulse" />
+            <p>Discovering packs to check…</p>
           </div>
         {:else}
           {#each event.slots as slot (slot.id)}

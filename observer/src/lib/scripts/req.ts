@@ -558,7 +558,14 @@ export function streamModpackCheck(onEvent: (data: any) => void, signal?: AbortS
     },
     signal,
   }).then(async (res) => {
-    if (!res.ok || !res.body) return;
+    // A non-OK response (denied auth, a proxy that dropped the streamed
+    // request, ...) or a missing body (streaming Response#body unsupported)
+    // means no NDJSON line will ever arrive — tell the caller explicitly
+    // rather than leaving it waiting on an event that's never coming.
+    if (!res.ok || !res.body) {
+      onEvent({ streamError: true, status: res.status });
+      return;
+    }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -580,7 +587,12 @@ export function streamModpackCheck(onEvent: (data: any) => void, signal?: AbortS
       }
     }
   }).catch(() => {
-    // Connection dropped/aborted — the caller's UI just stops updating.
+    // An intentional abort (component unmounted / caller closed the view)
+    // isn't a failure worth surfacing - anything else here is a connection
+    // that dropped mid-stream, which the caller can't otherwise tell apart
+    // from "still waiting for the first event".
+    if (signal?.aborted) return;
+    onEvent({ streamError: true });
   });
 }
 
