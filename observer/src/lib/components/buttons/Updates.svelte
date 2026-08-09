@@ -1,173 +1,259 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { onMount } from "svelte";
   import { AlertTriangle, ArrowDownCircle } from "lucide-svelte";
   import { apiurl } from "../../scripts/req";
   import { updateServer } from "../../scripts/req";
   import { t } from "$lib/scripts/i18n";
-  let worldgenMods = [];
-  let latestUpdate = "1.19.4";
-  let serverAddons = [];
-  let areWorldgenMods = true;
-  let updateReady = true;
+
+  let latestUpdate = "";
+  let latestVariant = "release";
+  let serverAddons: string[] = [];
+  let addonReady: Record<string, boolean> = {};
+  let areWorldgenMods = false;
+  let updateReady = false;
   let serverVersion = "";
   let serverSoftware = "";
   let newerVersionAvailable = false;
+  let jarsList: string[] = [];
+  // The version we've just asked for, so the button stops offering an update
+  // the server is already applying.
+  let pendingVersion = "";
+  let pendingServerId = "";
 
-  function update() {
-    if (updateReady && browser) {
-      updateServer(localStorage.getItem("serverID"), latestUpdate);
-      setTimeout(function () {
-        serverVersion = localStorage.getItem("serverVersion");
-      }, 1000);
-    }
+  // /info/jars normalises every filename to software-version-variant.ext
+  const JAR_NAME = /^([a-zA-Z]+)-(\d+(?:\.\d+)*)-(\w+)\.(jar|zip)$/;
+
+  // A stored server version can carry a variant suffix ("1.20.1*pre",
+  // "1.20.1 Experimental") — compare on the numeric part only.
+  function cleanVersion(v: string) {
+    return (v || "").split("*")[0].split(" ")[0].trim();
   }
-  if (browser) {
-    serverVersion = localStorage.getItem("serverVersion");
-    serverSoftware = localStorage.getItem("serverSoftware");
-    if (localStorage.getItem("serverAddons") != null) {
-      // serverAddons is stored as `addons.toString()`, so a server with none is
-      // saved as "" — and "".split(",") is [""], a length-1 array holding one
-      // empty string, not []. Drop those blanks so "no addons" really is empty.
-      serverAddons = localStorage
-        .getItem("serverAddons")
-        .split(",")
-        .filter((addon) => addon !== "");
+
+  // Compare dotted versions segment by segment, treating a missing segment as
+  // 0. Subtracting the third segment of a two-part version like "1.21" gives
+  // NaN, which silently made every x.y server ineligible for any update.
+  // Returns NaN when either side isn't a numeric version (e.g. "latest").
+  function compareVersions(a: string, b: string) {
+    const pa = a.split(".").map((n: string) => parseInt(n, 10));
+    const pb = b.split(".").map((n: string) => parseInt(n, 10));
+    if (pa.some(isNaN) || pb.some(isNaN)) return NaN;
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const x = pa[i] === undefined ? 0 : pa[i];
+      const y = pb[i] === undefined ? 0 : pb[i];
+      if (x !== y) return x - y;
+    }
+    return 0;
+  }
+
+  function variantLabel(variant: string) {
+    if (!variant || variant == "release") return "";
+    return " " + variant.charAt(0).toUpperCase() + variant.slice(1);
+  }
+
+  function evaluate() {
+    newerVersionAvailable = false;
+    updateReady = false;
+    latestUpdate = "";
+    latestVariant = "release";
+    addonReady = {};
+
+    if (!serverSoftware || !serverVersion || jarsList.length == 0) return;
+
+    const current = cleanVersion(serverVersion);
+    if (pendingVersion) {
+      if (current != pendingVersion) return;
+      pendingVersion = "";
+    }
+    const software = serverSoftware.toLowerCase();
+
+    // Track the newest release and the newest of any variant separately, so a
+    // server is only pushed onto an experimental/snapshot build when there is
+    // no newer release at all — and the variant is labelled when that happens.
+    let bestRelease: { version: string; variant: string } | null = null;
+    let bestAny: { version: string; variant: string } | null = null;
+
+    for (const file of jarsList) {
+      const match = file.match(JAR_NAME);
+      if (!match) continue;
+      const [, jarSoftware, version, variant, ext] = match;
+      if (jarSoftware != software || ext != "jar") continue;
+
+      // With an uncomparable current version ("latest") there's nothing to
+      // measure against, so fall back to offering the newest jar we have.
+      const diff = compareVersions(version, current);
+      if (isNaN(diff) ? version == current : diff <= 0) continue;
+
+      if (bestAny == null || compareVersions(version, bestAny.version) > 0) {
+        bestAny = { version: version, variant: variant };
+      }
+      if (
+        variant == "release" &&
+        (bestRelease == null ||
+          compareVersions(version, bestRelease.version) > 0)
+      ) {
+        bestRelease = { version: version, variant: variant };
+      }
     }
 
+    const target = bestRelease || bestAny;
+    if (target == null) return;
+
+    latestUpdate = target.version;
+    latestVariant = target.variant;
+    newerVersionAvailable = true;
+
+    // Readiness is about the version we're moving *to*. This used to compare
+    // against serverVersion, so it checked the version being left behind —
+    // green-lighting updates to a version with no worldgen zip, and blocking
+    // ones where the zip only exists for the target.
     areWorldgenMods = serverAddons.length > 0;
+    const ready: Record<string, boolean> = {};
+    serverAddons.forEach((addon: string) => {
+      ready[addon] = jarsList.some((jar: string) =>
+        jar.startsWith(addon.toLowerCase() + "-" + latestUpdate + "-")
+      );
+    });
+    addonReady = ready;
+    updateReady =
+      !areWorldgenMods || serverAddons.every((addon: string) => ready[addon]);
+  }
 
-    console.log(serverAddons);
+  let lastState = "";
+  // Returns true when the server this button belongs to has changed under us.
+  function readState() {
+    if (!browser) return false;
+    const serverId = localStorage.getItem("serverID") || "";
+    const version = localStorage.getItem("serverVersion") || "";
+    const software = localStorage.getItem("serverSoftware") || "";
+    const addons = localStorage.getItem("serverAddons") || "";
+    const state = serverId + "|" + software + "|" + version + "|" + addons;
+    if (state == lastState) return false;
+    lastState = state;
 
-    fetch(apiurl + "info/jars")
+    // A pending update belongs to the server it was started on — carrying it
+    // over would hide the button on whichever server is opened next.
+    if (serverId != pendingServerId) pendingVersion = "";
+
+    serverVersion = version;
+    serverSoftware = software;
+    // serverAddons is stored as `addons.toString()`, so a server with none is
+    // saved as "" — and "".split(",") is [""], a length-1 array holding one
+    // empty string, not []. Drop those blanks so "no addons" really is empty.
+    serverAddons = addons.split(",").filter((addon) => addon !== "");
+    areWorldgenMods = serverAddons.length > 0;
+    return true;
+  }
+
+  function fetchJars() {
+    return fetch(apiurl + "info/jars")
       .then((x) => x.json())
       .then((x) => {
-        let worldgenModsAvailable = 0;
-        for (let i in x) {
-          const match = x[i].match(/^([a-zA-Z]+)-(\d+(?:\.\d+)*)-(\w+)\.(jar|zip)$/);
-          if (!match) continue;
+        jarsList = x;
+        evaluate();
+      })
+      .catch(() => {});
+  }
 
-          const software = match[1];
-          const version = match[2];
+  onMount(() => {
+    readState();
+    fetchJars();
+    // /server/[slug] isn't keyed, so this component is reused when navigating
+    // between servers — and localStorage only gets the current server's values
+    // once getStatus() resolves, which is after this component is created.
+    // Poll rather than trusting the snapshot taken at construction.
+    const interval = setInterval(() => {
+      if (readState()) evaluate();
+    }, 500);
+    return () => clearInterval(interval);
+  });
 
-          if (software == serverSoftware.toLowerCase()) {
-            if (version != serverVersion) {
-              let versionPart1 = version.split(".")[0];
-              let versionPart2 = version.split(".")[1];
-              let versionPart3 = version.split(".")[2];
-              let serverVersionPart1 = serverVersion.split(".")[0];
-              let serverVersionPart2 = serverVersion.split(".")[1];
-              let serverVersionPart3 = serverVersion.split(".")[2];
-
-              let part1diff = versionPart1 - serverVersionPart1;
-              let part2diff = versionPart2 - serverVersionPart2;
-              let part3diff = versionPart3 - serverVersionPart3;
-              if (
-                part1diff > 0 ||
-                (part1diff == 0 && part2diff > 0) ||
-                (part1diff == 0 && part2diff == 0 && part3diff > 0)
-              ) {
-                latestUpdate = version;
-                newerVersionAvailable = true;
-              }
-            }
-          }
-          //Worldgen Check
-          if (areWorldgenMods) {
-            serverAddons.forEach((item) => {
-              if (software == item.toLowerCase()) {
-                if (version == serverVersion) {
-                  worldgenModsAvailable++;
-                  //remove grayscale
-                  document
-                    .getElementById(item + "Updates")
-                    .classList.remove("grayscale");
-                }
-              }
-            });
-          }
-        }
-        console.log(worldgenModsAvailable + " " + serverAddons.length);
-        // With no worldgen addons there's nothing to gate on, so the update is
-        // ready. Previously the phantom [""] entry made this `1 == 0`, which
-        // blocked every addon-free server from ever updating.
-        updateReady =
-          !areWorldgenMods || serverAddons.length == worldgenModsAvailable;
-
-        console.log(x);
-        if (
-          x.some(jar => jar.startsWith(serverSoftware.toLowerCase() + "-" + latestUpdate + "-"))
-        ) {
-          jarAvailable = true;
-        }
-      });
-    
-    
+  function update() {
+    if (!updateReady || !browser || latestUpdate == "") return;
+    const target = latestUpdate;
+    const serverId = localStorage.getItem("serverID") || "";
+    pendingVersion = target;
+    pendingServerId = serverId;
+    newerVersionAvailable = false;
+    updateServer(Number(serverId), target)?.then((res) => {
+      if (res == "error") {
+        // Nothing was applied, so let the button come back.
+        pendingVersion = "";
+        evaluate();
+      }
+    });
   }
 
   function onclick() {
-    serverVersion = localStorage.getItem("serverVersion");
+    readState();
+    fetchJars();
   }
 </script>
+
 {#if newerVersionAvailable && serverSoftware != "Forge"}
   <label for="updates" class="btn btn-neutral btn-sm" on:click={onclick}
-    ><ArrowDownCircle class="mr-1.5" size=18/>
+    ><ArrowDownCircle class="mr-1.5" size="18" />
     {$t("button.update")}</label
   >
-{/if}
-<!-- Put this part before </body> tag -->
-<input type="checkbox" id="updates" class="modal-toggle" />
-<div class="modal" style="margin:0rem;">
-  <div class="modal-box bg-opacity-95 backdrop-blur relative">
-    <label
-      for="updates"
-      class="btn btn-neutral btn-sm btn-circle absolute right-2 top-2">✕</label
-    >
-    <h3 class="text-xl font-bold mb-2">{latestUpdate} {$t("update")}</h3>
-    {#if serverSoftware == "Forge" || serverSoftware == "Quilt" || serverSoftware == "Fabric"}
-      <div
-        class="bg-warning w-86 rounded-lg text-black p-2 py-0.5 flex items-center space-x-2"
+
+  <!-- Put this part before </body> tag -->
+  <input type="checkbox" id="updates" class="modal-toggle" />
+  <div class="modal" style="margin:0rem;">
+    <div class="modal-box bg-opacity-95 backdrop-blur relative">
+      <label
+        for="updates"
+        class="btn btn-neutral btn-sm btn-circle absolute right-2 top-2">✕</label
       >
-        <AlertTriangle size="48" />
-        <span class="text-sm">{$t("warning.updateModded")}</span>
+      <h3 class="text-xl font-bold mb-2">
+        {latestUpdate}{variantLabel(latestVariant)}
+        {$t("update")}
+      </h3>
+      {#if serverSoftware == "Quilt" || serverSoftware == "Fabric" || serverSoftware == "NeoForge"}
+        <div
+          class="bg-warning w-86 rounded-lg text-black p-2 py-0.5 flex items-center space-x-2"
+        >
+          <AlertTriangle size="48" />
+          <span class="text-sm">{$t("warning.updateModded")}</span>
+        </div>
+      {/if}
+      <div class="flex justify-center">
+        {#if areWorldgenMods}
+          {#each serverAddons as addon}
+            <img
+              class="mask mask-hexagon {addonReady[addon] ? '' : 'grayscale'}"
+              src="/images/{addon}.webp"
+              width="80ch"
+            />
+          {/each}
+        {/if}
       </div>
-    {/if}
-    <div class="flex justify-center">
-      {#if areWorldgenMods}
-        {#each serverAddons as addon}
-          <img
-            id="{addon}Updates"
-            class="mask mask-hexagon grayscale"
-            src="/images/{addon}.webp"
-            width="80ch"
-          />
-        {/each}
+
+      {#if updateReady}
+        <p class="text-center my-3">
+          {#if areWorldgenMods}
+            {$t("update.worldgenReady")} {latestUpdate}.
+          {:else}
+            {$t("changeVersion.readyToUpdate")} {latestUpdate}.
+          {/if}
+        </p>
+      {:else}
+        <p class="text-center">
+          {#if areWorldgenMods}
+            {$t("update.worldgenNotReady")}
+            {latestUpdate}
+            {$t("update.worldgenNotReady2")}
+          {:else}
+            {$t("update.cantUpdate")} {latestUpdate}.
+          {/if}
+        </p>
+      {/if}
+      {#if updateReady}
+        <label on:click={update} for="updates" class="btn btn-neutral"
+          >{$t("button.update")}</label
+        >
+      {:else}
+        <label class="btn btn-disabled">{$t("button.update")}</label>
       {/if}
     </div>
-
-    {#if updateReady}
-      <p class="text-center my-3">
-        {#if areWorldgenMods}
-          {$t("update.worldgenReady")} {latestUpdate}.
-        {:else}
-          {$t("changeVersion.readyToUpdate")} {latestUpdate}.
-        {/if}
-      </p>
-    {:else}
-      <p class="text-center">
-        {#if areWorldgenMods}
-          {$t("update.worldgenNotReady")}
-          {latestUpdate}
-          {$t("update.worldgenNotReady2")}
-        {:else}
-          {$t("update.cantUpdate")} {latestUpdate}.
-        {/if}
-      </p>
-    {/if}
-    <label
-      on:click={update}
-      for="updates"
-      id="confirmBtn"
-      class="btn btn-neutral">{$t("button.update")}</label
-    >
   </div>
-</div>
+{/if}
