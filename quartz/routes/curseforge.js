@@ -3,6 +3,55 @@ const Router = express.Router();
 const config = require("../scripts/utils.js").getConfig();
 const apiKey = config.curseforgeKey;
 
+// CurseForge's own modLoaderType filter is loose - it returns a pack if ANY
+// file the project has ever published matches, not just the file(s) for the
+// requested loader. That lets a pack like "Better MC [FABRIC]" show up in a
+// Forge search just because one old build happened to also carry a Forge tag.
+// Only Forge (1) and Fabric (4) are handled - CurseForge doesn't reliably tag
+// NeoForge (6) or unspecified files, so a strict same/opposite check there
+// would throw away results that are actually fine.
+const OPPOSITE_LOADER = { 1: 4, 4: 1 };
+
+// Drops a result if it has at least one file tagged with the opposite loader
+// and none tagged with the one actually requested - i.e. the "match" was
+// incidental, not the pack's real loader.
+function filterByLoader(data, modLoaderType) {
+  // modLoaderType arrives as whatever req.query.loader was ("1", 1, ...) -
+  // normalize to a number so the strict === below against CurseForge's
+  // numeric modLoader field actually matches.
+  const requested = Number(modLoaderType);
+  const opposite = OPPOSITE_LOADER[requested];
+  if (opposite === undefined || !Array.isArray(data.data)) return data;
+
+  data.data = data.data.filter((mod) => {
+    const indexes = mod.latestFilesIndexes;
+    if (!Array.isArray(indexes)) return true;
+    const hasOpposite = indexes.some((f) => f.modLoader === opposite);
+    const hasRequested = indexes.some((f) => f.modLoader === requested);
+    return !(hasOpposite && !hasRequested);
+  });
+
+  // Deliberately not re-paging to top the count back up to what was asked
+  // for: doing that would mean fetching CurseForge's next index internally,
+  // which the frontend's own index/offset (unchanged here) wouldn't know
+  // about — the next "load more" would re-request that same now-consumed
+  // index and show duplicates. Passing index/pageSize straight through to
+  // CurseForge like this instead keeps every page mapped 1:1 to a fixed,
+  // disjoint slice of CurseForge's ranking, so a short page (< pageSize)
+  // just means fewer results were genuinely this loader, not something
+  // that will collide with the next page's results.
+  //
+  // resultCount still needs correcting to match, though — it's CurseForge's
+  // count of what THEY returned, not what survived this filter, and left
+  // alone would overstate data.data.length to anything reading it. totalCount
+  // is left as-is: it counts matches across the whole result set, most of
+  // which was never fetched here to filter.
+  if (data.pagination) {
+    data.pagination.resultCount = data.data.length;
+  }
+  return data;
+}
+
 Router.get("/search", (req, res) => {
   if (apiKey != "") {
     let gameVersion = req.query.version;
@@ -47,7 +96,8 @@ Router.get("/search", (req, res) => {
       (error, stdout, stderr) => {
         if (!error && stdout != undefined) {
           try {
-            res.status(200).json(JSON.parse(stdout));
+            const data = filterByLoader(JSON.parse(stdout), modLoaderType);
+            res.status(200).json(data);
           } catch {
             res.status(400).json({ msg: "Error parsing JSON." });
           }

@@ -117,11 +117,11 @@
     if (platform != "cf" && platform != "mr") {
       platform = tab;
     }
-    offset = 0;
     if (loadMore) {
       skeletonsLength = offset + 15;
       offset += 15;
     } else {
+      offset = 0;
       if (skeletonsLength > 15) skeletonsLength = 15;
       if (platform == "cf") cfResults = [];
       else if (platform == "mr") mrResults = [];

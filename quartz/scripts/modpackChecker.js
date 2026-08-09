@@ -41,6 +41,9 @@ const CHECK_CPU_CORES = 1;
 const CF_GAME_ID = 432;
 const CF_MODPACK_CLASS = 4471;
 const CF_LOADER_FORGE = 1;
+// Only used to recognize an incidental Fabric tag during Forge discovery
+// (see topForgeModpacks) — Fabric is no longer searched or checked on its own.
+const CF_LOADER_FABRIC = 4;
 const CF_SORT_DOWNLOADS = 6;
 
 // Curated list of packs independently confirmed to be Forge-only (see
@@ -324,8 +327,26 @@ async function topForgeModpacks(gameVersion) {
     { "x-api-key": apiKey }
   );
 
+  // CurseForge's modLoaderType filter is loose — see the identical note on
+  // filterByLoader in routes/curseforge.js — so a "Forge" search can still
+  // surface a pack that's actually Fabric because one old file happened to
+  // carry a Forge tag. Left in, that pack burns one of the TOP_N slots for
+  // this version and reports "unavailable" once resolveForgePack finds no
+  // real Forge file, rather than the genuinely next-ranked Forge pack never
+  // getting checked at all. Note this can leave fewer than TOP_N packs for a
+  // version — deliberately not backfilled with an extra page, since ranking
+  // is by downloads and there's no sane page to pull a replacement from
+  // without re-fetching and re-filtering the whole ranked list.
+  const genuineForgeHits = (search.data || []).filter((mod) => {
+    const indexes = mod.latestFilesIndexes;
+    if (!Array.isArray(indexes)) return true;
+    const hasFabric = indexes.some((f) => f.modLoader === CF_LOADER_FABRIC);
+    const hasForge = indexes.some((f) => f.modLoader === CF_LOADER_FORGE);
+    return !(hasFabric && !hasForge);
+  });
+
   const packs = [];
-  for (const mod of search.data || []) {
+  for (const mod of genuineForgeHits) {
     packs.push(await resolveForgePack(mod, gameVersion));
   }
   return packs;
