@@ -66,6 +66,24 @@ function isForgeOnlyModpack(cfId) {
   return getForgeOnlyModpacks().some((pack) => pack.id === cfId);
 }
 
+function getClientSideModpackIds() {
+  try {
+    const content = fs.readFileSync("assets/clientsidemodpacks.txt", "utf8");
+    return content
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#"))
+      .map((id) => parseInt(id))
+      .filter((id) => !isNaN(id));
+  } catch (e) {
+    return [];
+  }
+}
+
+function isClientSideModpack(cfId) {
+  return getClientSideModpackIds().includes(cfId);
+}
+
 // A pack has to install a loader, generate a world and reach "Done" — slow
 // packs on a cold cache genuinely take this long.
 const START_TIMEOUT_MS = Number(config.modpackCheckTimeoutMs) || 8 * 60 * 1000;
@@ -338,6 +356,9 @@ async function topForgeModpacks(gameVersion) {
   // is by downloads and there's no sane page to pull a replacement from
   // without re-fetching and re-filtering the whole ranked list.
   const genuineForgeHits = (search.data || []).filter((mod) => {
+    // Skip client-side only modpacks
+    if (isClientSideModpack(mod.id)) return false;
+
     const indexes = mod.latestFilesIndexes;
     if (!Array.isArray(indexes)) return true;
     const hasFabric = indexes.some((f) => f.modLoader === CF_LOADER_FABRIC);

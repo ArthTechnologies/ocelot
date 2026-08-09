@@ -2,6 +2,7 @@ const express = require("express");
 const Router = express.Router();
 const config = require("../scripts/utils.js").getConfig();
 const apiKey = config.curseforgeKey;
+const fs = require("fs");
 
 // CurseForge's own modLoaderType filter is loose - it returns a pack if ANY
 // file the project has ever published matches, not just the file(s) for the
@@ -11,6 +12,20 @@ const apiKey = config.curseforgeKey;
 // NeoForge (6) or unspecified files, so a strict same/opposite check there
 // would throw away results that are actually fine.
 const OPPOSITE_LOADER = { 1: 4, 4: 1 };
+
+function getClientSideModpackIds() {
+  try {
+    const content = fs.readFileSync("assets/clientsidemodpacks.txt", "utf8");
+    return content
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#"))
+      .map((id) => parseInt(id))
+      .filter((id) => !isNaN(id));
+  } catch (e) {
+    return [];
+  }
+}
 
 // Drops a result if it has at least one file tagged with the opposite loader
 // and none tagged with the one actually requested - i.e. the "match" was
@@ -46,6 +61,21 @@ function filterByLoader(data, modLoaderType) {
   // alone would overstate data.data.length to anything reading it. totalCount
   // is left as-is: it counts matches across the whole result set, most of
   // which was never fetched here to filter.
+  if (data.pagination) {
+    data.pagination.resultCount = data.data.length;
+  }
+  return data;
+}
+
+// Filters out modpacks that are client-side only (listed in clientsidemodpacks.txt)
+function filterClientSideModpacks(data) {
+  if (!Array.isArray(data.data)) return data;
+
+  const clientSideIds = getClientSideModpackIds();
+  if (clientSideIds.length === 0) return data;
+
+  data.data = data.data.filter((mod) => !clientSideIds.includes(mod.id));
+
   if (data.pagination) {
     data.pagination.resultCount = data.data.length;
   }
@@ -96,7 +126,8 @@ Router.get("/search", (req, res) => {
       (error, stdout, stderr) => {
         if (!error && stdout != undefined) {
           try {
-            const data = filterByLoader(JSON.parse(stdout), modLoaderType);
+            let data = filterByLoader(JSON.parse(stdout), modLoaderType);
+            data = filterClientSideModpacks(data);
             res.status(200).json(data);
           } catch {
             res.status(400).json({ msg: "Error parsing JSON." });
