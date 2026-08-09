@@ -21,7 +21,7 @@ const GAME_VERSION = "1.18.2";
 // per version, so this is 4x the Forge work of a single-version run — see the
 // note on the weekly schedule in run.js.
 const FORGE_GAME_VERSIONS = ["1.18.2", "1.12.2", "1.20.1", "1.16.5"];
-const TOP_N = 10;
+const TOP_N = 12;
 
 // How many packs are checked at once, one reserved server slot each — ids
 // `modpackCheckServerId` .. `+ SLOT_COUNT - 1`. Raising this is a trade against
