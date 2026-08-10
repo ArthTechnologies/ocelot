@@ -273,6 +273,15 @@ function moveServerToTrashbin(entry) {
       console.log("Deleting empty server folder " + entry.serverId);
       fs.rmSync(`servers/${entry.serverId}`, { recursive: true, force: true });
     }
+
+    // The sftp container's bind mount pins the old folder inode, so FTP would
+    // keep serving the binned (or emptied) directory until the next rebuild.
+    // Lazy require: ftp.js imports from utils.js at top level.
+    try {
+      require("./ftp").startFtpServer();
+    } catch (ftpError) {
+      console.log("Error restarting FTP server after trashbin move: " + ftpError);
+    }
   } catch (e) {
     console.log("Error moving server to trashbin " + entry.serverId);
     console.log(e);

@@ -76,4 +76,15 @@ function getFileAccessKey(serverId) {
   return fileAccessKeys.find((key) => key.serverId == serverId).key;
 }
 
-module.exports = { getFileAccessKey, refreshKeys };
+// Adds a key for a server created (or restored) after the last refreshKeys(),
+// without rotating everyone else's keys. getFileAccessKey throws otherwise.
+function ensureKey(serverId) {
+  if (!fileAccessKeys.find((key) => key.serverId == serverId)) {
+    fileAccessKeys.push({
+      serverId: String(serverId),
+      key: crypto.randomBytes(16).toString("hex"),
+    });
+  }
+}
+
+module.exports = { getFileAccessKey, refreshKeys, ensureKey };

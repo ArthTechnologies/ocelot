@@ -287,6 +287,13 @@ function handleServerRecovery(res, email, targetServerId, verified) {
                     typeof s === "string" && s.includes(":freed") && s.startsWith(serverId) ? serverId : s
                   );
                   writeJSON(`accounts/${email}.json`, account);
+                  // Rebuild the sftp container so the restored server gets
+                  // its FTP user and mount back
+                  try {
+                    require("../scripts/ftp.js").startFtpServer();
+                  } catch (ftpError) {
+                    console.log("Error restarting FTP server after restore: " + ftpError);
+                  }
                   break;
                 }
               }

@@ -884,13 +884,14 @@ router.post(`/new/:id`, function (req, res) {
                 console.error("Error creating automatic backup task:", err);
               }
             }
-                          //restart the ftp container
+                          // refresh keys before the ftp rebuild — the new
+                          // server needs a key for its ftp user
+                          security.refreshKeys();
                           try {
                             ftp.startFtpServer();
                           } catch (e) {
                             console.log("error restarting ftp container " + e);
                           }
-                          security.refreshKeys();
             f.run(
               id,
               req.body.software,
@@ -1022,13 +1023,14 @@ router.post(`/new/:id`, function (req, res) {
                           console.log(
                             "debug: " + email + req.headers.username + em
                           );
-                          //restart the ftp container
+                          // refresh keys before the ftp rebuild — the new
+                          // server needs a key for its ftp user
+                          security.refreshKeys();
                           try {
                             ftp.startFtpServer();
                           } catch (e) {
                             console.log("error restarting ftp container " + e);
                           }
-                          security.refreshKeys();
                           f.run(
                             id,
                             req.body.software,
@@ -1560,11 +1562,15 @@ router.get("/:id/getFtpToken", function (req, res) {
   ) {
     if (account.accountId.includes("acc_"))
       account.accountId = account.accountId.replace("acc_", "");
-    res.status(200).json({
-      token: ftp.getTempToken(
-        account.accountId.slice(-6) + "." + req.params.id
-      ),
-    });
+    let ftpToken = ftp.getTempToken(
+      account.accountId.slice(-6) + "." + req.params.id
+    );
+    if (ftpToken == undefined) {
+      return res.status(503).json({
+        msg: "FTP credentials are not ready yet. Please try again in a moment.",
+      });
+    }
+    res.status(200).json({ token: ftpToken });
   } else {
     res.status(401).json({ msg: "Invalid credentials." });
   }
