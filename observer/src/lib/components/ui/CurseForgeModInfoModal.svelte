@@ -16,7 +16,7 @@
     if (data && data.name) {
       mod = data;
     } else {
-      error = "Couldn't load info for this mod — it may have been removed from CurseForge.";
+      error = "Couldn't load info for this mod - it may have been removed from CurseForge.";
     }
     loading = false;
   });

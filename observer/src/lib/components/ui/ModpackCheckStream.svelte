@@ -76,7 +76,7 @@
   }
 
   function elapsed(startedAt: number | null | undefined) {
-    if (!startedAt) return "—";
+    if (!startedAt) return "-";
     const secs = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
     if (secs < 60) return `${secs}s`;
     const m = Math.floor(secs / 60);
@@ -188,7 +188,7 @@
           {:else if !sawAnything}
             <p class="text-base-content/50 text-xs mt-0.5">Waiting for the check to start…</p>
           {:else}
-            <p class="text-base-content/50 text-xs mt-0.5">Check finished — close this to see the updated results.</p>
+            <p class="text-base-content/50 text-xs mt-0.5">Check finished - close this to see the updated results.</p>
           {/if}
         </div>
         <button class="btn btn-ghost btn-sm btn-circle" on:click={() => dispatch("close")} aria-label="Close">
@@ -233,7 +233,7 @@
               <div class="flex items-center justify-between px-4 py-2.5 bg-base-200/50 border-b border-base-300/40">
                 <div class="flex items-center gap-2 min-w-0">
                   <svelte:component this={meta.icon} size={14} class="text-primary shrink-0 {meta.icon === Loader ? 'animate-spin' : ''}" />
-                  <span class="font-medium text-sm truncate">{slot.pack?.name || "—"}</span>
+                  <span class="font-medium text-sm truncate">{slot.pack?.name || "-"}</span>
                   <span class="badge badge-ghost badge-sm shrink-0 capitalize">
                     {slot.pack?.loader} {slot.pack?.gameVersion}
                   </span>

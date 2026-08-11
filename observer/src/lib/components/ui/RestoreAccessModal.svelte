@@ -227,7 +227,7 @@
           </p>
           {#if !result.worldKept}
             <p class="text-xs restore-muted">
-              Your previous world was moved to storage — you'll start on a fresh one.
+              Your previous world was moved to storage - you'll start on a fresh one.
             </p>
           {/if}
         </div>
@@ -238,7 +238,7 @@
           {#if status === "done"}
             You can start your server from the dashboard.
           {:else if status === "failed"}
-            Nothing was lost — your data is still in storage.
+            Nothing was lost - your data is still in storage.
           {:else}
             This usually takes a few seconds. Please don't close this window.
           {/if}

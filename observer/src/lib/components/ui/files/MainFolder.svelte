@@ -78,7 +78,7 @@
       downloadUrl = baseUrl() + "server/" + id + "/files/mainfolder?key=" + data.key;
     } catch (err) {
       console.error("Error preparing download:", err);
-      downloadError = "Couldn't create a download link — connection lost.";
+      downloadError = "Couldn't create a download link - connection lost.";
     } finally {
       preparingDownload = false;
     }

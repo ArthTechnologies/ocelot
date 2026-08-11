@@ -127,16 +127,16 @@
           return;
         }
         if (xhr.status === 401) {
-          alert("Upload failed — your session expired. Log in again.", "error");
+          alert("Upload failed - your session expired. Log in again.", "error");
           return;
         }
         if (xhr.status === 404) {
-          alert("Upload failed — the destination folder no longer exists.", "error");
+          alert("Upload failed - the destination folder no longer exists.", "error");
           document.dispatchEvent(new CustomEvent("refresh"));
           return;
         }
         if (xhr.status === 413) {
-          alert("Upload failed — the file is too large.", "error");
+          alert("Upload failed - the file is too large.", "error");
           return;
         }
 

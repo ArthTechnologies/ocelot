@@ -118,7 +118,7 @@
   }
 
   function duration(ms: number | null | undefined) {
-    if (!ms || ms < 1000) return "—";
+    if (!ms || ms < 1000) return "-";
     const total = Math.round(ms / 1000);
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
@@ -442,7 +442,7 @@
                       <td>
                         <div class="font-medium">{row.name}</div>
                         <div class="text-xs text-base-content/50">
-                          {row.versionName || "—"}
+                          {row.versionName || "-"}
                           {#if row.attempts > 1}· {row.attempts} attempts{/if}
                         </div>
                       </td>
@@ -468,7 +468,7 @@
                       </td>
                       <td class="text-xs">
                         {#if row.mods?.serverPack}
-                          <span title="Installed from the server pack — mods come pre-bundled, so there is no manifest count to compare against">
+                          <span title="Installed from the server pack - mods come pre-bundled, so there is no manifest count to compare against">
                             {row.mods.installed}
                           </span>
                         {:else if row.mods?.expected}
@@ -478,7 +478,7 @@
                             {row.mods.installed}/{row.mods.expected}
                           </span>
                         {:else}
-                          <span class="text-base-content/40">—</span>
+                          <span class="text-base-content/40">-</span>
                         {/if}
                       </td>
                       <td class="text-xs text-base-content/60">{duration(row.durationMs)}</td>
@@ -509,7 +509,7 @@
                             </div>
                             {#if row.mods?.serverPack}
                               <div class="text-base-content/60">
-                                Installed from the pack's server pack — same file customers get.
+                                Installed from the pack's server pack - same file customers get.
                                 {row.mods.installed} mods live on the server; nothing was
                                 downloaded per-mod, so there is no manifest count to compare against.
                                 {#if row.mods.removedClientSide || row.mods.disabledByConflict}
@@ -545,7 +545,7 @@
                                   {#each row.mods.failedMods as mod (mod.name)}
                                     <div>
                                       <span class="font-medium">{mod.name}</span>
-                                      <span class="text-base-content/50"> — {mod.reason}</span>
+                                      <span class="text-base-content/50"> - {mod.reason}</span>
                                     </div>
                                   {/each}
                                 </div>

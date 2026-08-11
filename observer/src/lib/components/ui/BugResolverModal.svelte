@@ -73,7 +73,7 @@
   const warningLabels: Record<string, string> = {
     missing_world: "World folder missing",
     missing_jar: "Server jar missing",
-    missing_server_json: "No server config — may be corrupted"
+    missing_server_json: "No server config - may be corrupted"
   };
 </script>
 

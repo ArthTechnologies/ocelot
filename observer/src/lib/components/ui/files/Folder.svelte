@@ -233,7 +233,7 @@
       refresh();
     } catch (err) {
       console.error("Error deleting folder:", err);
-      deleteError = "Couldn't delete the folder — connection lost.";
+      deleteError = "Couldn't delete the folder - connection lost.";
     } finally {
       deleting = false;
     }
@@ -293,7 +293,7 @@
       refresh();
     } catch (err) {
       console.error("Error renaming folder:", err);
-      renameError = "Rename failed — connection lost.";
+      renameError = "Rename failed - connection lost.";
     } finally {
       renaming = false;
     }
@@ -337,7 +337,7 @@
         data.key;
     } catch (err) {
       console.error("Error preparing download:", err);
-      downloadError = "Couldn't create a download link — connection lost.";
+      downloadError = "Couldn't create a download link - connection lost.";
     } finally {
       preparingDownload = false;
     }

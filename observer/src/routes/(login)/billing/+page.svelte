@@ -538,7 +538,7 @@
       <div class="stat-tile">
         <div class="stat-icon"><CalendarDays size="17" /></div>
         <div>
-          <p class="stat-num stat-num-sm">{memberSince ? formatDate(memberSince) : "—"}</p>
+          <p class="stat-num stat-num-sm">{memberSince ? formatDate(memberSince) : "-"}</p>
           <p class="stat-label">Customer since</p>
         </div>
       </div>
@@ -964,9 +964,9 @@
           <AlertCircle size="15" class="shrink-0 mt-0.5" />
           <span>
             {#if planModalMode === "upgrade"}
-              You're already on our highest plan — there's nothing to upgrade to.
+              You're already on our highest plan - there's nothing to upgrade to.
             {:else}
-              You're already on our smallest plan — there's nothing to downgrade to.
+              You're already on our smallest plan - there's nothing to downgrade to.
             {/if}
           </span>
         </div>
@@ -1040,7 +1040,7 @@
                         <p class="text-xs font-mono muted truncate">{server.id}</p>
                         <p class="text-xs muted opacity-60">Pending creation</p>
                       </div>
-                      <span class="pill pill-xs pill-gray">—</span>
+                      <span class="pill pill-xs pill-gray">-</span>
                     {:else}
                       <div class="flex-1 min-w-0">
                         <p class="text-xs font-mono truncate">
@@ -1052,7 +1052,7 @@
                         bind:value={planAssignments[server.id]}
                         disabled={server.isPending}
                       >
-                        <option value="" disabled selected>—</option>
+                        <option value="" disabled selected>-</option>
                         {#each modalPlans as plan, letterIdx}
                           <option value={plan.name}>
                             {String.fromCharCode(65 + letterIdx)}
