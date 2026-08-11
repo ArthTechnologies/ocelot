@@ -5,19 +5,56 @@
   import { apiurl } from "$lib/scripts/req";
   import { ArrowLeft, ArrowRight, Check, Loader2, X } from "lucide-svelte";
   import BugResolverModal from "$lib/components/ui/BugResolverModal.svelte";
+  import RestoreAccessModal from "$lib/components/ui/RestoreAccessModal.svelte";
 
   $: serverId = $page.params.slug;
 
   let subscriptionActive = false;
   let subscriptionLoading = true;
   let lastPaymentDate: number | null = null;
-  let slotsAvailable = true;
-  let slotLoading = true;
   let showFindSlotModal = false;
   let findSlotLoading = false;
   let findSlotResult: { available: boolean; id: number | null } | null = null;
   let showBugResolver = false;
   let dontRestoreWorld = false;
+  let showRestoreModal = false;
+
+  type Blocker = { code: string; message: string };
+  type Plan = {
+    serverId: string;
+    kind: string;
+    canRestore: boolean;
+    blockers: Blocker[];
+    warnings: Blocker[];
+    slot?: {
+      originalId: string;
+      originalState: string;
+      originalReason: string | null;
+      targetId: string | null;
+      needsNewSlot: boolean;
+    };
+    data?: { source: string; hasLive: boolean; hasArchive: boolean; archiveCount: number };
+    subscription?: {
+      checked: boolean;
+      active: number;
+      pastDue: number;
+      freeServers: number;
+      liveServers: number;
+      required: number;
+      sufficient: boolean;
+    };
+    activeJob?: { status: string } | null;
+  };
+  // The backend is the authority on whether a restore can go ahead — the page's
+  // own three checks are only there to explain why.
+  let plan: Plan | null = null;
+  let planLoading = true;
+
+  function blocker(code: string) {
+    return plan?.blockers?.find((b) => b.code === code) ?? null;
+  }
+  $: subscriptionBlocker =
+    blocker("no_subscription") || blocker("payment_pending") || blocker("insufficient_subscriptions");
 
   type WorldCopy = {
     worldSize: string;
@@ -122,14 +159,17 @@
           subscriptionLoading = false;
         });
 
-      fetch(apiurl + "info/capacity")
+      fetch(apiurl + "support/restore/" + serverId + "/plan", { method: "GET", headers })
         .then((res) => res.json())
         .then((data) => {
-          slotsAvailable = !data.atCapacity;
+          plan = data;
+          // A restore already running (another tab, or a reload mid-way) —
+          // rejoin it rather than offering to start a second one.
+          if (data?.activeJob) showRestoreModal = true;
         })
-        .catch((e) => console.error("Failed to load capacity info:", e))
+        .catch((e) => console.error("Failed to load restore plan:", e))
         .finally(() => {
-          slotLoading = false;
+          planLoading = false;
         });
 
       fetch(apiurl + "support/world-info/" + serverId, { method: "GET", headers })
@@ -186,13 +226,60 @@
         showWorldToggle: true,
       }) as Step;
 
+  // Driven by the restore plan rather than raw panel capacity: what matters is
+  // whether *this* server's own slot survived, not whether the node has room.
+  $: slotStep = (planLoading
+    ? {
+        done: false,
+        loading: true,
+        title: "Slot",
+        text: "Checking your server slot…",
+        button: null,
+      }
+    : !plan || !plan.slot
+    ? {
+        done: false,
+        title: "Slot",
+        text: "We couldn't check the status of your server slot.",
+        button: null,
+      }
+    : !plan.slot.needsNewSlot
+    ? {
+        done: true,
+        title: "Slot",
+        text:
+          plan.slot.originalState === "ours"
+            ? `Your server is still on its original slot (#${plan.slot.originalId}).`
+            : `Your original slot (#${plan.slot.originalId}) is still free and will be reused.`,
+        button: null,
+      }
+    : plan.slot.targetId
+    ? {
+        done: true,
+        title: "Slot",
+        text: `Your original slot (#${plan.slot.originalId}) was reassigned, so your server will be restored as #${plan.slot.targetId}. Its IP address will change.`,
+        button: "Find new slot",
+        onClick: findNewSlot,
+      }
+    : {
+        done: false,
+        title: "Slot",
+        text: "Your slot is no longer available, and this location currently has no open slots either.",
+        button: "Find new slot",
+        onClick: findNewSlot,
+      }) as Step;
+
+  $: subscriptionDone = subscriptionActive && !subscriptionBlocker;
+
   $: steps = [
     {
-      done: subscriptionActive,
-      loading: subscriptionLoading,
+      done: subscriptionDone,
+      loading: subscriptionLoading || planLoading,
       title: "Subscription",
-      text: subscriptionLoading
+      text: subscriptionLoading || planLoading
         ? "Checking your subscription status…"
+        : subscriptionBlocker
+        ? subscriptionBlocker.message
         : subscriptionActive
         ? "You have an active subscription on this account."
         : `You currently have no active subscriptions.${
@@ -200,24 +287,23 @@
               ? ` Your final payment was on ${formatDate(lastPaymentDate)}.`
               : ""
           } Renew your plan to continue.`,
-      button: subscriptionLoading || subscriptionActive ? null : "Renew subscription",
-      href: subscriptionLoading || subscriptionActive ? null : "/billing",
+      button: subscriptionLoading || planLoading || subscriptionDone ? null : "Renew subscription",
+      href: subscriptionLoading || planLoading || subscriptionDone ? null : "/billing",
     },
-    {
-      done: slotsAvailable,
-      loading: slotLoading,
-      title: "Slot",
-      text: slotLoading
-        ? "Checking slot availability…"
-        : slotsAvailable
-        ? "Your slot is no longer available. There are open slots available on this location though."
-        : "Your slot is no longer available, and this location currently has no open slots either.",
-      button: "Find new slot",
-      disabled: slotLoading || !slotsAvailable,
-      onClick: findNewSlot,
-    },
+    slotStep,
     worldStep,
   ] as Step[];
+
+  // Blockers the three steps above don't already explain in their own text.
+  $: otherBlockers = (plan?.blockers ?? []).filter(
+    (b) =>
+      b.code !== "no_subscription" &&
+      b.code !== "payment_pending" &&
+      b.code !== "insufficient_subscriptions" &&
+      b.code !== "no_slots" &&
+      b.code !== "world_conflict" &&
+      b.code !== "no_data"
+  );
 </script>
 
 <div class="flex place-content-center text-neutral-content">
@@ -301,13 +387,42 @@
 
       <div class="flex gap-4">
         <div class="w-10 shrink-0"></div>
-        <div class="flex-1">
-          <button class="btn btn-disabled w-full sm:w-auto" disabled>Restore access</button>
+        <div class="flex-1 flex flex-col gap-2">
+          <button
+            class="btn w-full sm:w-auto {plan?.canRestore && !planLoading ? 'btn-primary' : 'btn-disabled'}"
+            disabled={planLoading || !plan?.canRestore}
+            on:click={() => (showRestoreModal = true)}
+          >
+            {#if planLoading}
+              <Loader2 size="16" class="animate-spin" />
+              Checking…
+            {:else}
+              Restore access
+            {/if}
+          </button>
+
+          {#each otherBlockers as b}
+            <p class="text-xs opacity-70">{b.message}</p>
+          {/each}
+
+          {#if plan?.canRestore}
+            {#each plan.warnings ?? [] as w}
+              <p class="text-xs opacity-70">{w.message}</p>
+            {/each}
+          {/if}
         </div>
       </div>
     </div>
   </div>
 </div>
+
+{#if showRestoreModal}
+  <RestoreAccessModal
+    {serverId}
+    restoreWorld={!dontRestoreWorld}
+    on:close={() => (showRestoreModal = false)}
+  />
+{/if}
 
 {#if showBugResolver}
   <BugResolverModal

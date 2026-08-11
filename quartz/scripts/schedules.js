@@ -156,6 +156,27 @@ function deleteTask(taskId) {
   writeSchedules(schedules);
 }
 
+// Point every task for one server at a different server id. Used when an
+// expired server is restored into a slot other than the one it was created in
+// — the tasks would otherwise keep firing against the id a different customer
+// now owns. serverId is stored as a number by createTask but older rows can
+// hold a string, so both are matched.
+function remapServerId(oldId, newId) {
+  const schedules = readSchedules();
+  let moved = 0;
+
+  for (const list of [schedules.userTasks, schedules.systemTasks]) {
+    for (const task of list) {
+      if (String(task.serverId) !== String(oldId)) continue;
+      task.serverId = typeof task.serverId === "number" ? parseInt(newId) : String(newId);
+      moved++;
+    }
+  }
+
+  if (moved > 0) writeSchedules(schedules);
+  return moved;
+}
+
 // Toggle task enabled/disabled (searches both user and system tasks)
 function toggleTask(taskId) {
   const schedules = readSchedules();
@@ -365,6 +386,7 @@ module.exports = {
   updateTask,
   deleteTask,
   toggleTask,
+  remapServerId,
   calculateNextRun,
   setDependencies,
   readSchedules,

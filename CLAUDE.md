@@ -158,6 +158,30 @@ quartz/
 - `utils.js` writes the `{id}:freed` marker to every linked account holding the id, so both logins land on code 100 rather than one falling through to a bare 101.
 - `utils.js` requires `accountLinking` **lazily inside the function** — `accountLinking` imports `readJSON` from `utils.js`, so a top-level import there would create a cycle.
 
+#### Restoring an Expired Server
+The expired-server card links to `/expired/{id}` (Observer), which walks the user through three checks — subscription, slot, world data — and then restores the server through `routes/support.js`. Three endpoints back it, all resolving state across the **whole email group** (`accountLinking.getLinkedAccountFiles`), since the archive folder is named after the account that owned the server and the `:freed` marker may sit on the sibling login:
+- `GET /support/restore/:id/plan` — preflight. Returns `kind`, `canRestore`, `blockers[]`, `warnings[]`, plus `slot`, `data` and `subscription` detail. The page drives its slot step and the enabled state of the Restore button from this; the three per-step endpoints only explain *why*.
+- `POST /support/restore/:id` — starts a job and returns it immediately (202). Body `{ restoreWorld }` (defaults to `true` — the safe reading of a missing field is "keep the customer's world").
+- `GET /support/restore/:id/progress` — the job's nine steps with per-step `status`/`detail`, polled ~1s by `RestoreAccessModal.svelte`.
+
+`kind` is the whole taxonomy, derived from what actually exists on disk rather than the error code the card showed:
+- `live` — server still in `servers/{id}`, owned by the group (error 106/105). Nothing moves; the restore clears `expired`/`markedExpired` and refreshes the subscription log.
+- `archive` — a `trashbin/{id}-{owner}` copy (error 100). Moved back into a slot.
+- `conflict` — both exist (error 103). Blocked; `BugResolverModal` has to resolve it first.
+- `missing` — neither (error 104). Blocked.
+- `not_owned` — the group doesn't list the id at all.
+
+Nuances worth keeping:
+- **The plan is rebuilt inside the job.** The page's answers are minutes old and the slot it saw free may since have been handed out by `/server/reserve`. Slot selection and the folder move run under a promise-chain lock, and the chosen id goes into a `pendingSlots` set for the life of the job — the folder a restore creates would otherwise look like an abandoned empty folder to the next restore seconds later.
+- **A restored server may not get its old id back.** If `servers/{id}` now belongs to someone else, the archive is moved to the next free slot: `server.json`'s `id` is rewritten, schedules are remapped (`schedules.remapServerId`), `backups/{old}` is renamed, and the stale plain entry is dropped from the group's accounts. Ports need no rewriting — `mc.js` recomputes `10000 + id` and restamps `server.properties`, BlueMap and the Geyser config on every run — but `server.subdomain` is cleared, because its SRV record points at the old port and `subdomainCleanup` collects records no live server claims.
+- **`logs/subscriptions.json` must be rewritten, or the restore undoes itself.** `info.js` decides "expired" from that file, so a server restored against a stale entry shows as expired again on the next page load. The job removes the group's entries for the id and writes a fresh one in the exact shape `checkSubscriptions()` produces.
+- **Only `active`/`trialing` count as paid.** `past_due` is tempting — the customer hasn't cancelled — but `enforceSubscription()` treats anything else as lapsed and, with no `ended_at` to measure a grace period from, would bin the server again on the very next sweep. It gets its own `payment_pending` blocker.
+- **Restoring can't hand out a server the group isn't paying for.** `activeSubs + freeServers` must cover the group's live servers *plus* the one being restored (`freeServers` is the **max** across the group, not the sum — the duplicate-email migration credited each account separately).
+- **"Don't bring back my old world" moves the world aside, never deletes it** — into `trashbin/{id}-{owner}-world-{ts}`. A mis-tapped toggle shouldn't cost someone their base. If the server is somehow still running, it's killed first.
+- **A finished job is history, not a result to replay.** `POST` reuses only a *running* job; a completed one is discarded so a server that expired twice actually restores the second time.
+- An archive with no `server.json` is refused **before** the move, so the files aren't left in a slot nothing points at.
+- `/support/world-info/:id` and `/support/bug-resolver/:id` check that `servers/{id}` actually belongs to the account group before reporting on it. A freed id can be reassigned, and both used to report the *new* owner's world size, mod count and player count — and bug-resolver's "keep the archived version" would have renamed that customer's live folder out from under them.
+
 #### Payments (Provider Mode)
 - Stripe integration for server subscriptions
 - Pricing tiers (Basic, Modded)
