@@ -1578,7 +1578,11 @@ function downloadModFileWithRetry(destPath, url, attempt = 1) {
   const BACKOFF_MS = [1500, 4000];
 
   return new Promise((resolve) => {
-    exec(`curl -sS --max-time 60 -o "${destPath}" -L "${url}"`, (error) => {
+    // --fail matters as much as the retry: without it curl treats a CDN's
+    // 403/429/5xx body as a "successful" download and writes it to
+    // destPath, so a rate-limited request would otherwise look identical to
+    // a real mod jar to the size>0 check below.
+    exec(`curl -sS --fail --max-time 60 -o "${destPath}" -L "${url}"`, (error) => {
       let ok = false;
       try {
         ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
@@ -1595,6 +1599,52 @@ function downloadModFileWithRetry(destPath, url, attempt = 1) {
         );
         setTimeout(() => {
           downloadModFileWithRetry(destPath, url, attempt + 1).then(resolve);
+        }, delay);
+        return;
+      }
+
+      resolve({
+        ok: false,
+        reason: error
+          ? `Download failed after ${MAX_ATTEMPTS} attempts (${error.message})`
+          : `Download produced an empty file after ${MAX_ATTEMPTS} attempts`,
+      });
+    });
+  });
+}
+
+// Same treatment as downloadModFileWithRetry, but for the modpack archive
+// itself (.zip/.mrpack) rather than a single mod jar. Unlike per-mod
+// downloads, this one previously went through files.downloadAsync, which has
+// no --fail, no timeout, no retry, and discards curl's exit code entirely -
+// so a transient CDN blip (rate limit, reset connection) silently produced a
+// corrupt/partial archive that got unzipped anyway, surfacing later as "no
+// mods extracted" with no indication the download itself was the problem.
+// The timeout is longer than the per-mod one since these archives (server
+// packs especially) can run into the hundreds of MB.
+function downloadModpackArchiveWithRetry(destPath, url, attempt = 1) {
+  const MAX_ATTEMPTS = 3;
+  const BACKOFF_MS = [2000, 6000];
+  const MAX_TIME_SEC = 300;
+
+  return new Promise((resolve) => {
+    exec(`curl -sS --fail --max-time ${MAX_TIME_SEC} -o "${destPath}" -L "${url}"`, (error) => {
+      let ok = false;
+      try {
+        ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
+      } catch (e) {}
+
+      if (ok) return resolve({ ok: true, reason: null });
+
+      if (attempt < MAX_ATTEMPTS) {
+        const delay = BACKOFF_MS[attempt - 1] || 6000;
+        console.log(
+          `Downloading modpack archive ${destPath} failed` +
+            (error ? ` (${error.message})` : " (empty file)") +
+            ` - retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS}).`
+        );
+        setTimeout(() => {
+          downloadModpackArchiveWithRetry(destPath, url, attempt + 1).then(resolve);
         }, delay);
         return;
       }
@@ -1917,10 +1967,11 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
   }
 
   if (modpackURL.includes("modrinth.com")) {
-    files.downloadAsync(
-      folder + "/modpack.mrpack",
-      modpackURL,
-      (error, stdout, stderr) => {
+    downloadModpackArchiveWithRetry(folder + "/modpack.mrpack", modpackURL).then(({ ok, reason }) => {
+      if (!ok) {
+        console.log("Modpack archive download failed for server " + id + ": " + reason);
+        return finishModpackDownload(id, [], download);
+      }
         exec(
           "unzip -o " + folder + "/modpack.mrpack" + " -d " + folder,
           (error, stdout, stderr) => {
@@ -2022,10 +2073,11 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
   } else if (modpackURL.includes("forge")) {
     const apiKey = config.curseforgeKey;
 
-    files.downloadAsync(
-      folder + "/modpack.zip",
-      modpackURL,
-      (error, stdout, stderr) => {
+    downloadModpackArchiveWithRetry(folder + "/modpack.zip", modpackURL).then(({ ok, reason }) => {
+      if (!ok) {
+        console.log("Modpack archive download failed for server " + id + ": " + reason);
+        return finishModpackDownload(id, [], download);
+      }
         console.log("downloading modpack from forge...");
         //make the directory "temp"
         if (!fs.existsSync(folder + "/temp")) {
@@ -2038,11 +2090,21 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
             //if theres no overrides folder, get the name of the folder inside temp
             if (!fs.existsSync(folder + "/temp/overrides")) {
               overridesFolder = "/temp";
-              //deletes .txt files, so it only moves over mods and configs and such
-              exec(
-                "find " + folder + "/temp -type f -name '*.txt' -delete",
-                () => {}
-              );
+              //deletes .txt files, so it only moves over mods and configs and such.
+              //execSync (not exec) matters here - the readdirSync just below
+              //reads this same folder, and an async delete racing an
+              //unrelated sync read meant a leftover .txt could make
+              //tempFiles.length come out wrong depending on timing, silently
+              //skipping the flatten below on an otherwise perfectly good pack.
+              try {
+                execSync(
+                  "find " + folder + "/temp -type f -name '*.txt' -delete"
+                );
+              } catch (e) {
+                console.log(
+                  "Could not clean up server pack .txt files for " + id + ": " + e.message
+                );
+              }
 
               if (fs.existsSync(folder + "/temp/server.properties")) {
                 fs.unlinkSync(folder + "/temp/server.properties");
