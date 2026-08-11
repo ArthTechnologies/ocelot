@@ -268,11 +268,43 @@ router.get(`/servers`, function (req, res) {
         }
         account.servers[i].isStandard = true;
       } else {
-        serverObject.isStandard = false;
-        serverObject.error = {
-          code: 101
-        };
-        account.servers[i] = serverObject;
+        // No live server.json for this id — normally a freshly reserved slot
+        // still waiting on /server/new (code 101). But if data for this id is
+        // sitting in trashbin, the account's entry never got converted to
+        // "{id}:freed" (a manual trashbin move, a migration edge case, an
+        // old-style /support/serverRecovery attempt that didn't finish). Report
+        // it the same way the :freed+no-live case does (code 100) instead of
+        // "not created yet", so the user lands on the expired-server recovery
+        // flow instead of being pointed at server creation for data that
+        // already exists. Same trashbin/linkedOwners lookup as the :freed
+        // branch above, since the folder is named after whichever linked login
+        // owned the server.
+        const inTrashbin = linkedOwners.some((file) =>
+          fs.existsSync(`trashbin/${serverId}-${file.replace(/\.json$/, "")}`)
+        );
+
+        if (inTrashbin) {
+          // Heal the marker so subsequent requests take the already-tested
+          // :freed path above instead of re-deriving this every time.
+          const freshAccount = readJSON(`accounts/${req.headers.username}.json`);
+          const idx = freshAccount.servers.indexOf(serverId);
+          if (idx !== -1) freshAccount.servers[idx] = `${serverId}:freed`;
+          writeJSON(`accounts/${req.headers.username}.json`, freshAccount);
+
+          serverObject.isStandard = false;
+          serverObject.error = {
+            code: 100,
+            resetDate: -1,
+            subscriptionCause: "freed"
+          };
+          account.servers[i] = serverObject;
+        } else {
+          serverObject.isStandard = false;
+          serverObject.error = {
+            code: 101
+          };
+          account.servers[i] = serverObject;
+        }
       }
     }
     res.status(200).json(account.servers);
