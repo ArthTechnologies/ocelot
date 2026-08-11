@@ -17,11 +17,23 @@ const LOG_PATH = "logs/modpackChecks.json";
 // the reserved slot's server.json, …). Also what old Fabric rows in the log
 // were checked on, back when the batch run covered Fabric.
 const GAME_VERSION = "1.18.2";
-// Forge is checked across every version people still run packs on. Top TOP_N
-// per version, so this is 4x the Forge work of a single-version run — see the
-// note on the weekly schedule in run.js.
+// Forge is checked across every version people still run packs on. Up to
+// TARGET_CHECKED_PER_VERSION actually-checked packs per version, so this is
+// 4x the Forge work of a single-version run — see the note on the weekly
+// schedule in run.js.
 const FORGE_GAME_VERSIONS = ["1.18.2", "1.12.2", "1.20.1", "1.16.5"];
+// Page size for each CurseForge search request while discovering packs.
 const TOP_N = 12;
+// topForgeModpacks keeps paging CurseForge's ranked search for a version
+// until this many packs have actually resolved to something checkable, not
+// merely discovered — a flat single page used to leave a version with
+// however many of its top TOP_N survived resolveForgePack (no file for this
+// version, distribution disabled, a Forge tag that turned out to be a false
+// positive, ...), often well under TOP_N.
+const TARGET_CHECKED_PER_VERSION = 15;
+// Backstop so a version CurseForge just doesn't have many Forge packs for
+// can't page forever chasing a target it'll never reach.
+const MAX_CANDIDATES_PER_VERSION = 60;
 
 // How many packs are checked at once, one reserved server slot each — ids
 // `modpackCheckServerId` .. `+ SLOT_COUNT - 1`. Raising this is a trade against
@@ -342,7 +354,12 @@ async function resolveForgePack(mod, gameVersion) {
 
 // Top Forge packs by total downloads for one game version, newest usable file
 // each. Called once per entry in FORGE_GAME_VERSIONS — the ranking is per
-// version, so each list is the top packs people actually run on that version.
+// version, so each list is the top packs people actually run on that
+// version. Pages through CurseForge's ranked search, resolving candidates as
+// it goes, until TARGET_CHECKED_PER_VERSION of them are actually checkable
+// (or MAX_CANDIDATES_PER_VERSION have been looked at) — a single fixed-size
+// page would leave a version with only however many of its candidates
+// happened to survive resolveForgePack, often well under the target.
 async function topForgeModpacks(gameVersion) {
   const apiKey = config.curseforgeKey;
   if (!apiKey) {
@@ -350,40 +367,51 @@ async function topForgeModpacks(gameVersion) {
     return [];
   }
 
-  const search = await fetchJson(
-    `https://api.curseforge.com/v1/mods/search?gameId=${CF_GAME_ID}` +
-      `&classId=${CF_MODPACK_CLASS}` +
-      `&gameVersion=${gameVersion}` +
-      `&modLoaderType=${CF_LOADER_FORGE}` +
-      `&sortField=${CF_SORT_DOWNLOADS}&sortOrder=desc&index=0&pageSize=${TOP_N}`,
-    { "x-api-key": apiKey }
-  );
-
-  // CurseForge's modLoaderType filter is loose — see the identical note on
-  // filterByLoader in routes/curseforge.js — so a "Forge" search can still
-  // surface a pack that's actually Fabric because one old file happened to
-  // carry a Forge tag. Left in, that pack burns one of the TOP_N slots for
-  // this version and reports "unavailable" once resolveForgePack finds no
-  // real Forge file, rather than the genuinely next-ranked Forge pack never
-  // getting checked at all. Note this can leave fewer than TOP_N packs for a
-  // version — deliberately not backfilled with an extra page, since ranking
-  // is by downloads and there's no sane page to pull a replacement from
-  // without re-fetching and re-filtering the whole ranked list.
-  const genuineForgeHits = (search.data || []).filter((mod) => {
-    // Skip client-side only modpacks
-    if (isClientSideModpack(mod.id)) return false;
-
-    const indexes = mod.latestFilesIndexes;
-    if (!Array.isArray(indexes)) return true;
-    const hasFabric = indexes.some((f) => f.modLoader === CF_LOADER_FABRIC);
-    const hasForge = indexes.some((f) => f.modLoader === CF_LOADER_FORGE);
-    return !(hasFabric && !hasForge);
-  });
-
   const packs = [];
-  for (const mod of genuineForgeHits) {
-    packs.push(await resolveForgePack(mod, gameVersion));
+  let checkedCount = 0;
+  let index = 0;
+
+  while (checkedCount < TARGET_CHECKED_PER_VERSION && index < MAX_CANDIDATES_PER_VERSION) {
+    const search = await fetchJson(
+      `https://api.curseforge.com/v1/mods/search?gameId=${CF_GAME_ID}` +
+        `&classId=${CF_MODPACK_CLASS}` +
+        `&gameVersion=${gameVersion}` +
+        `&modLoaderType=${CF_LOADER_FORGE}` +
+        `&sortField=${CF_SORT_DOWNLOADS}&sortOrder=desc&index=${index}&pageSize=${TOP_N}`,
+      { "x-api-key": apiKey }
+    );
+
+    const hits = search.data || [];
+    // CurseForge has nothing further to page through for this version.
+    if (!hits.length) break;
+    index += hits.length;
+
+    // CurseForge's modLoaderType filter is loose — see the identical note on
+    // filterByLoader in routes/curseforge.js — so a "Forge" search can still
+    // surface a pack that's actually Fabric because one old file happened to
+    // carry a Forge tag. Left in (as "unavailable") rather than dropped
+    // silently, so the log still shows why a popular hit didn't count toward
+    // the target - but it doesn't count toward checkedCount, so the loop
+    // keeps paging for a real replacement instead of coming up short.
+    const genuineForgeHits = hits.filter((mod) => {
+      // Skip client-side only modpacks
+      if (isClientSideModpack(mod.id)) return false;
+
+      const indexes = mod.latestFilesIndexes;
+      if (!Array.isArray(indexes)) return true;
+      const hasFabric = indexes.some((f) => f.modLoader === CF_LOADER_FABRIC);
+      const hasForge = indexes.some((f) => f.modLoader === CF_LOADER_FORGE);
+      return !(hasFabric && !hasForge);
+    });
+
+    for (const mod of genuineForgeHits) {
+      const resolved = await resolveForgePack(mod, gameVersion);
+      packs.push(resolved);
+      if (!resolved.unavailable) checkedCount++;
+      if (checkedCount >= TARGET_CHECKED_PER_VERSION) break;
+    }
   }
+
   return packs;
 }
 
@@ -805,7 +833,7 @@ async function checkModpacks() {
   progress.phase = "discovering";
   progress.startedAt = startedAt;
   log(
-    `Starting check of the top ${TOP_N} Forge modpacks by downloads on each of ` +
+    `Starting check of the top ${TARGET_CHECKED_PER_VERSION} checkable Forge modpacks by downloads on each of ` +
       `${FORGE_GAME_VERSIONS.join(", ")}…`
   );
 
