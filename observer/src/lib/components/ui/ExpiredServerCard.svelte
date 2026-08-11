@@ -53,7 +53,6 @@
   class="relative bg-base-300 w-[3.75rem] h-[3.75rem] rounded-lg max-lg:hidden flex justify-center items-center overflow-hidden"
 >
   <AlertOctagon size=32/>
-  <div class="absolute bottom-0 left-0 right-0 h-1 bg-error"></div>
 </div>
 <div class="-mt-1">
   <p class="font-poppins-bold text-gray-200 text-sm truncate max-md:hidden">
