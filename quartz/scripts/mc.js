@@ -1204,11 +1204,21 @@ ls.stderr.on("data", data => {
       }
     }
 
-    var text = fs.readFileSync("assets/template/geyserconfig.yml", "utf8");
-    var textByLine = text.split("\n");
-    textByLine[15] = "  port: " + port;
-
-    text = textByLine.join("\n");
+    function buildGeyserConfig(existingPath) {
+      //re-reads the existing config (if any) rather than the template, so a
+      //re-applied port doesn't clobber other settings a user changed in it
+      var configText = fs.existsSync(existingPath)
+        ? fs.readFileSync(existingPath, "utf8")
+        : fs.readFileSync("assets/template/geyserconfig.yml", "utf8");
+      var configLines = configText.split("\n");
+      //find by content, not a hardcoded index - the "bedrock:" port comes
+      //before the unrelated "remote:" port, so the first match is correct
+      var portIdx = configLines.findIndex((line) => line.trim().startsWith("port:"));
+      if (portIdx !== -1) {
+        configLines[portIdx] = "  port: " + port;
+      }
+      return configLines.join("\n");
+    }
 
     const geyserStampedJar = fs.readdirSync("assets/jars").find(f => f.startsWith("geyser-spigot-") && f.endsWith(".jar"));
 
@@ -1243,8 +1253,11 @@ ls.stderr.on("data", data => {
       if (!fs.existsSync(folder + "/plugins/Geyser-Spigot")) {
         fs.mkdirSync(folder + "/plugins/Geyser-Spigot");
       }
-      if (!server.adminServer && !fs.existsSync(folder + "/plugins/Geyser-Spigot/config.yml")) {
-        fs.writeFileSync(folder + "/plugins/Geyser-Spigot/config.yml", text);
+      if (!server.adminServer) {
+        fs.writeFileSync(
+          folder + "/plugins/Geyser-Spigot/config.yml",
+          buildGeyserConfig(folder + "/plugins/Geyser-Spigot/config.yml")
+        );
       }
 
       fs.copyFile(
@@ -1283,8 +1296,11 @@ ls.stderr.on("data", data => {
       if (!fs.existsSync(folder + "/plugins/Geyser-Velocity")) {
         fs.mkdirSync(folder + "/plugins/Geyser-Velocity");
       }
-      if (!server.adminServer && !fs.existsSync(folder + "/plugins/Geyser-Velocity/config.yml")) {
-        fs.writeFileSync(folder + "/plugins/Geyser-Velocity/config.yml", text);
+      if (!server.adminServer) {
+        fs.writeFileSync(
+          folder + "/plugins/Geyser-Velocity/config.yml",
+          buildGeyserConfig(folder + "/plugins/Geyser-Velocity/config.yml")
+        );
       }
       fs.copyFile(
         "assets/template/downloading/cx_geyser-velocity_Geyser.jar",
