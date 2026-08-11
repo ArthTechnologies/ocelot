@@ -16,7 +16,6 @@
   let findSlotLoading = false;
   let findSlotResult: { available: boolean; id: number | null } | null = null;
   let showBugResolver = false;
-  let dontRestoreWorld = false;
   let showRestoreModal = false;
 
   type Blocker = { code: string; message: string };
@@ -77,7 +76,6 @@
     disabled?: boolean;
     onClick?: () => void;
     meta?: string[];
-    showWorldToggle?: boolean;
   };
 
   function formatDate(timestamp: number) {
@@ -206,7 +204,6 @@
         text: "We found two separate copies of your world data. Choose which one to keep before we can restore access.",
         button: "Resolve conflict",
         onClick: () => (showBugResolver = true),
-        showWorldToggle: true,
       }
     : worldInfo.hasLive
     ? {
@@ -215,7 +212,6 @@
         text: "Your server's world data is safe and will carry over once access is restored.",
         button: null,
         meta: worldMeta(worldInfo.live),
-        showWorldToggle: true,
       }
     : {
         done: true,
@@ -223,7 +219,6 @@
         text: "Your world data was moved to temporary storage, but it's still safe and recoverable.",
         button: null,
         meta: worldMeta(worldInfo.trashbin),
-        showWorldToggle: true,
       }) as Step;
 
   // Driven by the restore plan rather than raw panel capacity: what matters is
@@ -368,12 +363,6 @@
                 {/if}
               {/if}
             </div>
-            {#if step.showWorldToggle}
-              <label class="flex items-center gap-2 self-end text-xs opacity-80 cursor-pointer">
-                <span>Don't bring back my old world</span>
-                <input type="checkbox" class="toggle toggle-sm" bind:checked={dontRestoreWorld} />
-              </label>
-            {/if}
           </div>
         </div>
 
@@ -417,11 +406,9 @@
 </div>
 
 {#if showRestoreModal}
-  <RestoreAccessModal
-    {serverId}
-    restoreWorld={!dontRestoreWorld}
-    on:close={() => (showRestoreModal = false)}
-  />
+  <!-- restoreWorld is left at its default: the world always comes back. The
+       endpoint still accepts `false`, there just isn't a way to ask for it. -->
+  <RestoreAccessModal {serverId} on:close={() => (showRestoreModal = false)} />
 {/if}
 
 {#if showBugResolver}
