@@ -478,12 +478,12 @@ function removeFolder(folder) {
 }
 
 // A clean slot with just enough server.json for run() to read.
-async function prepareSlot(id, pack) {
+async function prepareSlot(id, pack, isSingleRecheck = false) {
   const folder = `servers/${id}`;
   await removeFolder(folder);
   fs.mkdirSync(folder, { recursive: true });
 
-  writeJSON(`${folder}/server.json`, {
+  const serverJson = {
     id: String(id),
     name: `Modpack check — ${pack.name}`,
     software: pack.software,
@@ -495,14 +495,24 @@ async function prepareSlot(id, pack) {
     // and binning it mid-check.
     adminServer: true,
     modpackCheck: true,
+  };
+
+  if (isSingleRecheck) {
+    // Individual rechecks get more resources and no CPU limits
+    serverJson.ramOverrideGB = 10;
+    // Don't set cpuCoresOverride so it uses the default 4 cores
+  } else {
+    // Batch run slots get limited resources
     // Big modded packs OOM at the 4GB a plain server.json falls back to.
-    ramOverrideGB: CHECK_RAM_GB,
+    serverJson.ramOverrideGB = CHECK_RAM_GB;
     // A slot gets a single core rather than the default four — with several
     // checks in flight at once, handing each one four would oversubscribe the
     // box against the customer servers sharing it. Slower boots, so this
     // trades against START_TIMEOUT_MS.
-    cpuCoresOverride: CHECK_CPU_CORES,
-  });
+    serverJson.cpuCoresOverride = CHECK_CPU_CORES;
+  }
+
+  writeJSON(`${folder}/server.json`, serverJson);
 }
 
 function modpackIndexPath(id, platform) {
@@ -646,7 +656,7 @@ function waitForOnline(id) {
 
 // One install-and-boot attempt. Always leaves the slot killed and empty, so
 // the next attempt (or pack) starts from nothing.
-async function runAttempt(pack, id) {
+async function runAttempt(pack, id, isSingleRecheck = false) {
   let outcome;
   // Recorded even on success: "passed with 142/187 mods" is the difference
   // between a healthy pack and one that only booted because half of it is
@@ -660,7 +670,7 @@ async function runAttempt(pack, id) {
   };
 
   try {
-    await prepareSlot(id, pack);
+    await prepareSlot(id, pack, isSingleRecheck);
     // The filters/download tracker set these on every install, but a retry
     // reusing the slot must never be able to read the previous attempt's
     // numbers.
@@ -734,7 +744,7 @@ async function runAttempt(pack, id) {
   return { outcome, mods, consoleTail };
 }
 
-async function checkOne(pack, id) {
+async function checkOne(pack, id, isSingleRecheck = false) {
   const startedAt = Date.now();
   const gameVersion = pack.gameVersion || GAME_VERSION;
 
@@ -767,7 +777,7 @@ async function checkOne(pack, id) {
 
   log(`Checking ${pack.name} (${pack.platform}:${pack.projectId}, ${gameVersion})…`);
 
-  let attempt = await runAttempt(pack, id);
+  let attempt = await runAttempt(pack, id, isSingleRecheck);
   let attempts = 1;
   let firstFailure = null;
 
@@ -778,7 +788,7 @@ async function checkOne(pack, id) {
     firstFailure = attempt.outcome.reason;
     log(`${pack.name}: attempt 1 failed (${firstFailure}) — retrying once.`);
     attempts = 2;
-    attempt = await runAttempt(pack, id);
+    attempt = await runAttempt(pack, id, isSingleRecheck);
   }
 
   const { outcome, mods, consoleTail } = attempt;
@@ -974,7 +984,7 @@ async function checkOneModpack({ platform, projectId, gameVersion, loader, name,
       throw new Error(`Unknown platform "${platform}".`);
     }
 
-    const result = await checkOne(pack, id);
+    const result = await checkOne(pack, id, true);
     progress.plannedPacks[0].status = result.status;
 
     const data = readLog();
