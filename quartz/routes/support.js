@@ -1043,14 +1043,6 @@ async function buildRestorePlan(email, account, rawId) {
     });
   }
 
-  if (kind === "missing") {
-    blockers.push({
-      code: "no_data",
-      message:
-        "We couldn't find any data for this server — it's past the recovery window. Please contact support.",
-    });
-  }
-
   // Caught here rather than after the move: without a server.json the restore
   // can't finish, and a failure halfway would leave the files sitting in a
   // slot with nothing pointing at them.
@@ -1078,6 +1070,14 @@ async function buildRestorePlan(email, account, rawId) {
           "Your server's stored copy is missing its configuration, so it can't be restored automatically. Please contact support — your files are safe.",
       });
     }
+  }
+
+  if (kind === "missing") {
+    warnings.push({
+      code: "no_world_data",
+      message:
+        "Your world data was deleted. We typically remove server data 1 week after your subscription expires.",
+    });
   }
 
   // --- slot ---------------------------------------------------------------
@@ -1520,6 +1520,32 @@ async function runRestore(job, email, account, rawId, restoreWorld) {
         return;
       }
       finishStep(job, "data", "Server files moved back from storage");
+    } else if (plan.kind === "missing") {
+      // No world data — create a fresh server
+      try {
+        if (!fs.existsSync("servers")) fs.mkdirSync("servers");
+        if (!fs.existsSync(serverDir)) fs.mkdirSync(serverDir);
+
+        const freshServer = {
+          name: `Server #${targetId}`,
+          software: "Paper",
+          version: "1.20.1",
+          specialDatapacks: [],
+          specialPlugins: [],
+          allowedAccounts: "",
+          accountId: accountIds[0],
+          id: String(targetId),
+        };
+        writeJSON(`${serverDir}/server.json`, freshServer);
+        finishStep(job, "data", "Created fresh server");
+      } catch (e) {
+        console.error(`Restore of server ${rawId} failed while creating fresh server:`, e);
+        try {
+          if (fs.existsSync(serverDir) && isDirEmpty(serverDir)) fs.rmdirSync(serverDir);
+        } catch (cleanupError) {}
+        failJob(job, "data", "We couldn't create your fresh server. Please contact support.");
+        return;
+      }
     } else {
       skipStep(job, "data", "Your files never left this node");
     }
