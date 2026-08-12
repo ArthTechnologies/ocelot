@@ -1,12 +1,31 @@
 const express = require("express");
 const router = express.Router();
 const fs = require("fs");
+const path = require("path");
 const config = require("../scripts/utils.js").getConfig();
 const readJSON = require("../scripts/utils.js").readJSON;
 const writeJSON = require("../scripts/utils.js").writeJSON;
 const stripeKey = config.stripeKey;
 const stripe = require("stripe")(stripeKey);
 const mode = config.mode;
+
+function getDirectorySize(dirPath) {
+  let size = 0;
+  try {
+    const files = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const file of files) {
+      const fullPath = path.join(dirPath, file.name);
+      if (file.isDirectory()) {
+        size += getDirectorySize(fullPath);
+      } else {
+        size += fs.statSync(fullPath).size;
+      }
+    }
+  } catch (e) {
+    console.log(`Error calculating size for ${dirPath}: ${e}`);
+  }
+  return size;
+}
 
 // List expired servers for recovery selection
 router.get("/listExpiredServers", async (req, res) => {
@@ -1036,11 +1055,29 @@ async function buildRestorePlan(email, account, rawId) {
   // can't finish, and a failure halfway would leave the files sitting in a
   // slot with nothing pointing at them.
   if (kind === "archive" && !fs.existsSync(`${archives[0].path}/server.json`)) {
-    blockers.push({
-      code: "archive_incomplete",
-      message:
-        "Your server's stored copy is missing its configuration, so it can't be restored automatically. Please contact support — your files are safe.",
-    });
+    const archiveSize = getDirectorySize(archives[0].path);
+    const sizeInMB = archiveSize / (1024 * 1024);
+
+    if (sizeInMB < 10) {
+      // Small archive — delete it and treat as missing data so user can create fresh
+      try {
+        fs.rmSync(archives[0].path, { recursive: true, force: true });
+        kind = "missing";
+      } catch (e) {
+        console.log(`Error deleting small incomplete archive ${archives[0].path}: ${e}`);
+        blockers.push({
+          code: "archive_incomplete",
+          message:
+            "Your server's stored copy is missing its configuration, so it can't be restored automatically. Please contact support — your files are safe.",
+        });
+      }
+    } else {
+      blockers.push({
+        code: "archive_incomplete",
+        message:
+          "Your server's stored copy is missing its configuration, so it can't be restored automatically. Please contact support — your files are safe.",
+      });
+    }
   }
 
   // --- slot ---------------------------------------------------------------
