@@ -1,10 +1,17 @@
 const { createHash, scryptSync, randomBytes } = require("crypto");
+const { execFile } = require("child_process");
 
 const fs = require("fs");
 const fsPromises = require("fs").promises;
 
+// download()/downloadAsync()/GET() below all take a url that may be fully
+// attacker-controlled (a modpack/plugin download link, a query param). They
+// use execFile rather than exec so the url and file path are passed as
+// discrete argv entries to curl instead of being interpolated into a shell
+// string - no shell parses them, so shell metacharacters in either one are
+// inert. See scripts/security/rce.js for the shared version of this pattern.
 function download(file, url) {
-  exec(`curl -o ${file} -LO "${url}"`);
+  execFile("curl", ["-o", file, "-LO", url]);
 }
 
 function downloadAsync(file, url, callback) {
@@ -12,8 +19,7 @@ function downloadAsync(file, url, callback) {
   url = url.replace(/ /g, "%20");
   url = url.replace(/\[/g, "%5B");
   url = url.replace(/\]/g, "%5D");
-  //console.log(`curl -sS -o ${file} -L "${url}" > /dev/null`);
-  exec(`curl -sS -o ${file} -L "${url}" > /dev/null`, (error, stdout, stderr) => {
+  execFile("curl", ["-sS", "-o", file, "-L", url], (error, stdout, stderr) => {
     try {
       let out = "";
       if (stdout != undefined) {
@@ -317,7 +323,7 @@ function write(file, content) {
 }
 
 function GET(url, callback) {
-  exec(`curl ` + url, (error, stdout, stderr) => {
+  execFile("curl", [url], (error, stdout, stderr) => {
     if (error) {
       console.error(`exec error: ${error}`);
       return;

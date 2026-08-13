@@ -11,6 +11,8 @@ const accountLinking = require("../scripts/accountLinking.js");
 const writeJSON = require("../scripts/utils.js").writeJSON;
 const config = require("../scripts/utils.js").getConfig();
 const readJSON = require("../scripts/utils.js").readJSON;
+const pathTraversal = require("../scripts/security/pathtraversal.js");
+const security = require("../scripts/security/rce.js");
 const enableCloudflareVerify = JSON.parse(config.enableCloudflareVerify);
 const mode = config.mode;
 
@@ -37,6 +39,40 @@ function findConflictingAccount(email, currentName) {
       `An account for ${email} already exists using ${label}. ` +
       `Sign in with ${label} instead, or use a different email address.`,
   };
+}
+
+// A nonexistent (or path-rejected) account resolves via readJSON to {},
+// whose .token is undefined - comparing that against an omitted token
+// header used to pass every one of the checks below, letting an
+// unauthenticated request "authenticate" as an account that was never
+// actually created. Requiring token to be a non-empty string first closes
+// that off without changing behavior for any real, already-authenticated
+// request (a real token is always a non-empty uuid).
+function validToken(token, account) {
+  return typeof token === "string" && token.length > 0 && token === account.token;
+}
+
+// cloudflareVerifyToken is attacker-controlled (req.query) and used to be
+// interpolated straight into a single-quoted exec() curl string - a single
+// quote in it broke out of that quoting into arbitrary shell execution.
+// security.curl runs curl via execFile (no shell), and URLSearchParams
+// percent-encodes the token before it ever reaches curl, so neither of
+// those escapes is possible here regardless of what the token contains.
+function verifyTurnstile(token, callback) {
+  const params = new URLSearchParams({
+    secret: config.cloudflareVerifySecretKey,
+    response: token,
+  });
+  security
+    .curl(["-s", "https://challenges.cloudflare.com/turnstile/v0/siteverify", "--data", params.toString()])
+    .then(({ stdout }) => {
+      try {
+        callback(JSON.parse(stdout).success === true);
+      } catch {
+        callback(false);
+      }
+    })
+    .catch(() => callback(false));
 }
 
 function writeAccount(id, username, billingEmail, servers, stripeServers, freeServers, lastSignin, token, salt, password, resetAttempts) {
@@ -66,25 +102,13 @@ Router.post("/email/signup/", (req, res) => {
   let confirmPassword = req.body.confirmPassword;
   let cloudflareVerifyToken = req.query.cloudflareVerifyToken;
   if (enableCloudflareVerify) {
-    const exec = require("child_process").exec;
-    exec(
-      `curl 'https://challenges.cloudflare.com/turnstile/v0/siteverify' --data 'secret=${config.cloudflareVerifySecretKey}&response=${cloudflareVerifyToken}'`,
-      (err, stdout, stderr) => {
-        try {
-          if (JSON.parse(stdout).success) {
-            signup();
-          } else {
-            res
-              .status(400)
-              .send({ token: -1, reason: "Human Verification Failed" });
-          }
-        } catch {
-          res
-            .status(400)
-            .send({ token: -1, reason: "Human Verification Failed" });
-        }
+    verifyTurnstile(cloudflareVerifyToken, (success) => {
+      if (success) {
+        signup();
+      } else {
+        res.status(400).send({ token: -1, reason: "Human Verification Failed" });
       }
-    );
+    });
   } else {
     signup();
   }
@@ -92,8 +116,12 @@ Router.post("/email/signup/", (req, res) => {
 
     email = email.toLowerCase();
     if (email.includes("email:")) email = email.replace("email:", "");
+    const emailPath = pathTraversal.accountFilePath("email", email);
+    if (emailPath === null) {
+      return res.status(400).send({ token: -1, reason: "Invalid email" });
+    }
     try {
-      if (fs.existsSync("accounts/email:" + email + ".json")) {
+      if (fs.existsSync(emailPath)) {
         emailExists = true;
       }
 
@@ -121,7 +149,7 @@ Router.post("/email/signup/", (req, res) => {
             account.freeServers = 0;
             account.lastSignin = new Date().getTime();
 ;
-            writeJSON("accounts/email:" + email + ".json", account);
+            writeJSON(emailPath, account);
             writeAccount(account.accountId, "email:"+email, email, account.servers, 0, account.freeServers, account.lastSignin, account.token, account.salt, account.password, account.resetAttempts);
             res
               .status(200)
@@ -148,7 +176,11 @@ Router.post("/email/signin/", (req, res) => {
   let password = req.body.password;
   let email = req.query.username;
   if (email.includes("email:")) email = email.replace("email:", "");
-  let account = readJSON("accounts/email:" + email + ".json");
+  const emailPath = pathTraversal.accountFilePath("email", email);
+  if (emailPath === null) {
+    return res.status(400).send({ token: -1, reason: "Incorrect email or password" });
+  }
+  let account = readJSON(emailPath);
   let response = {};
 
   let salt = account.salt;
@@ -158,25 +190,13 @@ Router.post("/email/signin/", (req, res) => {
     if (account.password != files.hash(password, salt).split(":")[1]) {
       res.status(400).send({ token: -1, reason: "Incorrect email or password" });
     } else {
-    const exec = require("child_process").exec;
-    exec(
-      `curl 'https://challenges.cloudflare.com/turnstile/v0/siteverify' --data 'secret=${config.cloudflareVerifySecretKey}&response=${cloudflareVerifyToken}'`,
-      (err, stdout, stderr) => {
-        try {
-          if (JSON.parse(stdout).success) {
-            signin();
-          } else {
-            res
-              .status(400)
-              .send({ token: -1, reason: "Human Verification Failed" });
-          }
-        } catch {
-          res
-            .status(400)
-            .send({ token: -1, reason: "Human Verification Failed" });
+      verifyTurnstile(cloudflareVerifyToken, (success) => {
+        if (success) {
+          signin();
+        } else {
+          res.status(400).send({ token: -1, reason: "Human Verification Failed" });
         }
-      }
-    );
+      });
     }
   } else {
     signin();
@@ -192,7 +212,7 @@ Router.post("/email/signin/", (req, res) => {
       };
       account.lastSignin = new Date().getTime();
 
-      writeJSON("accounts/email:" + email + ".json", account);
+      writeJSON(emailPath, account);
     } else {
       response = { token: -1, reason: "Incorrect email or password" };
     }
@@ -206,14 +226,18 @@ Router.delete("/email", (req, res) => {
   if (email.includes("email:")) email = email.replace("email:", "");
   password = req.body.password;
   token = req.headers.token;
-  let account = readJSON("accounts/email:" + email + ".json");
+  const emailPath = pathTraversal.accountFilePath("email", email);
+  if (emailPath === null) {
+    return res.status(400).send({ success: false, reason: "Invalid token" });
+  }
+  let account = readJSON(emailPath);
 
-  if (token == account.token) {
+  if (validToken(token, account)) {
     if (account.password == files.hash(password, account.salt).split(":")[1]) {
       for (let i in account.servers) {
         files.removeDirectoryRecursiveAsync("servers/" + account.servers[i]);
       }
-      fs.unlinkSync("accounts/email:" + email + ".json");
+      fs.unlinkSync(emailPath);
 
       res.status(200).send({ success: true });
     } else {
@@ -229,13 +253,25 @@ Router.post("/changeToEmail", (req, res) => {
   let username = req.headers.username;
   let token = req.headers.token;
   let password = req.body.password;
-  let account = readJSON("accounts/" + username + ".json");
 
-  if (token === account.token) {
+  // username names the whole account file directly (e.g. "discord:someuser")
+  // - accountFilePathFromKey confines it to accounts/ instead of trusting it
+  // as-is, which otherwise lets ".." in the header reach any JSON file on
+  // the host the process can read/write, not just other accounts.
+  const usernamePath = pathTraversal.accountFilePathFromKey(username);
+  const newEmailPath = typeof username === "string"
+    ? pathTraversal.accountFilePath("email", username.split(":")[1])
+    : null;
+  if (usernamePath === null || newEmailPath === null) {
+    return res.status(400).send({ success: false, reason: "Invalid token" });
+  }
+  let account = readJSON(usernamePath);
+
+  if (validToken(token, account)) {
     account.email = email;
     account.password = files.hash(password).split(":")[1];
     account.salt = files.hash(password).split(":")[0];
-    writeJSON("accounts/email:" + username.split(":")[1] + ".json", account);
+    writeJSON(newEmailPath, account);
     writeAccount(account.accountId, "email:"+username.split(":")[1], email, account.servers, 0, account.freeServers, account.lastSignin, account.token, account.salt, account.password, account.resetAttempts);
 
     res.status(200).send({ success: true });
@@ -249,10 +285,17 @@ Router.post("/email/resetPassword/", async (req, res) => {
 
   let password = req.body.password;
   let email = req.query.email;
+  if (!email) {
+    return res.status(400).send({ success: false, reason: "Invalid email" });
+  }
   if (email.includes("email:")) email = email.replace("email:", "");
   let confirmPassword = req.body.confPassword;
   let created2 = req.query.created;
-  let account = readJSON("accounts/email:" + email + ".json");
+  const emailPath = pathTraversal.accountFilePath("email", email);
+  if (emailPath === null) {
+    return res.status(400).send({ success: false, reason: "Invalid email" });
+  }
+  let account = readJSON(emailPath);
 
   try {
     const created = await s.getCustomerCreationDate(email);
@@ -296,7 +339,7 @@ Router.post("/email/resetPassword/", async (req, res) => {
     console.log(err);
     res.status(500).send({ success: false, reason: "An error occurred" });
   }
-  writeJSON("accounts/email:" + email + ".json", account);
+  writeJSON(emailPath, account);
   writeAccount(account.accountId,  "email:"+email, email, account.servers, 0, account.freeServers, account.lastSignin, account.token, account.salt, account.password, account.resetAttempts);
 });
 
@@ -337,13 +380,24 @@ Router.post("/discord/", async (req, res) => {
       .send({ token: -1, reason: "Discord authentication failed" });
   }
 
+  // Discord itself doesn't allow "/" in usernames, but the account path is
+  // still built by concatenation below - validating here means that
+  // guarantee doesn't have to be trusted for path safety.
+  const discordPath = pathTraversal.accountFilePath("discord", username);
+  const discordPathLower = pathTraversal.accountFilePath("discord", username.toLowerCase());
+  if (discordPath === null || discordPathLower === null) {
+    return res
+      .status(401)
+      .send({ token: -1, reason: "Discord authentication failed" });
+  }
+
   try {
-    if (fs.existsSync("accounts/discord:" + username + ".json")) {
+    if (fs.existsSync(discordPath)) {
       nameTaken = true;
     }
     //if account exists, so the user is signing in not up...
     if (nameTaken) {
-      let account = readJSON("accounts/discord:" + username + ".json");
+      let account = readJSON(discordPath);
       let response = {};
       account.ips = [];
       if (account.ips.indexOf(files.getIPID(req.ip)) == -1) {
@@ -359,7 +413,7 @@ Router.post("/discord/", async (req, res) => {
         bannerColor: res2.banner_color,
       };
       account.lastSignin = new Date().getTime();
-      writeJSON("accounts/discord:" + username + ".json", account);
+      writeJSON(discordPath, account);
       writeAccount(account.accountId, "discord:"+username, account.email, account.servers, 0, account.freeServers, account.lastSignin, account.token, account.salt, account.password, account.resetAttempts);
       res.status(200).send(response);
     } else {
@@ -393,10 +447,7 @@ Router.post("/discord/", async (req, res) => {
       account.servers = [];
       account.freeServers = 0;
       account.lastSignin = new Date().getTime();
-      writeJSON(
-        "accounts/discord:" + username.toLowerCase() + ".json",
-        account
-      );
+      writeJSON(discordPathLower, account);
       writeAccount(account.accountId, "discord:"+username.toLowerCase(), account.email, account.servers, 0, account.freeServers, account.lastSignin, account.token, account.salt, account.password, account.resetAttempts);
       console.log("discord:", res2);
       res.status(200).send({
@@ -420,14 +471,18 @@ Router.post("/discord/", async (req, res) => {
 Router.delete("/discord", (req, res) => {
   username = req.headers.username;
   token = req.headers.token;
-  let account = readJSON("accounts/discord:" + username + ".json");
+  const discordPath = pathTraversal.accountFilePath("discord", username);
+  if (discordPath === null) {
+    return res.status(400).send({ success: false, reason: "Invalid token" });
+  }
+  let account = readJSON(discordPath);
 
-  if (token == account.token) {
+  if (validToken(token, account)) {
     for (let i in account.servers) {
       files.removeDirectoryRecursiveAsync("servers/" + account.servers[i]);
     }
 
-    fs.unlinkSync("accounts/discord:" + username + ".json");
+    fs.unlinkSync(discordPath);
 
     res.status(200).send({ success: true });
   } else {
@@ -454,11 +509,17 @@ Router.post("/google/", (req, res) => {
     return res.status(500).send({ token: -1, reason: "Google OAuth not configured in config.txt. Please add googleOAuthId and googleOAuthSecret." });
   }
 
-  const { exec } = require("child_process");
-
   console.log("Google OAuth: Using client_id:", config.googleOAuthId);
 
   // Step 1: Exchange authorization code for access token
+  //
+  // code/redirectUri are attacker-controlled (req.query) and used to be
+  // interpolated into a single-quoted exec() curl string via
+  // tokenParams.toString() - URLSearchParams happens to percent-encode
+  // quotes, so that particular string was never actually exploitable, but
+  // it relied on that encoding being the only thing standing between here
+  // and a shell. security.curl runs curl via execFile (no shell) so this
+  // isn't a shell-quoting problem anymore regardless of encoding.
   const tokenParams = new URLSearchParams({
     code: code,
     client_id: config.googleOAuthId,
@@ -467,13 +528,25 @@ Router.post("/google/", (req, res) => {
     grant_type: 'authorization_code'
   });
 
-  exec(
-    `curl -X POST https://oauth2.googleapis.com/token -H 'Content-Type: application/x-www-form-urlencoded' -d '${tokenParams.toString()}'`,
-    (err1, tokenResponse) => {
-      if (err1) {
-        console.error("Error exchanging code for token:", err1);
-        return res.status(500).send({ token: -1, reason: "Failed to exchange authorization code" });
-      }
+  security
+    .curl([
+      "-s",
+      "-X",
+      "POST",
+      "https://oauth2.googleapis.com/token",
+      "-H",
+      "Content-Type: application/x-www-form-urlencoded",
+      "-d",
+      tokenParams.toString(),
+    ])
+    .catch((err1) => {
+      console.error("Error exchanging code for token:", err1);
+      res.status(500).send({ token: -1, reason: "Failed to exchange authorization code" });
+      return null;
+    })
+    .then((result) => {
+      if (result === null || res.headersSent) return;
+      const tokenResponse = result.stdout;
 
       let tokenData;
       try {
@@ -491,13 +564,16 @@ Router.post("/google/", (req, res) => {
       const accessToken = tokenData.access_token;
 
       // Step 2: Fetch user profile using access token
-      exec(
-        `curl -X GET https://www.googleapis.com/oauth2/v2/userinfo -H 'Authorization: Bearer ${accessToken}'`,
-        (err2, userResponse) => {
-          if (err2) {
-            console.error("Error fetching user info:", err2);
-            return res.status(500).send({ token: -1, reason: "Failed to fetch user info" });
-          }
+      security
+        .curl(["-s", "-X", "GET", "https://www.googleapis.com/oauth2/v2/userinfo", "-H", `Authorization: Bearer ${accessToken}`])
+        .catch((err2) => {
+          console.error("Error fetching user info:", err2);
+          res.status(500).send({ token: -1, reason: "Failed to fetch user info" });
+          return null;
+        })
+        .then((result2) => {
+          if (result2 === null || res.headersSent) return;
+          const userResponse = result2.stdout;
 
           let userData;
           try {
@@ -517,14 +593,19 @@ Router.post("/google/", (req, res) => {
           let email = userData.email.toLowerCase();
           if (email.includes("email:")) email = email.replace("email:", "");
 
+          const googlePath = pathTraversal.accountFilePath("google", email);
+          if (googlePath === null) {
+            return res.status(400).send({ token: -1, reason: "Invalid email" });
+          }
+
           // Check if account exists (sign-in)
-          if (fs.existsSync("accounts/google:" + email + ".json")) {
+          if (fs.existsSync(googlePath)) {
             emailTaken = true;
           }
 
           if (emailTaken) {
             // Sign-in: Load existing account
-            let account = readJSON("accounts/google:" + email + ".json");
+            let account = readJSON(googlePath);
             let response = {};
 
             if (account.ips.indexOf(files.getIPID(req.ip)) == -1) {
@@ -542,7 +623,7 @@ Router.post("/google/", (req, res) => {
             };
 
             account.lastSignin = new Date().getTime();
-            writeJSON("accounts/google:" + email + ".json", account);
+            writeJSON(googlePath, account);
             writeAccount(
               account.accountId,
               "google:" + email,
@@ -583,7 +664,7 @@ Router.post("/google/", (req, res) => {
             account.freeServers = 0;
             account.lastSignin = new Date().getTime();
 
-            writeJSON("accounts/google:" + email + ".json", account);
+            writeJSON(googlePath, account);
             writeAccount(
               account.accountId,
               "google:" + email,
@@ -609,10 +690,8 @@ Router.post("/google/", (req, res) => {
               email: email,
             });
           }
-        }
-      );
-    }
-  );
+        });
+      });
 });
 
 // Delete Google account
@@ -622,16 +701,20 @@ Router.delete("/google", (req, res) => {
   let token = req.headers.token;
 
   try {
-    let account = readJSON("accounts/google:" + email + ".json");
+    const googlePath = pathTraversal.accountFilePath("google", email);
+    if (googlePath === null) {
+      return res.status(400).send({ success: false, reason: "Invalid token" });
+    }
+    let account = readJSON(googlePath);
 
-    if (token == account.token) {
+    if (validToken(token, account)) {
       // Delete all user's servers
       for (let i in account.servers) {
         files.removeDirectoryRecursiveAsync("servers/" + account.servers[i]);
       }
 
       // Delete account file
-      fs.unlinkSync("accounts/google:" + email + ".json");
+      fs.unlinkSync(googlePath);
 
       res.status(200).send({ success: true });
     } else {
@@ -647,11 +730,20 @@ Router.post("/email", (req, res) => {
   let email = req.query.email;
   let accountname = req.headers.accountname;
   let token = req.headers.token;
-  let account = readJSON("accounts/" + accountname + ".json");
 
-  if (token === account.token) {
+  // accountname names the whole account file directly - accountFilePathFromKey
+  // confines it to accounts/ instead of trusting it as-is, which otherwise
+  // lets ".." in the header reach (and overwrite) any JSON file on the host
+  // the process can access, not just other accounts.
+  const accountPath = pathTraversal.accountFilePathFromKey(accountname);
+  if (accountPath === null) {
+    return res.status(400).send({ success: false, reason: "Invalid token" });
+  }
+  let account = readJSON(accountPath);
+
+  if (validToken(token, account)) {
     account.email = email;
-    writeJSON("accounts/" + accountname + ".json", account);
+    writeJSON(accountPath, account);
     writeAccount(account.accountId, accountname, email, account.servers, 0, account.freeServers, account.lastSignin, account.token, account.salt, account.password, account.resetAttempts);
     res.status(200).send({ success: true });
   }

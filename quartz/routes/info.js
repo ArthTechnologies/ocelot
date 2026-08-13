@@ -11,7 +11,7 @@ const writeJSON = require("../scripts/utils.js").writeJSON;
 const mode = config.mode;
 const stripeKey = config.stripeKey;
 const stripe = require("stripe")(stripeKey);
-const security = require("../scripts/security.js");
+const security = require("../scripts/security/rce.js");
 
 // server.allowedAccounts is a comma-separated string of accountIds
 // (see /server/:id/allowAccount).

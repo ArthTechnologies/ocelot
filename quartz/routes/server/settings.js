@@ -16,7 +16,7 @@ const fs = require("fs");
 const writeJSON = require("../../scripts/utils.js").writeJSON;
 const enableVirusScan = JSON.parse(config.enableVirusScan);
 const backups = require("../../scripts/backups.js");
-const security = require("../../scripts/security.js");
+const security = require("../../scripts/security/rce.js");
 
 router.post(`/`, function (req, res) {
   let email = req.headers.username;
@@ -234,7 +234,17 @@ router.post(`/setStartupFlags`, function (req, res) {
   if (utils.hasAccess(token, account, req.params.id)) {
     try {
       const { flags } = req.body;
-      server.startupFlags = flags || "";
+      const startupFlags = flags || "";
+      // Startup flags get embedded in a shell-invoked docker/java command
+      // line when the server boots (scripts/mc.js), so anything outside a
+      // plain JVM-flag charset is rejected here rather than trusted through
+      // to that shell.
+      if (!security.isSafeStartupFlags(startupFlags)) {
+        return res.status(400).json({
+          msg: "Invalid startup flags: only letters, numbers, and the punctuation used in JVM flags (- . : = , / @ _) are allowed.",
+        });
+      }
+      server.startupFlags = startupFlags;
       writeJSON("servers/" + req.params.id + "/server.json", server);
       res.status(200).json({ msg: "Done" });
     } catch (err) {

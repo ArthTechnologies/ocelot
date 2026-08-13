@@ -16,7 +16,8 @@ const fs = require("fs");
 const writeJSON = require("../../scripts/utils.js").writeJSON;
 const enableVirusScan = JSON.parse(config.enableVirusScan);
 const backups = require("../../scripts/backups.js");
-const security = require("../../scripts/security.js");
+const security = require("../../scripts/security/rce.js");
+const { sanitizePath, resolveInServer } = require("../../scripts/security/pathtraversal.js");
 
 // A missing server directory is a different failure from a bad token, but every
 // route used to collapse both into a single 401. Code 101 matches the vocabulary
@@ -78,37 +79,9 @@ const fileKeyMatches = (serverId, key) => {
   }
 };
 
-// Resolve a client-supplied path against the server root, refusing anything that
-// escapes it or targets the root itself.
-//
-// sanitizePath splits on path.sep, so it never inspects the segments of a
-// "*"-joined path — "*..*..*etc*passwd" survives it intact. The resolve +
-// containment check below is what actually enforces the boundary.
-function resolveInServer(serverId, rawPath, { allowRoot = false } = {}) {
-  if (typeof rawPath !== "string") return null;
-  const sanitized = utils.sanitizePath(rawPath);
-  if (sanitized === "invalid") return null;
-
-  // The client joins paths with "*", and a path rooted at the server directory
-  // arrives with a leading one ("*config"). Strip it, or path.resolve treats
-  // the result as absolute and every folder delete fails.
-  const relPath = (sanitized.includes("*")
-    ? sanitized.split("*").join("/")
-    : sanitized
-  )
-    .replace(/^\/+/, "")
-    .replace(/\/{2,}/g, "/");
-
-  const serverRoot = path.resolve(`servers/${serverId}`);
-  if (relPath === "") {
-    // "*" means the server directory itself — only uploads target it.
-    return allowRoot ? { relPath, serverRoot, fullPath: serverRoot } : null;
-  }
-
-  const fullPath = path.resolve(serverRoot, relPath);
-  if (!fullPath.startsWith(serverRoot + path.sep)) return null;
-  return { relPath, serverRoot, fullPath };
-}
+// resolveInServer/sanitizePath now live in scripts/security/pathtraversal.js
+// alongside the rest of the panel's path-traversal guards - see that file
+// for what they actually check.
 
 // rm's stderr and Node's fs error messages embed the full absolute host path
 // (serverRoot included) - swap that prefix for the server-relative path before
@@ -326,7 +299,7 @@ router.post("/compress/:path", (req, res) => {
     fs.existsSync(`servers/${req.params.id}/`)
   ) {
     // Sanitize and normalize the requested path
-    let folderPath = utils.sanitizePath(rawPath);
+    let folderPath = sanitizePath(rawPath);
     if (folderPath.includes("*")) {
       folderPath = folderPath.split("*").join("/");
     }
@@ -366,8 +339,8 @@ router.post("/rename", function (req, res) {
     return res.status(400).json({ msg: "Invalid new name." });
   }
 
-  let from = utils.sanitizePath(req.body.from);
-  let to   = utils.sanitizePath(req.body.to);
+  let from = sanitizePath(req.body.from);
+  let to   = sanitizePath(req.body.to);
   if (from === "invalid" || to === "invalid") {
     return res.status(400).json({ msg: "Invalid path." });
   }

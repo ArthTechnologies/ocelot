@@ -3,6 +3,7 @@ const Router = express.Router();
 const config = require("../scripts/utils.js").getConfig();
 const apiKey = config.curseforgeKey;
 const fs = require("fs");
+const security = require("../scripts/security/rce.js");
 
 // CurseForge's own modLoaderType filter is loose - it returns a pack if ANY
 // file the project has ever published matches, not just the file(s) for the
@@ -99,44 +100,37 @@ Router.get("/search", (req, res) => {
         modLoaderType = 6;
       } 
     }
-    let filterText = encodeURIComponent(req.query.query || "");
     let classId = req.query.classId;
     let index = req.query.index || 0;
     let sortField = req.query.sortField || 1;
-    let results = [];
     let categories = req.query.categories || "";
 
-    const exec = require("child_process").exec;
+    const params = new URLSearchParams({
+      gameId: "432",
+      gameVersion: gameVersion,
+      modLoaderType: modLoaderType,
+      searchFilter: req.query.query || "",
+      classId: classId,
+      index: index,
+      pageSize: "15",
+      sortField: sortField,
+      sortOrder: "desc",
+      categoryIds: categories,
+    });
+    const url = `https://api.curseforge.com/v1/mods/search?${params.toString()}`;
 
-    console.log(`curseforge request ?gameId=432&gameVersion=${gameVersion}&modLoaderType=${modLoaderType}&searchFilter=${filterText}&classId=${classId}&index=${index}&pageSize=15&sortField=${sortField}&sortOrder=desc&categoryIds=${categories}`);
+    console.log(`curseforge request ${url}`);
 
-    exec(
-      `curl -X GET "https://api.curseforge.com/v1/mods/search` +
-        `?gameId=432` +
-        `&gameVersion=${gameVersion}` +
-        `&modLoaderType=${modLoaderType}` +
-        `&searchFilter=${filterText}` +
-        `&classId=${classId}` +
-        `&index=${index}` +
-        `&pageSize=15` +
-        `&sortField=${sortField}` +
-        `&sortOrder=desc` +
-        `&categoryIds=${categories}"` +
-        ` -H 'x-api-key: ${apiKey}'`,
-      (error, stdout, stderr) => {
-        if (!error && stdout != undefined) {
-          try {
-            let data = filterByLoader(JSON.parse(stdout), modLoaderType);
-            data = filterClientSideModpacks(data);
-            res.status(200).json(data);
-          } catch {
-            res.status(400).json({ msg: "Error parsing JSON." });
-          }
-        } else {
-          res.status(500).json({ msg: "Internal server error." });
-        }
-      }
-    );
+    security
+      .curlGetJSON(url, { "x-api-key": apiKey })
+      .then((data) => {
+        data = filterByLoader(data, modLoaderType);
+        data = filterClientSideModpacks(data);
+        res.status(200).json(data);
+      })
+      .catch((err) => {
+        res.status(400).json({ msg: "Error parsing JSON." });
+      });
   }
 });
 
@@ -152,117 +146,57 @@ Router.get("/forgeonly", (req, res) => {
 
 Router.get("/:id", (req, res) => {
   if (apiKey != "") {
-    let id = req.params.id;
-    const exec = require("child_process").exec;
-    exec(
-      `curl -X GET "https://api.curseforge.com/v1/mods/${id}"` +
-        ` -H 'x-api-key: ${apiKey}'`,
-      (error, stdout, stderr) => {
-        if (!error && stdout != undefined) {
-          try {
-            res.status(200).json(JSON.parse(stdout).data);
-          } catch {
-            res.status(400).json({ msg: "Error parsing JSON." });
-          }
-        } else {
-          res.status(500).json({ msg: "Internal server error." });
-        }
-      }
-    );
+    let id = encodeURIComponent(req.params.id);
+    security
+      .curlGetJSON(`https://api.curseforge.com/v1/mods/${id}`, { "x-api-key": apiKey })
+      .then((data) => res.status(200).json(data.data))
+      .catch(() => res.status(400).json({ msg: "Error parsing JSON." }));
   }
 });
 
 Router.get("/:id/description", (req, res) => {
   if (apiKey != "") {
-    let id = req.params.id;
-    const exec = require("child_process").exec;
-    exec(
-      `curl -X GET "https://api.curseforge.com/v1/mods/${id}/description"` +
-        ` -H 'x-api-key: ${apiKey}'`,
-      (error, stdout, stderr) => {
-        if (!error && stdout != undefined) {
-          try {
-            res.status(200).json(JSON.parse(stdout).data);
-          } catch {
-            res.status(400).json({ msg: "Error parsing JSON." });
-          }
-        } else {
-          res.status(500).json({ msg: "Internal server error." });
-        }
-      }
-    );
+    let id = encodeURIComponent(req.params.id);
+    security
+      .curlGetJSON(`https://api.curseforge.com/v1/mods/${id}/description`, { "x-api-key": apiKey })
+      .then((data) => res.status(200).json(data.data))
+      .catch(() => res.status(400).json({ msg: "Error parsing JSON." }));
   }
 });
 
 Router.get("/:id/versions", (req, res) => {
   if (apiKey != "") {
-    let id = req.params.id;
+    let id = encodeURIComponent(req.params.id);
     let indexString = "";
     if (req.query.index != undefined) {
-      indexString = "?index=" + req.query.index;
+      indexString = "?" + new URLSearchParams({ index: req.query.index }).toString();
     }
-    const exec = require("child_process").exec;
-    exec(
-      `curl -X GET "https://api.curseforge.com/v1/mods/${id}/files${indexString}"` +
-        ` -H 'x-api-key: ${apiKey}'`,
-      (error, stdout, stderr) => {
-        if (!error && stdout != undefined) {
-          try {
-            res.status(200).json(JSON.parse(stdout).data);
-          } catch {
-            res.status(400).json({ msg: "Error parsing JSON." });
-          }
-        } else {
-          res.status(500).json({ msg: "Internal server error." });
-        }
-      }
-    );
+    security
+      .curlGetJSON(`https://api.curseforge.com/v1/mods/${id}/files${indexString}`, { "x-api-key": apiKey })
+      .then((data) => res.status(200).json(data.data))
+      .catch(() => res.status(400).json({ msg: "Error parsing JSON." }));
   }
 });
 
 Router.get("/:id/version/:versionId/changelog", (req, res) => {
   if (apiKey != "") {
-    let id = req.params.id;
-    let versionId = req.params.versionId;
-    const exec = require("child_process").exec;
-    exec(
-      `curl -X GET "https://api.curseforge.com/v1/mods/${id}/files/${versionId}/changelog"` +
-        ` -H 'x-api-key: ${apiKey}'`,
-      (error, stdout, stderr) => {
-        if (!error && stdout != undefined) {
-          try {
-            res.status(200).json(JSON.parse(stdout).data);
-          } catch {
-            res.status(400).json({ msg: "Error parsing JSON." });
-          }
-        } else {
-          res.status(500).json({ msg: "Internal server error." });
-        }
-      }
-    );
+    let id = encodeURIComponent(req.params.id);
+    let versionId = encodeURIComponent(req.params.versionId);
+    security
+      .curlGetJSON(`https://api.curseforge.com/v1/mods/${id}/files/${versionId}/changelog`, { "x-api-key": apiKey })
+      .then((data) => res.status(200).json(data.data))
+      .catch(() => res.status(400).json({ msg: "Error parsing JSON." }));
   }
 });
 
 Router.get("/:id/version/:versionId/", (req, res) => {
   if (apiKey != "") {
-    let id = req.params.id;
-    let versionId = req.params.versionId;
-    const exec = require("child_process").exec;
-    exec(
-      `curl -X GET "https://api.curseforge.com/v1/mods/${id}/files/${versionId}/"` +
-        ` -H 'x-api-key: ${apiKey}'`,
-      (error, stdout, stderr) => {
-        if (!error && stdout != undefined) {
-          try {
-            res.status(200).json(JSON.parse(stdout).data);
-          } catch {
-            res.status(400).json({ msg: "Error parsing JSON." });
-          }
-        } else {
-          res.status(500).json({ msg: "Internal server error." });
-        }
-      }
-    );
+    let id = encodeURIComponent(req.params.id);
+    let versionId = encodeURIComponent(req.params.versionId);
+    security
+      .curlGetJSON(`https://api.curseforge.com/v1/mods/${id}/files/${versionId}/`, { "x-api-key": apiKey })
+      .then((data) => res.status(200).json(data.data))
+      .catch(() => res.status(400).json({ msg: "Error parsing JSON." }));
   }
 });
 module.exports = Router;

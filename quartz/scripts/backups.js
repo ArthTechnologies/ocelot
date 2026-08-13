@@ -74,8 +74,13 @@ async function getBackupsFolderSize() {
 
 async function getWorldFileCount(serverId) {
   try {
-    const { stdout } = await execPromise(`find ./servers/${serverId}/world -type f | wc -l`);
-    return parseInt(stdout.trim());
+    // serverId is asserted numeric before it's ever handed to a shell -
+    // find/wc run without a shell at all via execFileAsync, so this is safe
+    // even if that assertion is ever the only guard between here and a
+    // request handler.
+    const id = security.assertNumericId(serverId, "serverId");
+    const { stdout } = await security.execFileAsync("find", [`./servers/${id}/world`, "-type", "f"]);
+    return stdout.split("\n").filter((line) => line.trim().length > 0).length;
   } catch (err) {
     console.error("Error counting files:", err.message);
     return 0;
@@ -337,10 +342,11 @@ async function backupSingleServer(serverId) {
 
 async function getWorldTotalSize(serverId) {
   try {
-    const { stdout } = await execPromise(
-      `du -c servers/${serverId}/world --max-depth=0 | tail -n 1`
-    );
-    return parseInt(stdout.split("\t")[0]) * 1024 || 1024 * 1024; // Default to 1MB if empty
+    const id = security.assertNumericId(serverId, "serverId");
+    const { stdout } = await security.execFileAsync("du", ["-c", `servers/${id}/world`, "--max-depth=0"]);
+    const lines = stdout.trim().split("\n");
+    const totalLine = lines[lines.length - 1];
+    return parseInt(totalLine.split("\t")[0]) * 1024 || 1024 * 1024; // Default to 1MB if empty
   } catch (err) {
     console.error(`Error getting world size for server ${serverId}:`, err.message);
     return 1024 * 1024; // Default to 1MB

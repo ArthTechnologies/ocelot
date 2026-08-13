@@ -23,7 +23,8 @@ const portOffset = 10000;
 const idOffset = parseInt(config.idOffset);
 const stats = require("../../scripts/stats.js");
 const backups = require("../../scripts/backups.js");
-const security = require("../../scripts/security.js");
+const security = require("../../scripts/security/rce.js");
+const pathTraversal = require("../../scripts/security/pathtraversal.js");
 const schedules = require("../../scripts/schedules.js");
 
 const checkSubscriptions = require("../../scripts/utils.js").checkSubscriptions;
@@ -370,23 +371,33 @@ router.delete(`/:id/:modtype(plugin|datapack|mod)`, function (req, res) {
 
     const fs = require("fs");
 
-    //delete platform_id_name.jar
-    console.log(
-      id +
-        modtype +
-        pluginPlatform +
-        "_" +
-        pluginId +
-        "_" +
-        pluginName +
-        "." +
-        extension
-    );
-    fs.unlinkSync(
-      `servers/${id}/${modtype}/${pluginPlatform}_${pluginId}_${pluginName}.${extension}`
-    );
+    // Each of these is a discrete filename component, never a path -
+    // isSafePathSegment closes off the traversal that concatenating them
+    // straight into a filesystem path would otherwise allow (a pluginId of
+    // "../../../etc/passwd" could otherwise reach outside this server's
+    // mod folder entirely).
+    if (
+      !pathTraversal.isSafePathSegment(pluginPlatform) ||
+      !pathTraversal.isSafePathSegment(pluginId) ||
+      !pathTraversal.isSafePathSegment(pluginName)
+    ) {
+      return res.status(400).json({ msg: "Invalid plugin identifier." });
+    }
 
-    res.status(200).json({ msg: `Success. Mod deleted.` });
+    const fileName = `${pluginPlatform}_${pluginId}_${pluginName}.${extension}`;
+    const fullPath = pathTraversal.resolveWithin(`servers/${id}/${modtype}`, fileName);
+    if (fullPath === null) {
+      return res.status(400).json({ msg: "Invalid plugin identifier." });
+    }
+
+    //delete platform_id_name.jar
+    console.log(id + modtype + fileName);
+    try {
+      fs.unlinkSync(fullPath);
+      res.status(200).json({ msg: `Success. Mod deleted.` });
+    } catch (err) {
+      res.status(404).json({ msg: `Mod not found.` });
+    }
   } else {
     res.status(401).json({ msg: `Invalid credentials.` });
   }
@@ -559,12 +570,8 @@ router.post(`/:id/add/:modtype(plugin|datapack|mod)`, function (req, res) {
     let id = req.params.id;
     let extension = "jar";
     pluginUrl = req.query.pluginUrl;
-    pluginId = req.query.id;
-    pluginName = req.query.name;
-    pluginName = pluginName.replace(/\//g, "-");
-    //replace other symbols like & with +
-    pluginName = pluginName.replace(/&/g, "+");
-    pluginName = pluginName.replace(/ /g, "_");
+    pluginId = security.sanitizeFilenameComponent(String(req.query.id));
+    pluginName = security.sanitizeFilenameComponent(req.query.name);
 
     modtype = req.params.modtype;
     if (modtype == "datapack") {
@@ -573,9 +580,11 @@ router.post(`/:id/add/:modtype(plugin|datapack|mod)`, function (req, res) {
     }
     console.log("downloading plugin" + pluginUrl);
     if (
-      pluginUrl.startsWith("https://cdn.modrinth.com/data/") |
-      pluginUrl.startsWith("https://github.com/") |
-      pluginUrl.startsWith("https://edge.forgecdn.net/")
+      typeof pluginUrl == "string" &&
+      security.isAllowedURL(pluginUrl, ["cdn.modrinth.com", "github.com", "edge.forgecdn.net"]) &&
+      (pluginUrl.startsWith("https://cdn.modrinth.com/data/") |
+        pluginUrl.startsWith("https://github.com/") |
+        pluginUrl.startsWith("https://edge.forgecdn.net/"))
     ) {
       let platform = "lr";
       if (pluginUrl.startsWith("https://github.com/")) platform = "gh";
@@ -587,6 +596,8 @@ router.post(`/:id/add/:modtype(plugin|datapack|mod)`, function (req, res) {
       );
 
       res.status(202).json({ msg: `Success. Plugin added.` });
+    } else {
+      res.status(400).json({ msg: `Invalid plugin URL.` });
     }
   } else {
     res.status(401).json({ msg: `Invalid credentials.` });
@@ -599,6 +610,9 @@ router.post(`/:id/modpack`, function (req, res) {
   let account = readJSON("accounts/" + email + ".json");
   let server = readJSON("servers/" + req.params.id + "/server.json");
   if (utils.hasAccess(token, account, req.params.id)) {
+    if (typeof req.query.modpackURL !== "string" || !req.query.modpackURL) {
+      return res.status(400).json({ msg: `Invalid modpack URL.` });
+    }
     f.stopAsync(req.params.id, () => {
       f.downloadModpack(
         req.params.id,
@@ -765,25 +779,28 @@ router.post(
       }
       let text = "disabled";
 
-      if (
-        !fs.existsSync(
-          "servers/" + id + "/" + modtype + "s/" + filename + ".disabled"
-        )
-      ) {
-        fs.copyFileSync(
-          "servers/" + id + "/" + modtype + "s/" + filename,
-          "servers/" + id + "/" + modtype + "s/" + filename + ".disabled"
-        );
-        fs.unlinkSync("servers/" + id + "/" + modtype + "s/" + filename);
+      // filename names a single file directly inside this modtype folder,
+      // never a path - isSafePathSegment closes off the traversal that
+      // concatenating it straight into a filesystem path would otherwise
+      // allow ("../../../server.json" could otherwise rename/delete a file
+      // well outside this server's mod folder).
+      if (!pathTraversal.isSafePathSegment(filename)) {
+        return res.status(400).json({ msg: "Invalid filename." });
+      }
+      const modFolder = `servers/${id}/${modtype}s`;
+      const target = pathTraversal.resolveWithin(modFolder, filename);
+      const disabledTarget = pathTraversal.resolveWithin(modFolder, filename + ".disabled");
+      if (target === null || disabledTarget === null) {
+        return res.status(400).json({ msg: "Invalid filename." });
+      }
+
+      if (!fs.existsSync(disabledTarget)) {
+        fs.copyFileSync(target, disabledTarget);
+        fs.unlinkSync(target);
       } else {
         text = "enabled";
-        fs.copyFileSync(
-          "servers/" + id + "/" + modtype + "s/" + filename + ".disabled",
-          "servers/" + id + "/" + modtype + "s/" + filename
-        );
-        fs.unlinkSync(
-          "servers/" + id + "/" + modtype + "s/" + filename + ".disabled"
-        );
+        fs.copyFileSync(disabledTarget, target);
+        fs.unlinkSync(disabledTarget);
       }
       res.status(202).json({ msg: `Success. Plugin ${text}.` });
     } else {
@@ -1576,7 +1593,7 @@ router.get("/:id/getFtpToken", function (req, res) {
   }
 });
 
-router.post("/:id/claimSubdomain", function (req, res) {
+router.post("/:id/claimSubdomain", async function (req, res) {
   let subdomain = req.query.subdomain;
   let baseUrl = req.query.baseUrl;
   let email = req.headers.username;
@@ -1588,107 +1605,63 @@ router.post("/:id/claimSubdomain", function (req, res) {
     fs.existsSync(`servers/${req.params.id}`)
   ) {
     if (server.subdomain !== undefined) {
-      res.status(400).json({ msg: "Server already has a subdomain." });
-    } else {
-      //address without subdomain
-      let address;
-      if (config.address.split(".").length == 2) {
-        address = config.address;
-      } else if (config.address.split(".").length > 2) {
-        address = config.address.split(".")[config.address.split(".").length - 2] + "." + config.address.split(".")[config.address.split(".").length - 1];
-      }
-      console.log(`curl https://api.cloudflare.com/client/v4/zones/${
-        config.cloudflareZone
-      }/dns_records \
-    -H 'Content-Type: application/json' \
-    -H "X-Auth-Email: ${config.cloudflareEmail}" \
-    -H "X-Auth-Key: ${config.cloudflareKey}" \
-    -d '{
-    "name": "_minecraft._tcp.${subdomain}",
-          "type": "SRV",
-      "data": {
-         "port": ${portOffset + parseInt(req.params.id)},
-         "priority": ${portOffset + parseInt(req.params.id)},
-         "target": "${baseUrl}.${address}",
-         "weight": 5
-      }
+      return res.status(400).json({ msg: "Server already has a subdomain." });
+    }
+    // Both values get embedded in a Cloudflare DNS record (name + target),
+    // so they're restricted to a valid DNS label rather than trusted as-is -
+    // this is also what keeps the curl calls below injection-safe regardless
+    // of how the request body/headers get built.
+    if (!security.isSafeDnsLabel(subdomain) || !security.isSafeDnsLabel(baseUrl)) {
+      return res.status(400).json({ msg: "Invalid subdomain." });
+    }
+    //address without subdomain
+    let address;
+    if (config.address.split(".").length == 2) {
+      address = config.address;
+    } else if (config.address.split(".").length > 2) {
+      address = config.address.split(".")[config.address.split(".").length - 2] + "." + config.address.split(".")[config.address.split(".").length - 1];
+    }
 
-    }'`);
-      exec(
-        `curl https://api.cloudflare.com/client/v4/zones/${
-          config.cloudflareZone
-        }/dns_records \
-    -H 'Content-Type: application/json' \
-    -H "X-Auth-Email: ${config.cloudflareEmail}" \
-    -H "X-Auth-Key: ${config.cloudflareKey}" \
-    -d '{
-    "name": "_minecraft._tcp.${subdomain}",
-          "type": "SRV",
-      "data": {
-         "port": ${portOffset + parseInt(req.params.id)},
-         "priority": ${portOffset + parseInt(req.params.id)},
-         "target": "${baseUrl}.${address}",
-         "weight": 5
-      }
+    const cfHeaders = {
+      "X-Auth-Email": config.cloudflareEmail,
+      "X-Auth-Key": config.cloudflareKey,
+    };
+    const recordUrl = `https://api.cloudflare.com/client/v4/zones/${config.cloudflareZone}/dns_records`;
+    const makeRecord = (proto) => ({
+      name: `_minecraft._${proto}.${subdomain}`,
+      type: "SRV",
+      data: {
+        port: portOffset + parseInt(req.params.id),
+        priority: portOffset + parseInt(req.params.id),
+        target: `${baseUrl}.${address}`,
+        weight: 5,
+      },
+    });
 
-    }'`,
-        (err, stdout, stderr) => {
-          if (err) {
-            console.log(err);
-            res.status(500).json({ msg: "Error claiming subdomain. (1)" });
-          } else {
-            exec(
-              `curl https://api.cloudflare.com/client/v4/zones/${
-                config.cloudflareZone
-              }/dns_records \
-        -H 'Content-Type: application/json' \
-        -H "X-Auth-Email: ${config.cloudflareEmail}" \
-        -H "X-Auth-Key: ${config.cloudflareKey}" \
-        -d '{
-        "name": "_minecraft._udp.${subdomain}",
-              "type": "SRV",
-          "data": {
-             "port": ${portOffset + parseInt(req.params.id)},
-             "priority": ${portOffset + parseInt(req.params.id)},
-             "target": "${baseUrl}.${address}",
-             "weight": 5
-          }
-
-        }'`,
-              (err, stdout, stderr) => {
-                if (err) {
-                  console.log(err);
-                  res
-                    .status(500)
-                    .json({ msg: "Error claiming subdomain. (1)" });
-                } else {
-                  let res2 = JSON.parse(stdout);
-                  if (res2.success == false) {
-                    if (res2.errors[0].code == 81058) {
-                      res.status(400).json({ msg: "Subdomain already taken." });
-                    } else {
-                      res
-                        .status(500)
-                        .json({ msg: "Error claiming subdomain. (2)" });
-                    }
-                  } else {
-                    server.subdomain = subdomain;
-                    writeJSON(`servers/${req.params.id}/server.json`, server);
-                    res.status(200).json({ msg: "Done" });
-                  }
-                }
-              }
-            );
-          }
+    try {
+      await security.curlPostJSON(recordUrl, cfHeaders, makeRecord("tcp"));
+      const res2 = await security.curlPostJSON(recordUrl, cfHeaders, makeRecord("udp"));
+      if (res2 && res2.success == false) {
+        if (res2.errors && res2.errors[0] && res2.errors[0].code == 81058) {
+          res.status(400).json({ msg: "Subdomain already taken." });
+        } else {
+          res.status(500).json({ msg: "Error claiming subdomain. (2)" });
         }
-      );
+      } else {
+        server.subdomain = subdomain;
+        writeJSON(`servers/${req.params.id}/server.json`, server);
+        res.status(200).json({ msg: "Done" });
+      }
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({ msg: "Error claiming subdomain. (1)" });
     }
   } else {
     res.status(401).json({ msg: "Invalid credentials." });
   }
 });
 
-router.post("/:id/deleteSubdomain", function (req, res) {
+router.post("/:id/deleteSubdomain", async function (req, res) {
   let email = req.headers.username;
   let token = req.headers.token;
   let subdomain = req.query.subdomain;
@@ -1700,35 +1673,30 @@ router.post("/:id/deleteSubdomain", function (req, res) {
     subdomain == server.subdomain
   ) {
     if (server.subdomain === undefined) {
-      res.status(400).json({ msg: "Server doesn't have a subdomain." });
-    } else {
-      console.log(`curl https://api.cloudflare.com/client/v4/zones/${config.cloudflareZone}/dns_records?name=_minecraft._tcp.${subdomain}.${config.address} \
-    -X DELETE \
-    -H 'Content-Type: application/json' \
-    -H "X-Auth-Email: ${config.cloudflareEmail}" \
-    -H "X-Auth-Key: ${config.cloudflareKey}"`);
-      exec(
-        `curl https://api.cloudflare.com/client/v4/zones/${config.cloudflareZone}/dns_records?name=_minecraft._tcp.${subdomain}.${config.address} \
-    -X DELETE \
-    -H 'Content-Type: application/json' \
-    -H "X-Auth-Email: ${config.cloudflareEmail}" \
-    -H "X-Auth-Key: ${config.cloudflareKey}"`,
-        (err, stdout, stderr) => {
-          if (err) {
-            console.log(err);
-            res.status(500).json({ msg: "Error deleting subdomain. (1)" });
-          } else {
-            let res2 = JSON.parse(stdout);
-            if (res2.success == false) {
-              res.status(500).json({ msg: "Error deleting subdomain. (2)" });
-            } else {
-              server.subdomain = undefined;
-              writeJSON(`servers/${req.params.id}/server.json`, server);
-              res.status(200).json({ msg: "Done" });
-            }
-          }
-        }
-      );
+      return res.status(400).json({ msg: "Server doesn't have a subdomain." });
+    }
+    if (!security.isSafeDnsLabel(subdomain)) {
+      return res.status(400).json({ msg: "Invalid subdomain." });
+    }
+
+    const params = new URLSearchParams({ name: `_minecraft._tcp.${subdomain}.${config.address}` });
+    const url = `https://api.cloudflare.com/client/v4/zones/${config.cloudflareZone}/dns_records?${params.toString()}`;
+
+    try {
+      const res2 = await security.curlDeleteJSON(url, {
+        "X-Auth-Email": config.cloudflareEmail,
+        "X-Auth-Key": config.cloudflareKey,
+      });
+      if (res2 && res2.success == false) {
+        res.status(500).json({ msg: "Error deleting subdomain. (2)" });
+      } else {
+        server.subdomain = undefined;
+        writeJSON(`servers/${req.params.id}/server.json`, server);
+        res.status(200).json({ msg: "Done" });
+      }
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({ msg: "Error deleting subdomain. (1)" });
     }
   } else {
     res.status(401).json({ msg: "Invalid credentials." });

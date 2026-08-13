@@ -16,7 +16,7 @@ const fs = require("fs");
 const writeJSON = require("../../scripts/utils.js").writeJSON;
 const enableVirusScan = JSON.parse(config.enableVirusScan);
 const backups = require("../../scripts/backups.js");
-const security = require("../../scripts/security.js");
+const security = require("../../scripts/security/rce.js");
 const mode = config.mode;
 
 router.get("/", (req, res) => {

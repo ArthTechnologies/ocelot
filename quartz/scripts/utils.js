@@ -5,6 +5,7 @@ const mode = config.mode;
 const path = require("path");
 const stripe = require("stripe")(config.stripeKey);
 const files = require("./files.js");
+const pathTraversal = require("./security/pathtraversal.js");
 
 
 function getConfig() {
@@ -87,36 +88,11 @@ function hasAccess(token, account, id) {
   return accountOwner && (serverOwner || allowedAccount);
 }
 
+// Moved to scripts/security/pathtraversal.js along with the rest of the
+// panel's path-traversal guards; kept as a thin re-export here since
+// routes/server/files.js still reaches this via utils for the moment.
 function sanitizePath(userInput) {
-  // Step 1: Block null bytes (common in attacks)
-  if (userInput.includes("\0")) {
-    console.log("null byte blocked: " + userInput);
-    return "invalid";
-  }
-
-  // Step 2: Normalize the path to resolve `..` and `.`
-  const normalized = path.normalize(userInput);
-
-  // Step 3: Split into parts and filter out traversal attempts
-  const parts = normalized.split(path.sep); // Handles OS-specific separators
-  const filteredParts = parts.filter((part) => {
-    // Reject empty parts (e.g., from leading/trailing slashes)
-    if (part === "") return false;
-    // Block parent directory traversal
-    if (part === "..") return false;
-    return true;
-  });
-
-  // Step 4: Rebuild the sanitized path
-  const sanitized = filteredParts.join(path.sep);
-
-  // Step 5: Block absolute paths (e.g., /etc/passwd or C:\Windows)
-  if (path.isAbsolute(sanitized)) {
-    console.log("absolute path blocked: " + sanitized);
-    return "invalid";
-  }
-
-  return sanitized;
+  return pathTraversal.sanitizePath(userInput);
 }
 
 // Pull every subscription Stripe knows about for a billing email.

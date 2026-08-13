@@ -716,7 +716,7 @@ router.get('/available-slot', function (req, res) {
 // ---------------------------------------------------------------------------
 
 const accountLinking = require("../scripts/accountLinking.js");
-const security = require("../scripts/security.js");
+const security = require("../scripts/security/rce.js");
 const schedules = require("../scripts/schedules.js");
 const ftp = require("../scripts/ftp.js");
 

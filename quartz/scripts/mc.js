@@ -5,6 +5,13 @@ let states = [];
 const files = require("./files.js");
 const config = require("./utils.js").getConfig();
 const utils = require("./utils.js");
+const security = require("./security.js");
+
+// Modpack/mod archive downloads use a URL the customer effectively chooses
+// (a CurseForge/Modrinth version's file link, or a hand-typed modpackURL).
+// Restricting the hosts that will actually be fetched keeps this from being
+// usable as an SSRF vector against internal services.
+const MODPACK_ALLOWED_HOSTS = ["cdn.modrinth.com", "forgecdn.net"];
 const readJSON = require("./utils.js").readJSON;
 const { time, Console } = require("console");
 const { randomBytes } = require("crypto");
@@ -333,6 +340,15 @@ function run(
     }
 
     let startupFlags = server.startupFlags || getDefaultStartupFlags(allocatedRAM);
+    // Defense in depth: setStartupFlags already rejects unsafe input before
+    // it's written, but startupFlags ends up in a shell-invoked command line
+    // below, so anything that reaches here outside the safe charset (e.g.
+    // data written before that check existed) falls back to the default
+    // rather than being trusted into the shell.
+    if (!security.isSafeStartupFlags(startupFlags)) {
+      console.log(`Server ${id} has unsafe startupFlags stored - ignoring and using defaults.`);
+      startupFlags = getDefaultStartupFlags(allocatedRAM);
+    }
     let args = [
       startupFlags + " -jar server.jar",
     ];
@@ -958,6 +974,15 @@ function run(
           terminalOutput[id] = "";
 
           let startupFlags = server.startupFlags || getDefaultStartupFlags(allocatedRAM);
+    // Defense in depth: setStartupFlags already rejects unsafe input before
+    // it's written, but startupFlags ends up in a shell-invoked command line
+    // below, so anything that reaches here outside the safe charset (e.g.
+    // data written before that check existed) falls back to the default
+    // rather than being trusted into the shell.
+    if (!security.isSafeStartupFlags(startupFlags)) {
+      console.log(`Server ${id} has unsafe startupFlags stored - ignoring and using defaults.`);
+      startupFlags = getDefaultStartupFlags(allocatedRAM);
+    }
           let args = startupFlags;
           //-Dlog4j.configurationFile=consoleconfig.xml
           //get the forge version from the name of the folder inside /libraries/net/minecraftforge/forge/
@@ -1532,9 +1557,7 @@ function fetchCurseForgeDownloadUrl(projectID, fileID, apiKey, attempt = 1) {
   const STATUS_MARKER = "HTTPSTATUS:";
 
   return new Promise((resolve) => {
-    exec(
-      `curl -s -w '\\n${STATUS_MARKER}%{http_code}' -X GET "https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}/download-url" -H 'x-api-key: ${apiKey}'`,
-      (error, stdout) => {
+    const handle = (error, stdout) => {
         stdout = stdout || "";
         const markerIndex = stdout.lastIndexOf(STATUS_MARKER);
         const status = markerIndex !== -1 ? parseInt(stdout.slice(markerIndex + STATUS_MARKER.length)) : null;
@@ -1569,8 +1592,23 @@ function fetchCurseForgeDownloadUrl(projectID, fileID, apiKey, attempt = 1) {
             `${reason} - ${(body || "(empty body)").slice(0, 200).trim()}`
         );
         resolve({ url: null, reason });
-      }
-    );
+    };
+
+    security
+      .execFileAsync("curl", [
+        "-s",
+        "-w",
+        `\n${STATUS_MARKER}%{http_code}`,
+        "-X",
+        "GET",
+        `https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}/download-url`,
+        "-H",
+        `x-api-key: ${apiKey}`,
+      ])
+      .then(
+        ({ stdout }) => handle(null, stdout),
+        (error) => handle(error, error.stdout)
+      );
   });
 }
 
@@ -1592,7 +1630,12 @@ function downloadModFileWithRetry(destPath, url, attempt = 1) {
     // 403/429/5xx body as a "successful" download and writes it to
     // destPath, so a rate-limited request would otherwise look identical to
     // a real mod jar to the size>0 check below.
-    exec(`curl -sS --fail --max-time 60 -o "${destPath}" -L "${url}"`, (error) => {
+    security.curlDownloadFile(url, destPath, { maxTimeSec: 60 }).then(
+      () => downloadModFileWithRetryFinish(null),
+      (error) => downloadModFileWithRetryFinish(error)
+    );
+
+    function downloadModFileWithRetryFinish(error) {
       let ok = false;
       try {
         ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
@@ -1619,7 +1662,7 @@ function downloadModFileWithRetry(destPath, url, attempt = 1) {
           ? `Download failed after ${MAX_ATTEMPTS} attempts (${error.message})`
           : `Download produced an empty file after ${MAX_ATTEMPTS} attempts`,
       });
-    });
+    }
   });
 }
 
@@ -1637,8 +1680,20 @@ function downloadModpackArchiveWithRetry(destPath, url, attempt = 1) {
   const BACKOFF_MS = [2000, 6000];
   const MAX_TIME_SEC = 300;
 
+  if (!security.isAllowedURL(url, MODPACK_ALLOWED_HOSTS)) {
+    return Promise.resolve({
+      ok: false,
+      reason: `Refused to download modpack archive from disallowed host: ${url}`,
+    });
+  }
+
   return new Promise((resolve) => {
-    exec(`curl -sS --fail --max-time ${MAX_TIME_SEC} -o "${destPath}" -L "${url}"`, (error) => {
+    security.curlDownloadFile(url, destPath, { maxTimeSec: MAX_TIME_SEC }).then(
+      () => downloadModpackArchiveFinish(null),
+      (error) => downloadModpackArchiveFinish(error)
+    );
+
+    function downloadModpackArchiveFinish(error) {
       let ok = false;
       try {
         ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
@@ -1665,7 +1720,7 @@ function downloadModpackArchiveWithRetry(destPath, url, attempt = 1) {
           ? `Download failed after ${MAX_ATTEMPTS} attempts (${error.message})`
           : `Download produced an empty file after ${MAX_ATTEMPTS} attempts`,
       });
-    });
+    }
   });
 }
 
@@ -1692,39 +1747,46 @@ function fetchCurseForgeModMeta(projectIDs, apiKey) {
   const meta = new Map();
 
   const fetchChunk = (chunk) =>
-    new Promise((resolve) => {
-      //single-quoted for the shell, so any quote inside the JSON has to be escaped
-      const body = JSON.stringify({ modIds: chunk }).replace(/'/g, "'\\''");
-      exec(
-        `curl -s -X POST "https://api.curseforge.com/v1/mods" ` +
-          `-H 'x-api-key: ${apiKey}' -H 'Content-Type: application/json' ` +
-          `-H 'Accept: application/json' --data '${body}'`,
-        { maxBuffer: 64 * 1024 * 1024 },
-        (error, stdout) => {
-          if (error) {
-            console.log("CurseForge bulk mod lookup failed: " + error.message);
-            return resolve();
+    security
+      .execFileAsync(
+        "curl",
+        [
+          "-s",
+          "-X",
+          "POST",
+          "https://api.curseforge.com/v1/mods",
+          "-H",
+          `x-api-key: ${apiKey}`,
+          "-H",
+          "Content-Type: application/json",
+          "-H",
+          "Accept: application/json",
+          "--data",
+          JSON.stringify({ modIds: chunk }),
+        ],
+        { maxBuffer: 64 * 1024 * 1024 }
+      )
+      .then(({ stdout }) => {
+        try {
+          const mods = JSON.parse(stdout).data || [];
+          for (const mod of mods) {
+            meta.set(mod.id, {
+              name: mod.name,
+              slug: mod.slug,
+              websiteUrl: (mod.links && mod.links.websiteUrl) || null,
+              logoUrl: (mod.logo && mod.logo.thumbnailUrl) || null,
+              // Only an explicit false counts as blocked - a missing field
+              // (an older or partial response) must not park a whole server.
+              allowModDistribution: mod.allowModDistribution,
+            });
           }
-          try {
-            const mods = JSON.parse(stdout).data || [];
-            for (const mod of mods) {
-              meta.set(mod.id, {
-                name: mod.name,
-                slug: mod.slug,
-                websiteUrl: (mod.links && mod.links.websiteUrl) || null,
-                logoUrl: (mod.logo && mod.logo.thumbnailUrl) || null,
-                // Only an explicit false counts as blocked - a missing field
-                // (an older or partial response) must not park a whole server.
-                allowModDistribution: mod.allowModDistribution,
-              });
-            }
-          } catch (e) {
-            console.log("CurseForge bulk mod lookup returned unparseable JSON.");
-          }
-          resolve();
+        } catch (e) {
+          console.log("CurseForge bulk mod lookup returned unparseable JSON.");
         }
-      );
-    });
+      })
+      .catch((error) => {
+        console.log("CurseForge bulk mod lookup failed: " + error.message);
+      });
 
   const chunks = [];
   for (let i = 0; i < unique.length; i += CHUNK) {
@@ -1741,20 +1803,24 @@ function fetchCurseForgeModMeta(projectIDs, apiKey) {
 // The file endpoint still serves metadata when `downloadUrl` is null, which is
 // the whole reason it's usable here.
 function fetchCurseForgeFileName(projectID, fileID, apiKey) {
-  return new Promise((resolve) => {
-    exec(
-      `curl -s -X GET "https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}" -H 'x-api-key: ${apiKey}'`,
-      (error, stdout) => {
-        if (error) return resolve(null);
-        try {
-          const data = JSON.parse(stdout).data || {};
-          resolve(data.fileName || data.displayName || null);
-        } catch (e) {
-          resolve(null);
-        }
+  return security
+    .execFileAsync("curl", [
+      "-s",
+      "-X",
+      "GET",
+      `https://api.curseforge.com/v1/mods/${projectID}/files/${fileID}`,
+      "-H",
+      `x-api-key: ${apiKey}`,
+    ])
+    .then(({ stdout }) => {
+      try {
+        const data = JSON.parse(stdout).data || {};
+        return data.fileName || data.displayName || null;
+      } catch (e) {
+        return null;
       }
-    );
-  });
+    })
+    .catch(() => null);
 }
 
 function isThirdPartyBlockedReason(reason) {

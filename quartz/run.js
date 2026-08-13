@@ -173,7 +173,7 @@ if (!fs.existsSync("./servers")) {
   fs.rmSync("./servers/template", { recursive: true });
 }
 const ftp = require("./scripts/ftp.js");
-const security = require("./scripts/security.js");
+const security = require("./scripts/security/rce.js");
 const backups = require("./scripts/backups.js");
 
 
