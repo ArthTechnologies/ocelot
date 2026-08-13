@@ -711,17 +711,14 @@ async function runAttempt(pack, id, isSingleRecheck = false) {
       if (pack.serverPack) mods.serverPack = true;
 
       // Booting a pack with none of its mods proves nothing, and burns the
-      // full start timeout doing it. For a server pack an empty mods folder
-      // means the unzip fell over — its jars come bundled, not downloaded.
+      // full start timeout doing it. For manifest-based packs (Modrinth/CF client
+      // packs), empty means the download failed. For server packs, try booting
+      // anyway — the jars are bundled, so 0 detected might just mean the
+      // extraction didn't populate the mods folder for some reason.
       if (mods.expected > 0 && mods.installed === 0) {
         outcome = {
           status: "failed",
           reason: `None of the ${mods.expected} mods downloaded — the pack couldn't be installed.`,
-        };
-      } else if (pack.serverPack && mods.installed === 0) {
-        outcome = {
-          status: "failed",
-          reason: `Server pack extracted no mods — the download or unzip fell over. (${pack.downloadUrl})`,
         };
       } else {
         setSlotPhase(id, "booting");
@@ -729,6 +726,11 @@ async function runAttempt(pack, id, isSingleRecheck = false) {
         // passing it would make run() download it a second time.
         mc().run(id, pack.software, pack.gameVersion || GAME_VERSION, [], [], undefined, true, undefined);
         outcome = await waitForOnline(id);
+
+        // For server packs with no detected mods, add context to failure reason
+        if (outcome.status === "failed" && pack.serverPack && mods.installed === 0) {
+          outcome.reason += ` (Note: server pack extracted no mods — may indicate incomplete extraction.)`;
+        }
       }
     }
   } catch (err) {
