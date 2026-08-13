@@ -8,14 +8,19 @@ const files = require("./files.js");
 
 
 function getConfig() {
-  let configTxt = fs.readFileSync("config.txt", "utf8").split("\n");
   let config = {};
-  configTxt.forEach((line) => {
-    if (line.includes("=")) {
-      let splitLine = line.split("=");
-      config[splitLine[0]] = splitLine[1];
-    }
-  });
+  try {
+    const configTxt = fs.readFileSync("config.txt", "utf8").split("\n");
+    configTxt.forEach((line) => {
+      if (line.includes("=")) {
+        let splitLine = line.split("=");
+        config[splitLine[0]] = splitLine[1];
+      }
+    });
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    // config.txt not found, return empty config
+  }
   return config;
 }
 
