@@ -727,6 +727,20 @@ async function runAttempt(pack, id, isSingleRecheck = false) {
         mc().run(id, pack.software, pack.gameVersion || GAME_VERSION, [], [], undefined, true, undefined);
         outcome = await waitForOnline(id);
 
+        // Recount mods after successful boot — manifest mods may have arrived
+        // during startup, and server packs might populate the folder during boot.
+        if (outcome.status === "passed") {
+          let finalInstalled = 0;
+          try {
+            finalInstalled = fs
+              .readdirSync(`servers/${id}/mods`)
+              .filter((f) => f.endsWith(".jar")).length;
+          } catch (e) {
+            finalInstalled = 0;
+          }
+          mods.installed = finalInstalled;
+        }
+
         // For server packs with no detected mods, add context to failure reason
         if (outcome.status === "failed" && pack.serverPack && mods.installed === 0) {
           outcome.reason += ` (Note: server pack extracted no mods — may indicate incomplete extraction.)`;
