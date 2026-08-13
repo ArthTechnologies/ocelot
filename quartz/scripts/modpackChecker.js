@@ -98,7 +98,7 @@ function isClientSideModpack(cfId) {
 
 // A pack has to install a loader, generate a world and reach "Done" — slow
 // packs on a cold cache genuinely take this long.
-const START_TIMEOUT_MS = 10 * 60 * 1000;
+const START_TIMEOUT_MS = 12 * 60 * 1000;
 // Big packs are hundreds of mods and several hundred MB.
 const DOWNLOAD_TIMEOUT_MS = 6 * 60 * 1000;
 // Only retry a failed pack if it failed within this window (transient failures)
@@ -621,6 +621,8 @@ function waitForOnline(id) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
     let sawLive = false;
+    let spawnAreaExtensionApplied = false;
+    let effectiveTimeout = START_TIMEOUT_MS;
 
     const timer = setInterval(() => {
       const state = mc().getState(id);
@@ -645,11 +647,24 @@ function waitForOnline(id) {
         return resolve({ status: "failed", reason: "Server never started." });
       }
 
-      if (elapsed > START_TIMEOUT_MS) {
+      // Extend timeout by 2 minutes if we see "Preparing spawn area" in terminal
+      if (!spawnAreaExtensionApplied) {
+        try {
+          const terminal = mc().getTerminalTail(id, 8000);
+          if (terminal && terminal.includes("Preparing spawn area")) {
+            spawnAreaExtensionApplied = true;
+            effectiveTimeout = START_TIMEOUT_MS + 2 * 60 * 1000;
+          }
+        } catch (e) {
+          // Ignore errors reading terminal
+        }
+      }
+
+      if (elapsed > effectiveTimeout) {
         clearInterval(timer);
         return resolve({
           status: "failed",
-          reason: `Didn't come online within ${Math.round(START_TIMEOUT_MS / 60000)} minutes.`,
+          reason: `Didn't come online within ${Math.round(effectiveTimeout / 60000)} minutes.`,
         });
       }
     }, POLL_MS);
@@ -659,6 +674,7 @@ function waitForOnline(id) {
 // One install-and-boot attempt. Always leaves the slot killed and empty, so
 // the next attempt (or pack) starts from nothing.
 async function runAttempt(pack, id, isSingleRecheck = false) {
+  const attemptStartedAt = Date.now();
   let outcome;
   // Recorded even on success: "passed with 142/187 mods" is the difference
   // between a healthy pack and one that only booted because half of it is
@@ -743,7 +759,7 @@ async function runAttempt(pack, id, isSingleRecheck = false) {
   await wait(KILL_SETTLE_MS);
   await removeFolder(`servers/${id}`);
 
-  return { outcome, mods, consoleTail };
+  return { outcome, mods, consoleTail, durationMs: Date.now() - attemptStartedAt };
 }
 
 async function checkOne(pack, id, isSingleRecheck = false) {

@@ -975,26 +975,32 @@ function run(
             execLine =
               prefix +
               ` @user_jvm_args.txt @${libraryline.substring(1)}${forgeVersion}/unix_args.txt "$@"`;
-            
-               //allocate ram to user_jvm_args.txt
-               if (fs.existsSync
-                (folder + "/user_jvm_args.txt")) {
-                  let data = fs.readFileSync(
-                    folder + "/user_jvm_args.txt",
-                    "utf8"  
-                  );
-                  let lines = data.split("\n");
-                  let a = lines.findIndex((line) => {
-                    return line.includes("-Xmx");
-                  }   
-                  );
-                  lines[a] = "-Xmx" + allocatedRAM + "G";
-                  fs.writeFileSync(
-                    folder + "/user_jvm_args.txt",
-                    lines.join("\n"),
-                    "utf8"
-                  );
-                }
+
+            // Allocate RAM to user_jvm_args.txt, or create it if missing (Forge only)
+            const userJvmArgsPath = folder + "/user_jvm_args.txt";
+            if (fs.existsSync(userJvmArgsPath)) {
+              let data = fs.readFileSync(userJvmArgsPath, "utf8");
+              let lines = data.split("\n");
+              let a = lines.findIndex((line) => line.includes("-Xmx"));
+              if (a !== -1) {
+                lines[a] = "-Xmx" + allocatedRAM + "G";
+              } else {
+                lines.push("-Xmx" + allocatedRAM + "G");
+              }
+              fs.writeFileSync(userJvmArgsPath, lines.join("\n"), "utf8");
+            } else if (software === "forge" || software === "neoforge") {
+              // Create default user_jvm_args.txt if it doesn't exist
+              const defaultArgs = [
+                `-Xmx${allocatedRAM}G`,
+                "-XX:+UseG1GC",
+                "-XX:MaxGCPauseMillis=130",
+                "-XX:InitiatingHeapOccupancyPercent=35",
+                "-XX:+PerfDisableSharedMem",
+                "-XX:G1NewCollectionThreads=4",
+                "-XX:G1MaxNewGenPercent=30",
+              ].join("\n");
+              fs.writeFileSync(userJvmArgsPath, defaultArgs, "utf8");
+            }
               
             if (software == "forge") {
               if (parseInt(version.split(".")[1]) >= 21) {
