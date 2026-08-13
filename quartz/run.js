@@ -1009,6 +1009,11 @@ const limiter = rateLimit({
 // middlewares
 app.use(limiter, express.json(), cors());
 
+// More specific than "/server" below, so it must be registered first —
+// otherwise index.js's own "/:id/..." routes would get first crack at
+// matching "/server/restore/..." requests and this router would only ever
+// see what falls through unmatched.
+app.use("/server/restore", require("./routes/server/restore.js"));
 app.use("/server", require("./routes/server/index.js"));
 app.use("/checkout", require("./routes/checkout"));
 app.use("/info", require("./routes/info"));
@@ -1018,7 +1023,6 @@ app.use("/translate", require("./routes/translate"));
 app.use("/node", require("./routes/node"));
 app.use("/referrals", require("./routes/referrals"));
 app.use("/admin", require("./routes/admin.js"));
-app.use("/support", require("./routes/support.js"));
 app.use("/modpack-checks", require("./routes/modpackChecks.js"));
 app.use("/agent", require("./routes/agent.js"));
 

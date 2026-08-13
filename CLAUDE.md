@@ -112,8 +112,10 @@ quartz/
 │   ├── referrals.js    # Referral system
 │   ├── translate.js    # Translation API
 │   ├── admin.js        # Admin dashboard/lookup endpoints
-│   ├── support.js      # Support tooling endpoints
-│   └── agent.js        # Localhost-only endpoints for AI agents (e.g. Claude Code)
+│   ├── agent.js        # Localhost-only endpoints for AI agents (e.g. Claude Code)
+│   └── server/
+│       ├── index.js    # Server CRUD, mounted at /server
+│       └── restore.js  # Expired-server restore flow, mounted at /server/restore
 ├── scripts/
 │   ├── mc.js           # Minecraft server control (start, stop, install)
 │   ├── files.js        # File system operations
@@ -157,18 +159,20 @@ quartz/
 - The same list resolves `trashbin/{id}-{owner}` lookups, since those folders are named after the owning account — without it a linked account reports 104 ("data deleted") for data sitting safely in trashbin.
 - `utils.js` writes the `{id}:freed` marker to every linked account holding the id, so both logins land on code 100 rather than one falling through to a bare 101.
 - `utils.js` requires `accountLinking` **lazily inside the function** — `accountLinking` imports `readJSON` from `utils.js`, so a top-level import there would create a cycle.
-- **A plain (non-`:freed`) entry with no live `servers/{id}/server.json` also gets checked against trashbin**, not just marked-freed ones. Normally this "no live folder" case means a freshly reserved slot still waiting on `/server/new` (code 101, "not created yet") — but if `trashbin/{id}-{owner}` exists for any linked login, that plain entry is data that was binned without the marker being set (a manual trashbin move, a migration edge case, an old `/support/serverRecovery` attempt that didn't finish). `routes/info.js` reports it the same way as the `:freed`+no-live case (code 100) instead of "not created yet," so the user lands on `/expired/{id}` instead of being pointed at server creation for data that already exists, and heals the entry to `{id}:freed` on the account file so the next request takes the already-tested `:freed` branch directly. A live server.json always wins first, so this can never misfire against an id that's actually in use.
+- **A plain (non-`:freed`) entry with no live `servers/{id}/server.json` also gets checked against trashbin**, not just marked-freed ones. Normally this "no live folder" case means a freshly reserved slot still waiting on `/server/new` (code 101, "not created yet") — but if `trashbin/{id}-{owner}` exists for any linked login, that plain entry is data that was binned without the marker being set (a manual trashbin move, a migration edge case, an old `/support/serverRecovery` attempt that didn't finish (that route and `/support/listExpiredServers` were removed as dead code — nothing in Observer called them)). `routes/info.js` reports it the same way as the `:freed`+no-live case (code 100) instead of "not created yet," so the user lands on `/expired/{id}` instead of being pointed at server creation for data that already exists, and heals the entry to `{id}:freed` on the account file so the next request takes the already-tested `:freed` branch directly. A live server.json always wins first, so this can never misfire against an id that's actually in use.
 
 #### Restoring an Expired Server
-The expired-server card links to `/expired/{id}` (Observer), which walks the user through three checks — subscription, slot, world data — and then restores the server through `routes/support.js`. Three endpoints back it, all resolving state across the **whole email group** (`accountLinking.getLinkedAccountFiles`), since the archive folder is named after the account that owned the server and the `:freed` marker may sit on the sibling login:
-- `GET /support/restore/:id/plan` — preflight. Returns `kind`, `canRestore`, `blockers[]`, `warnings[]`, plus `slot`, `data` and `subscription` detail. The page drives its slot step and the enabled state of the Restore button from this; the three per-step endpoints only explain *why*.
-- `POST /support/restore/:id` — starts a job and returns it immediately (202). Body `{ restoreWorld }` (defaults to `true` — the safe reading of a missing field is "keep the customer's world").
-- `GET /support/restore/:id/progress` — the job's nine steps with per-step `status`/`detail`, polled ~1s by `RestoreAccessModal.svelte`.
+The expired-server card links to `/expired/{id}` (Observer) for every error code, including 103 — Nav no longer short-circuits a 103 card into `BugResolverModal` directly; it renders the same clickable card as 100/104/105/106 and lets the expired page take it from there. The page walks the user through three checks — subscription, slot, world data — and then restores the server through `routes/server/restore.js`, mounted at `/server/restore` (moved from the now-deleted `routes/support.js`, which also carried two dead `/listExpiredServers` and `/serverRecovery` endpoints that were dropped in the move — nothing in Observer called them). `run.js` registers this mount *before* `/server` itself, since `routes/server/index.js`'s own `/:id/...` routes would otherwise get first crack at matching `/server/restore/...` requests. Endpoints back it, all resolving state across the **whole email group** (`accountLinking.getLinkedAccountFiles`), since the archive folder is named after the account that owned the server and the `:freed` marker may sit on the sibling login:
+- `GET /server/restore/:id/plan` — preflight. Returns `kind`, `canRestore`, `blockers[]`, `warnings[]`, plus `slot`, `data` and `subscription` detail. The page drives its slot step and the enabled state of the Restore button from this; the per-step endpoints only explain *why*.
+- `POST /server/restore/:id` — starts a job and returns it immediately (202). Body `{ restoreWorld }` (defaults to `true` — the safe reading of a missing field is "keep the customer's world").
+- `GET /server/restore/:id/progress` — the job's nine steps with per-step `status`/`detail`, polled ~1s by `RestoreAccessModal.svelte`.
+- `GET /server/restore/:id/conflict` / `POST /server/restore/:id/conflict/resolve` — the `kind: conflict` pair. Backs `BugResolverModal.svelte`, which the expired page opens when the plan reports `conflict`.
+- `GET /server/restore/world-info/:id` / `GET /server/restore/available-slot` — world stats and free-slot lookup for the page's other two steps. Both keep a bare (non-`:id`-prefixed) path since they don't share the `/:id/...` shape the other four do.
 
 `kind` is the whole taxonomy, derived from what actually exists on disk rather than the error code the card showed:
 - `live` — server still in `servers/{id}`, owned by the group (error 106/105). Nothing moves; the restore clears `expired`/`markedExpired` and refreshes the subscription log.
 - `archive` — a `trashbin/{id}-{owner}` copy (error 100). Moved back into a slot.
-- `conflict` — both exist (error 103). Blocked; `BugResolverModal` has to resolve it first.
+- `conflict` — both exist (error 103). Blocked; `GET/POST /server/restore/:id/conflict[/resolve]` (via `BugResolverModal`) has to resolve it first.
 - `missing` — neither (error 104). Blocked.
 - `not_owned` — the group doesn't list the id at all.
 
@@ -181,7 +185,7 @@ Nuances worth keeping:
 - **"Don't bring back my old world" moves the world aside, never deletes it** — into `trashbin/{id}-{owner}-world-{ts}`. A mis-tapped toggle shouldn't cost someone their base. If the server is somehow still running, it's killed first.
 - **A finished job is history, not a result to replay.** `POST` reuses only a *running* job; a completed one is discarded so a server that expired twice actually restores the second time.
 - An archive with no `server.json` is refused **before** the move, so the files aren't left in a slot nothing points at.
-- `/support/world-info/:id` and `/support/bug-resolver/:id` check that `servers/{id}` actually belongs to the account group before reporting on it. A freed id can be reassigned, and both used to report the *new* owner's world size, mod count and player count — and bug-resolver's "keep the archived version" would have renamed that customer's live folder out from under them.
+- `/server/restore/world-info/:id` and `/server/restore/:id/conflict` check that `servers/{id}` actually belongs to the account group before reporting on it. A freed id can be reassigned, and both used to report the *new* owner's world size, mod count and player count — and the conflict resolver's "keep the archived version" would have renamed that customer's live folder out from under them.
 
 #### Payments (Provider Mode)
 - Stripe integration for server subscriptions

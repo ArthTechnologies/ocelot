@@ -28,9 +28,6 @@
     import SupportModal from "../buttons/SupportModal.svelte";
     import LanguageSwitcherModal from "../buttons/LanguageSwitcherModal.svelte";
     import ExpiredServerCard from "../ui/ExpiredServerCard.svelte";
-    import BugResolverModal from "../ui/BugResolverModal.svelte";
-
-  let bugResolverServerId: number | null = null;
 
   // NOTE: the element that is using one of the theme attributes must be in the DOM on mount
   let servers: any[] = [];
@@ -203,9 +200,6 @@
         }
       } else if (servers.length > 0 && !servers[0].isStandard && servers[0].error?.code === 101 && !isViewingExistingServer(servers)) {
          createServer(parseInt(servers[0].id))
-      } else {
-        const conflicted = servers.find(s => !s.isStandard && s.error?.code === 103);
-        if (conflicted) bugResolverServerId = parseInt(conflicted.id);
       }
     } else {
         servers[0] = "-1:invalid accoount";
@@ -349,15 +343,7 @@
     <UncreatedServerCard id={parseInt(server.id)}/>
     </a>
     {/if}
-  {:else if server.error.code === 103}
-    <button
-      on:click={() => { bugResolverServerId = parseInt(server.id); }}
-      id="serverCard{parseInt(server.id)}"
-      class="neutralGradientStrokeB flex md:max-lg:px-4 gap-2.5 items-center p-3 w-12 sm:w-32 overflow-hidden md:w-full md:min-h-[5.5rem] rounded-lg bg-base-200 cursor-pointer text-left"
-    >
-    <ExpiredServerCard id={parseInt(server.id)} timestamp={-1} cause="freed" errorCode={103}/>
-    </button>
-  {:else if server.error.code === 100 || server.error.code === 104 || server.error.code === 105 || server.error.code === 106}
+  {:else if server.error.code === 100 || server.error.code === 103 || server.error.code === 104 || server.error.code === 105 || server.error.code === 106}
     <a
       href="/expired/{parseInt(server.id)}"
       id="serverCard{parseInt(server.id)}"
@@ -462,13 +448,6 @@
 </div>
 <LanguageSwitcherModal/>
 <SupportModal/>
-{#if bugResolverServerId !== null}
-  <BugResolverModal
-    serverId={bugResolverServerId}
-    on:close={() => bugResolverServerId = null}
-    on:resolved={() => bugResolverServerId = null}
-  />
-{/if}
 <style>
   .primaryGradientStroke {
     position: relative;

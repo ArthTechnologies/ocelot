@@ -58,7 +58,7 @@
   async function poll() {
     if (stopped) return;
     try {
-      const res = await fetch(`${apiurl}support/restore/${serverId}/progress`, {
+      const res = await fetch(`${apiurl}server/restore/${serverId}/progress`, {
         headers: headers(),
       });
       if (res.ok) apply(await res.json());
@@ -71,7 +71,7 @@
 
   async function start() {
     try {
-      const res = await fetch(`${apiurl}support/restore/${serverId}`, {
+      const res = await fetch(`${apiurl}server/restore/${serverId}`, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({ restoreWorld }),

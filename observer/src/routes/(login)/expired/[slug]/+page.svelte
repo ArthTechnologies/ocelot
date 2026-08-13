@@ -100,7 +100,7 @@
     findSlotLoading = true;
     findSlotResult = null;
 
-    fetch(apiurl + "support/available-slot", {
+    fetch(apiurl + "server/restore/available-slot", {
       method: "GET",
       headers: {
         username: localStorage.getItem("accountEmail"),
@@ -157,7 +157,7 @@
           subscriptionLoading = false;
         });
 
-      fetch(apiurl + "support/restore/" + serverId + "/plan", { method: "GET", headers })
+      fetch(apiurl + "server/restore/" + serverId + "/plan", { method: "GET", headers })
         .then((res) => res.json())
         .then((data) => {
           plan = data;
@@ -170,7 +170,7 @@
           planLoading = false;
         });
 
-      fetch(apiurl + "support/world-info/" + serverId, { method: "GET", headers })
+      fetch(apiurl + "server/restore/world-info/" + serverId, { method: "GET", headers })
         .then((res) => res.json())
         .then((data) => {
           worldInfo = data;

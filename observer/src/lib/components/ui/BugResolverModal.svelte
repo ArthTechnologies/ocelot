@@ -19,7 +19,7 @@
     document.body.style.overflow = "hidden";
     if (!browser) return;
     try {
-      const res = await fetch(`${apiurl}support/bug-resolver/${serverId}`, {
+      const res = await fetch(`${apiurl}server/restore/${serverId}/conflict`, {
         headers: {
           username: localStorage.getItem("accountEmail"),
           token: localStorage.getItem("token"),
@@ -43,7 +43,7 @@
     submitting = true;
     error = "";
     try {
-      const res = await fetch(`${apiurl}support/bug-resolver/${serverId}/resolve`, {
+      const res = await fetch(`${apiurl}server/restore/${serverId}/conflict/resolve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
