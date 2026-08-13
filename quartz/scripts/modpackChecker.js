@@ -98,9 +98,11 @@ function isClientSideModpack(cfId) {
 
 // A pack has to install a loader, generate a world and reach "Done" — slow
 // packs on a cold cache genuinely take this long.
-const START_TIMEOUT_MS = Number(config.modpackCheckTimeoutMs) || 8 * 60 * 1000;
+const START_TIMEOUT_MS = 10 * 60 * 1000;
 // Big packs are hundreds of mods and several hundred MB.
-const DOWNLOAD_TIMEOUT_MS = Number(config.modpackCheckDownloadTimeoutMs) || 10 * 60 * 1000;
+const DOWNLOAD_TIMEOUT_MS = 6 * 60 * 1000;
+// Only retry a failed pack if it failed within this window (transient failures)
+const RETRY_WINDOW_MS = 2 * 60 * 1000;
 // If it hasn't even left "false" by now, run() never got going.
 const LAUNCH_GRACE_MS = 90 * 1000;
 const POLL_MS = 2000;
@@ -781,14 +783,15 @@ async function checkOne(pack, id, isSingleRecheck = false) {
   let attempts = 1;
   let firstFailure = null;
 
-  // Downloads time out and containers fail to come up for reasons that have
-  // nothing to do with the pack. One retry separates a genuinely broken pack
-  // from a bad night. Per-attempt timeouts are unchanged.
-  if (attempt.outcome.status === "failed") {
+  // Only retry if the failure was early (transient) — if it failed after 2 min,
+  // it's likely a real problem with the pack, not infrastructure.
+  if (attempt.outcome.status === "failed" && attempt.durationMs < RETRY_WINDOW_MS) {
     firstFailure = attempt.outcome.reason;
-    log(`${pack.name}: attempt 1 failed (${firstFailure}) — retrying once.`);
+    log(`${pack.name}: attempt 1 failed early (${firstFailure}) — retrying once.`);
     attempts = 2;
     attempt = await runAttempt(pack, id, isSingleRecheck);
+  } else if (attempt.outcome.status === "failed") {
+    firstFailure = attempt.outcome.reason;
   }
 
   const { outcome, mods, consoleTail } = attempt;
