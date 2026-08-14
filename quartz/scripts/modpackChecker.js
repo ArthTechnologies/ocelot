@@ -106,10 +106,13 @@ const RETRY_WINDOW_MS = 2 * 60 * 1000;
 // If it hasn't even left "false" by now, run() never got going.
 const LAUNCH_GRACE_MS = 90 * 1000;
 const POLL_MS = 2000;
-// mc.killObstructingProcess fires its `docker kill` 2.5s after `docker stop`,
-// so wait slightly longer than that before deleting the slot out from under a
-// container that's still shutting down.
-const KILL_SETTLE_MS = 3000;
+// mc.kill()'s teardown (docker stop, then a docker kill scheduled 2.5s later)
+// doesn't confirm the container is actually gone before returning - under
+// load the daemon can take longer than that to release the port, which is
+// what produced "address already in use" / exit 125 on the next attempt's
+// docker run. waitForPortFree polls instead of guessing a fixed delay.
+const PORT_FREE_POLL_MS = 500;
+const PORT_FREE_TIMEOUT_MS = 20000;
 // downloadModpack() fires every mod's download unbounded by default, which for
 // a few-hundred-mod pack means that many simultaneous CurseForge API calls on
 // one shared key — the checker runs SLOT_COUNT packs at once on top of that, so
@@ -119,6 +122,33 @@ const KILL_SETTLE_MS = 3000;
 const MOD_DOWNLOAD_CONCURRENCY = Number(config.modpackCheckDownloadConcurrency) || 8;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Confirms a slot's port has actually been released by Docker rather than
+// guessing a fixed settle time - see the PORT_FREE_* comment above. Port
+// numbering (10000 + id) mirrors mc.js's own convention. Gives up after
+// PORT_FREE_TIMEOUT_MS and proceeds anyway rather than hanging a slot
+// forever on a docker ps that behaves unexpectedly.
+function waitForPortFree(id, timeoutMs = PORT_FREE_TIMEOUT_MS) {
+  const port = 10000 + parseInt(id);
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve) => {
+    function check() {
+      exec(
+        `docker ps --filter "publish=${port}" --format "{{.ID}}"`,
+        (error, stdout) => {
+          const stillBound = !error && stdout.trim().length > 0;
+          if (!stillBound) return resolve();
+          if (Date.now() >= deadline) {
+            log(`Port ${port} (slot ${id}) still bound after ${timeoutMs}ms - proceeding anyway.`);
+            return resolve();
+          }
+          setTimeout(check, PORT_FREE_POLL_MS);
+        }
+      );
+    }
+    check();
+  });
+}
 
 let running = false;
 
@@ -769,10 +799,9 @@ async function runAttempt(pack, id, isSingleRecheck = false) {
   } catch (e) {
     log(`Couldn't kill slot ${id}: ${e.message}`);
   }
-  // killObstructingProcess schedules its `docker kill` 2.5s out, so give the
-  // container a moment to actually go before the folder is pulled from under
-  // it. Not a timeout — a fixed settle so the retry starts clean.
-  await wait(KILL_SETTLE_MS);
+  // Confirm the container's actually gone (and the port released) rather
+  // than guessing a fixed settle - see waitForPortFree.
+  await waitForPortFree(id);
   await removeFolder(`servers/${id}`);
 
   return { outcome, mods, consoleTail, durationMs: Date.now() - attemptStartedAt };
