@@ -5,7 +5,7 @@ let states = [];
 const files = require("./files.js");
 const config = require("./utils.js").getConfig();
 const utils = require("./utils.js");
-const security = require("./security.js");
+const security = require("./security/rce.js");
 
 // Modpack/mod archive downloads use a URL the customer effectively chooses
 // (a CurseForge/Modrinth version's file link, or a hand-typed modpackURL).
