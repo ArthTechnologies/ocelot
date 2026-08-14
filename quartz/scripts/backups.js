@@ -2,7 +2,7 @@ const { spawn, exec } = require("child_process");
 const { promisify } = require("util");
 const execPromise = promisify(exec);
 const fs = require("fs").promises;
-const security = require("./security");
+const security = require("./security/rce.js");
 
 const servers = [];
 

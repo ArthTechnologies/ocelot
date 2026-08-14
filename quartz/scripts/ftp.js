@@ -2,7 +2,7 @@ var fs = require('fs');
 var path = require('path');
 const { readJSON } = require('./utils');
 const config = require('./utils').getConfig();
-const security = require('./security');
+const security = require('./security/rce.js');
 const { exec } = require('child_process');
 const dockerMode = JSON.parse(config.dockerMode);
 
