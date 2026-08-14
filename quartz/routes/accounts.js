@@ -222,10 +222,10 @@ Router.post("/email/signin/", (req, res) => {
 });
 
 Router.delete("/email", (req, res) => {
-  email = req.headers.username;
+  let email = req.headers.username;
   if (email.includes("email:")) email = email.replace("email:", "");
-  password = req.body.password;
-  token = req.headers.token;
+  let password = req.body.password;
+  let token = req.headers.token;
   const emailPath = pathTraversal.accountFilePath("email", email);
   if (emailPath === null) {
     return res.status(400).send({ success: false, reason: "Invalid token" });
@@ -469,8 +469,8 @@ Router.post("/discord/", async (req, res) => {
 });
 
 Router.delete("/discord", (req, res) => {
-  username = req.headers.username;
-  token = req.headers.token;
+  let username = req.headers.username;
+  let token = req.headers.token;
   const discordPath = pathTraversal.accountFilePath("discord", username);
   if (discordPath === null) {
     return res.status(400).send({ success: false, reason: "Invalid token" });

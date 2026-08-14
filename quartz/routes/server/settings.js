@@ -26,7 +26,7 @@ router.post(`/`, function (req, res) {
   if (utils.hasAccess(token, account, req.params.id)) {
     let id = req.params.id;
 
-    desc = req.body.desc;
+    let desc = req.body.desc;
 
     if (req.body.newName != undefined && req.body.newName != "") {
       server.name = req.body.newName;
@@ -184,6 +184,7 @@ router.get(`/`, function (req, res) {
    
 
     let automaticStartup = false;
+    let allowedAccounts;
 try {
       if (server.allowedAccounts == undefined) {
       server.allowedAccounts = "";
@@ -194,7 +195,7 @@ try {
     }
     let allowedAccounts1 = server.allowedAccounts.split(",");
     //scan accounts.tsv for each accountId and get the username
-    let allowedAccounts = [];
+    allowedAccounts = [];
     let accountstsv = fs.readFileSync("accounts.tsv").toString().split("\n");
     for (let i = 0; i < accountstsv.length; i++) {
       let account = accountstsv[i].split("\t");

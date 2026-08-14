@@ -47,7 +47,8 @@ function getLinkedAccountFiles(accountName, accountData) {
 
 router.get(`/servers`, function (req, res) {
   email = req.headers.username;
-  token = req.headers.token;
+  let token = req.headers.token;
+  let account;
 
   if (mode === "solo") email = "noemail";
   //prevents a crash that has occurred

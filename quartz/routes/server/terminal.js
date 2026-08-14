@@ -20,10 +20,10 @@ const security = require("../../scripts/security/rce.js");
 const mode = config.mode;
 
 router.get("/", (req, res) => {
-  email = req.headers.username;
-  token = req.headers.token;
-  account = readJSON("accounts/" + email + ".json");
-  server = readJSON("servers/" + req.params.id + "/server.json");
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON("accounts/" + email + ".json");
+  let server = readJSON("servers/" + req.params.id + "/server.json");
   if (hasAccess(token, account, req.params.id)) {
     res.send(f.readTerminal(req.params.id));
   } else {
@@ -32,10 +32,10 @@ router.get("/", (req, res) => {
 });
 
 router.post("/", (req, res) => {
-  email = req.headers.username;
-  token = req.headers.token;
-  account = readJSON("accounts/" + email + ".json");
-  server = readJSON("servers/" + req.params.id + "/server.json");
+  let email = req.headers.username;
+  let token = req.headers.token;
+  let account = readJSON("accounts/" + email + ".json");
+  let server = readJSON("servers/" + req.params.id + "/server.json");
   if (hasAccess(token, account, req.params.id)) {
     console.log("revieved request: " + req.query.cmd);
     f.writeTerminal(req.params.id, req.query.cmd);

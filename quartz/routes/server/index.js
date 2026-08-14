@@ -313,7 +313,7 @@ router.post(`/:id/state/:state`, function (req, res) {
   console.log("attempting to start server " + req.params.id);
   console.log(token + " " + account.token + utils.hasAccess(token, account, req.params.id));
   if (utils.hasAccess(token, account, req.params.id)) {
-    state = req.params.state;
+    let state = req.params.state;
     let id = req.params.id;
     let token = req.headers.token;
 
@@ -359,11 +359,11 @@ router.delete(`/:id/:modtype(plugin|datapack|mod)`, function (req, res) {
   let server = readJSON("servers/" + req.params.id + "/server.json");
   if (utils.hasAccess(token, account, req.params.id)) {
     let id = req.params.id;
-    pluginId = req.query.pluginId;
-    pluginPlatform = req.query.pluginPlatform;
-    pluginName = req.query.pluginName;
+    let pluginId = req.query.pluginId;
+    let pluginPlatform = req.query.pluginPlatform;
+    let pluginName = req.query.pluginName;
     let extension = "jar";
-    modtype = req.params.modtype;
+    let modtype = req.params.modtype;
     if (modtype == "datapack") {
       modtype = "world/datapack";
       extension = "zip";
@@ -499,7 +499,7 @@ router.post(`/:id/version/`, function (req, res) {
   let server = readJSON("servers/" + req.params.id + "/server.json");
   if (utils.hasAccess(token, account, req.params.id)) {
     let id = req.params.id;
-    version = req.query.version;
+    let version = req.query.version;
 
     let versionChanged = version !== server.version;
     let versionChangedSoftware = server.software;
@@ -569,11 +569,11 @@ router.post(`/:id/add/:modtype(plugin|datapack|mod)`, function (req, res) {
     res.header("Access-Control-Allow-Origin", "*");
     let id = req.params.id;
     let extension = "jar";
-    pluginUrl = req.query.pluginUrl;
-    pluginId = security.sanitizeFilenameComponent(String(req.query.id));
-    pluginName = security.sanitizeFilenameComponent(req.query.name);
+    let pluginUrl = req.query.pluginUrl;
+    let pluginId = security.sanitizeFilenameComponent(String(req.query.id));
+    let pluginName = security.sanitizeFilenameComponent(req.query.name);
 
-    modtype = req.params.modtype;
+    let modtype = req.params.modtype;
     if (modtype == "datapack") {
       modtype = "world/datapack";
       extension = "zip";
@@ -772,8 +772,8 @@ router.post(
     if (utils.hasAccess(token, account, req.params.id)) {
       let id = req.params.id;
 
-      filename = req.query.filename;
-      modtype = req.params.modtype;
+      let filename = req.query.filename;
+      let modtype = req.params.modtype;
       if (modtype == "datapack") {
         modtype = "world/datapack";
       }
@@ -854,7 +854,7 @@ router.post(`/new/:id`, function (req, res) {
           }
           datajson.numServers = numServers;
           writeJSON("assets/data.json", datajson);
-          em = req.headers.username;
+          let em = req.headers.username;
 
           let cid = "";
           console.log("debug: " + email + req.headers.username + em);
@@ -872,7 +872,7 @@ router.post(`/new/:id`, function (req, res) {
               req.body.version !== "undefined" &&
               req.body.name !== "undefined"
             ) {
-              server = {};
+              let server = {};
               server.name = req.body.name;
               server.software = req.body.software;
               server.version = req.body.version;
@@ -1020,7 +1020,7 @@ router.post(`/new/:id`, function (req, res) {
                             console.log(
                               "debug: " + email + req.headers.username + em
                             );
-                            server = {};
+                            let server = {};
                             server.name = req.body.name;
                             server.software = req.body.software;
                             server.version = req.body.version;
