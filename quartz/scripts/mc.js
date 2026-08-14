@@ -2057,7 +2057,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                 if (fs.existsSync(folder + "/modrinth.index.json")) {
                   //there's an odd bug where the file has no read access, so this changes that
                   exec("chmod +r " + folder + "/modrinth.index.json", (x) => {
-                    modpack = JSON.parse(
+                    let modpack = JSON.parse(
                       fs.readFileSync(folder + "/modrinth.index.json")
                     );
 
@@ -2221,7 +2221,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                       folder + "/temp/manifest.json",
                       folder + "/curseforge.index.json"
                     );
-                    modpack = JSON.parse(
+                    let modpack = JSON.parse(
                       fs.readFileSync(folder + "/curseforge.index.json")
                     );
                     console.log("modpackID:" + modpackID);
