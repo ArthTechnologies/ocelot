@@ -165,8 +165,9 @@ router.get(`/claim/:id`, function (req, res) {
           },
           function (err, customers) {
             if (err) {
-              console.log("err");
-              return "no";
+              console.log("Error listing Stripe customers for " + account.email);
+              console.log(err);
+              res.status(502).json({ msg: `Could not verify subscription. Please try again.` });
             } else {
               console.log(
                 "hasPayedForServer1: " + email + req.headers.username
@@ -215,6 +216,12 @@ router.get(`/claim/:id`, function (req, res) {
                   limit: 100,
                 },
                 function (err, subscriptions) {
+                  if (err) {
+                    console.log("Error listing Stripe subscriptions for " + account.email);
+                    console.log(err);
+                    res.status(502).json({ msg: `Could not verify subscription. Please try again.` });
+                    return;
+                  }
                   console.log("hasPayedForServer2");
                   let subs = 0;
                   for (let i in subscriptions.data) {
@@ -943,8 +950,9 @@ router.post(`/new/:id`, function (req, res) {
               },
               function (err, customers) {
                 if (err) {
-                  console.log("err");
-                  return "no";
+                  console.log("Error listing Stripe customers for " + account.email);
+                  console.log(err);
+                  res.status(502).json({ success: false, msg: `Could not verify subscription. Please try again.` });
                 } else {
                   //console.log("debug: " + account.email);
 
@@ -958,6 +966,12 @@ router.post(`/new/:id`, function (req, res) {
                         limit: 100,
                       },
                       function (err, subscriptions) {
+                        if (err) {
+                          console.log("Error listing Stripe subscriptions for " + account.email);
+                          console.log(err);
+                          res.status(502).json({ success: false, msg: `Could not verify subscription. Please try again.` });
+                          return;
+                        }
                         let subs = 0;
                         let planId = "";
                         //go through each item in the subscriptions.data array and if its not undefined, add 1 to the subscriptions variable

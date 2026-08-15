@@ -328,7 +328,9 @@ router.get(`/billing`, function (req, res) {
       },
       function (err, customers) {
         if (err) {
-          console.log("err", err);
+          console.log("Error listing Stripe customers for " + account.email);
+          console.log(err);
+          res.status(502).json({ msg: `Could not load billing information. Please try again.` });
         } else {
           if (customers.data.length == 0) {
             res.status(200).json({subscriptions: [], servers: []});
