@@ -108,7 +108,8 @@
   $: closeable = status === "done" || status === "failed";
 
   function goToServer() {
-    window.location.href = "/dashboard";
+    const targetId = parseInt(result?.serverId ?? serverId);
+    window.location.href = "/server/" + (10000 + targetId);
   }
 </script>
 
