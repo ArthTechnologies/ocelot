@@ -29,7 +29,6 @@
     { name: "nullscape", tooltip: "Nullscape - End Expansion" },
     { name: "structory", tooltip: "Structory - New Structures" },
   ];
-  let worldgen = null;
   let jarsList = [];
   let jarsError = ""; // set when the /info/jars fetch itself fails
   let versionsError = ""; // set when the selected software has zero available versions
@@ -262,15 +261,6 @@
         }
       });
     }
-    worldgen = document.getElementById("worldgen");
-    let intervalID = setInterval(() => {
-      if (worldgen == null) {
-        worldgen = document.getElementById("worldgen");
-      } else {
-        clearInterval(intervalID);
-      }
-    }, 100);
-
     jarsApiUrl = apiurl + "info/jars";
     fetch(jarsApiUrl, {
       method: "GET",
@@ -303,9 +293,19 @@
         console.log(parsed);
         jarsError = "";
         jarsList = parsed;
-        findVersions();
-        version = getLatestVersionForSoftware(software, jarsList);
-        checkV();
+
+        // The fetch itself has already succeeded at this point - jarsList is
+        // populated. An error in the UI refresh below is a separate bug, not
+        // a fetch failure, so it's caught here rather than by the outer
+        // catch - otherwise it gets mislabeled as "couldn't load available
+        // versions" even though the versions loaded just fine.
+        try {
+          findVersions();
+          version = getLatestVersionForSoftware(software, jarsList);
+          checkV();
+        } catch (err) {
+          console.error("Failed to refresh the version picker after loading versions:", err);
+        }
       })
       .catch((err) => {
         console.error("Failed to load available server versions:", err);
@@ -447,6 +447,15 @@
       alert($t("alert.enterName"));
     }
   }
+  // #worldgen is always in the template (never behind an {#if}), but the
+  // /info/jars fetch can resolve and call checkV() before Svelte's initial
+  // mount has actually inserted it into the DOM - a stale-cached lookup here
+  // used to throw ("worldgen is null") in that window even though the fetch
+  // itself succeeded. A fresh lookup each time sidesteps that race entirely.
+  function getWorldgenEl() {
+    return document.getElementById("worldgen");
+  }
+
   function checkV() {
     if (browser) {
       version = document.getElementById("versionDropdown").value.trim().toLowerCase();
@@ -474,16 +483,16 @@
         }
       });
       if (worldgenModsAvailable) {
-        worldgen.classList.remove("hidden");
+        getWorldgenEl()?.classList.remove("hidden");
       } else {
-        worldgen.classList.add("hidden");
+        getWorldgenEl()?.classList.add("hidden");
         document.getElementById("terralith").checked = false;
         document.getElementById("incendium").checked = false;
         document.getElementById("nullscape").checked = false;
         document.getElementById("structory").checked = false;
       }
     } else {
-      worldgen.classList.add("hidden");
+      getWorldgenEl()?.classList.add("hidden");
       //modpacks search as soon as the button is loaded, so this search needs to
       //be re-done for the new version.
       const modpacks = document.getElementById("modpacks");
@@ -568,7 +577,7 @@
     }
 
     if (software.split(" - ")[0] == "Paper") {
-      worldgen.classList.remove("hidden");
+      getWorldgenEl()?.classList.remove("hidden");
       modpackElement.classList.add("hidden");
       modpacks = false;
     } else if (
@@ -577,11 +586,11 @@
       software.split(" - ")[0] == "Forge" ||
       software.split(" - ")[0] == "NeoForge"
     ) {
-      worldgen.classList.add("hidden");
+      getWorldgenEl()?.classList.add("hidden");
       modpackElement.classList.remove("hidden");
       modpacks = true;
     } else {
-      worldgen.classList.add("hidden");
+      getWorldgenEl()?.classList.add("hidden");
       modpackElement.classList.add("hidden");
       modpacks = false;
     }
