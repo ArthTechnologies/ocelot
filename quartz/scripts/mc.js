@@ -1636,9 +1636,13 @@ function downloadModFileWithRetry(destPath, url, attempt = 1) {
     );
 
     function downloadModFileWithRetryFinish(error) {
+      // curl writes straight to destPath with no atomic temp+rename, so a
+      // timeout or dropped connection mid-transfer can leave a truncated but
+      // non-empty file behind. Checking size alone would accept that as a
+      // real download and skip the retry below - error must rule it out too.
       let ok = false;
       try {
-        ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
+        ok = !error && fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
       } catch (e) {}
 
       if (ok) return resolve({ ok: true, reason: null });
@@ -1694,9 +1698,12 @@ function downloadModpackArchiveWithRetry(destPath, url, attempt = 1) {
     );
 
     function downloadModpackArchiveFinish(error) {
+      // Same reasoning as downloadModFileWithRetryFinish: curl can leave a
+      // truncated but non-empty archive behind on a timed-out or reset
+      // transfer, so size alone isn't enough to call this a success.
       let ok = false;
       try {
-        ok = fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
+        ok = !error && fs.existsSync(destPath) && fs.statSync(destPath).size > 0;
       } catch (e) {}
 
       if (ok) return resolve({ ok: true, reason: null });
