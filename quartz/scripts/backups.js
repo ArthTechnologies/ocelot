@@ -1,8 +1,7 @@
-const { spawn, exec } = require("child_process");
-const { promisify } = require("util");
-const execPromise = promisify(exec);
+const { spawn } = require("child_process");
 const fs = require("fs").promises;
 const security = require("./security/rce.js");
+const commands = require("./commands.js");
 
 const servers = [];
 
@@ -42,10 +41,18 @@ async function getServerIds() {
 
 async function getWorldsTotalSize() {
   try {
-    const { stdout } = await execPromise(
-      "du -c servers/*/world --max-depth=0 | tail -n 1"
-    );
-    return parseInt(stdout.split("\t")[0]) * 1024;
+    const entries = await fs.readdir("./servers");
+    const worldPaths = [];
+    for (const entry of entries) {
+      const worldPath = `servers/${entry}/world`;
+      try {
+        await fs.access(worldPath);
+        worldPaths.push(worldPath);
+      } catch {
+        // no world folder for this entry
+      }
+    }
+    return await commands.getFolderDiskUsage(worldPaths);
   } catch (err) {
     console.error("Error getting total world size:", err.message);
     return 0;
@@ -53,23 +60,11 @@ async function getWorldsTotalSize() {
 }
 
 async function getSpaceAvailable() {
-  try {
-    const { stdout } = await execPromise("df --output=avail / | tail -n 1");
-    return parseInt(stdout) * 1024;
-  } catch (err) {
-    console.error("Error getting available space:", err.message);
-    return 0;
-  }
+  return commands.getDiskSpaceAvailable("/");
 }
 
 async function getBackupsFolderSize() {
-  try {
-    const { stdout } = await execPromise("du -c backups | tail -n 1");
-    return parseInt(stdout.split("\t")[0]);
-  } catch (err) {
-    console.error("Error getting total backups size:", err.message);
-    return 0;
-  }
+  return commands.getFolderDiskUsage("backups");
 }
 
 async function getWorldFileCount(serverId) {
@@ -343,10 +338,8 @@ async function backupSingleServer(serverId) {
 async function getWorldTotalSize(serverId) {
   try {
     const id = security.assertNumericId(serverId, "serverId");
-    const { stdout } = await security.execFileAsync("du", ["-c", `servers/${id}/world`, "--max-depth=0"]);
-    const lines = stdout.trim().split("\n");
-    const totalLine = lines[lines.length - 1];
-    return parseInt(totalLine.split("\t")[0]) * 1024 || 1024 * 1024; // Default to 1MB if empty
+    const size = await commands.getFolderDiskUsage(`servers/${id}/world`);
+    return size || 1024 * 1024; // Default to 1MB if empty
   } catch (err) {
     console.error(`Error getting world size for server ${serverId}:`, err.message);
     return 1024 * 1024; // Default to 1MB

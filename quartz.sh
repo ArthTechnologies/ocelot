@@ -58,15 +58,22 @@ refresh_permissions
 echo "[$(date)] Starting permission refresher loop for Quartz server." >> "$LOG_FILE"
 start_permission_loop
 
-# Launch Quartz screen session
+# Launch Quartz in the background. `screen` gives an attachable session but
+# isn't preinstalled on modern macOS (Apple dropped most GPL tooling), so
+# fall back to a plain disowned nohup process - it still survives this
+# script exiting, just without the "reattach and watch the console" option.
 SCREEN_SESSION="qua_$USERNAME"
+cd "$SCRIPT_DIR/quartz"
 
 if command -v screen >/dev/null 2>&1; then
-  cd "$SCRIPT_DIR/quartz"
   sudo -u "$USERNAME" screen -dmS "$SCREEN_SESSION" sh scripts/autorestart.sh
   echo "[$(date)] Started screen session: $SCREEN_SESSION" >> "$LOG_FILE"
 else
-  echo "Warning: screen not installed. Cannot start background session." >&2
+  mkdir -p logs
+  chown "$FTP_UID:$FTP_GID" logs
+  echo "Warning: screen not installed - starting Quartz with nohup instead (no attachable console)." >&2
+  sudo -u "$USERNAME" sh -c "cd '$SCRIPT_DIR/quartz' && nohup sh scripts/autorestart.sh >> logs/console.log 2>&1 < /dev/null &"
+  echo "[$(date)] Started via nohup (screen unavailable), logging to logs/console.log" >> "$LOG_FILE"
 fi
 
 echo "Quartz has started at port $PORT."

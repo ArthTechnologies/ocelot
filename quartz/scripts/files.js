@@ -3,6 +3,7 @@ const { execFile } = require("child_process");
 
 const fs = require("fs");
 const fsPromises = require("fs").promises;
+const commands = require("./commands.js");
 
 // download()/downloadAsync()/GET() below all take a url that may be fully
 // attacker-controlled (a modpack/plugin download link, a query param). They
@@ -419,11 +420,15 @@ function simplifyTerminal(terminal, software) {
 
 function getIndex(callback) {
   let index = {};
-  exec("ls -1 data | sort -r -V", (error, stdout, stderr) => {
-    // Split the sorted file names into an array
-    const sortedFiles = stdout.trim().split("\n");
-    // Process the sorted files
-    sortedFiles.forEach((file) => {
+  let sortedFiles;
+  try {
+    sortedFiles = commands.sortFilenamesByVersionDesc(fs.readdirSync("data"));
+  } catch (err) {
+    console.log("Error reading data directory for index:", err.message);
+    sortedFiles = [];
+  }
+  // Process the sorted files
+  sortedFiles.forEach((file) => {
       switch (file) {
         case "cx_geyser-velocity_Geyser.jar":
           file = "geyser-velocity.jar";
@@ -463,9 +468,8 @@ function getIndex(callback) {
           });
         }
       }
-    });
-    callback(index);
   });
+  callback(index);
 }
 module.exports = {
   hash,

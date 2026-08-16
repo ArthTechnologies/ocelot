@@ -1,5 +1,5 @@
 const fs = require("fs");
-const { exec } = require("child_process");
+const commands = require("./commands.js");
 const config = getConfig();
 const mode = config.mode;
 const path = require("path");
@@ -53,22 +53,7 @@ function writeJSON(file, json) {
 }
 
 function refreshPermissions() {
-  const { exec } = require("child_process");
-  exec("sudo chown sysadmin:100 -R servers/", (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Error setting permissions: ${error}`);
-      return;
-    }
-    exec("sudo chmod 2776 -R servers/", (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Error setting permissions: ${error}`);
-        return;
-      }
-      console.log("Permissions set successfully.");
-      return;
-    }); 
- 
-  });
+  return commands.refreshServerPermissions("servers/");
 }
 
 function hasAccess(token, account, id) {

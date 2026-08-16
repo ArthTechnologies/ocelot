@@ -175,6 +175,7 @@ if (!fs.existsSync("./servers")) {
 const ftp = require("./scripts/ftp.js");
 const security = require("./scripts/security/rce.js");
 const backups = require("./scripts/backups.js");
+const commands = require("./scripts/commands.js");
 
 
 try {ftp.startFtpServer();} catch (e) {
@@ -204,12 +205,11 @@ if (!migrationsStatus.mergeDuplicateEmailAccounts) {
 exec = require("child_process").exec;
 
 
-//if owner and group aren't 1000 warn the user to change it
-if (fs.statSync("servers").gid != 100) {
-  console.log(
-    "Warning: FTP may not work. Please run sudo chown yourusername:100 -R servers/ and sudo chmod 2770 -R servers/ to fix this."
-  );
-}
+// Warn if servers/ isn't owned by the group Quartz itself runs as (what
+// refreshServerPermissions() would set it to) - FTP reads/writes to that
+// folder as that identity.
+const permissionsWarning = commands.checkServerPermissionsWarning("servers");
+if (permissionsWarning) console.log(permissionsWarning);
 require("dotenv").config();
 if (!fs.existsSync("./backup")) {
   fs.mkdirSync("backup");
@@ -915,9 +915,7 @@ function getServerStates() {
 }
 
 // Kill any containers using server ports left over from a previous run
-exec(`docker ps --format "{{.ID}} {{.Ports}}" | awk '/1[0-9][0-9][0-9][0-9]->/{print $1}' | xargs -r docker stop`, (err) => {
-  if (err) console.log("Startup port cleanup error (non-fatal):", err.message);
-});
+commands.cleanupStalePortContainers();
 
 //automatic server start-up system
 const data = readJSON("./assets/data.json");

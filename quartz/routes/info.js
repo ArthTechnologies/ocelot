@@ -12,6 +12,7 @@ const mode = config.mode;
 const stripeKey = config.stripeKey;
 const stripe = require("stripe")(stripeKey);
 const security = require("../scripts/security/rce.js");
+const commands = require("../scripts/commands.js");
 
 // server.allowedAccounts is a comma-separated string of accountIds
 // (see /server/:id/allowAccount).
@@ -829,90 +830,6 @@ router.get(`/accounts`, function (req, res) {
   }
 });
 
-const { exec } = require("child_process");
-const { parse } = require("path");
-
-function getThreadUsage() {
-    return new Promise((resolve, reject) => {
-        exec("grep 'cpu[0-9]' /proc/stat", (err, firstSample) => {
-            if (err) return reject(err);
-
-            setTimeout(() => {
-                exec("grep 'cpu[0-9]' /proc/stat", (err, secondSample) => {
-                    if (err) return reject(err);
-
-                    const threads = [];
-                    const firstLines = firstSample.trim().split("\n");
-                    const secondLines = secondSample.trim().split("\n");
-
-                    for (let i = 0; i < firstLines.length; i++) {
-                        const firstParts = firstLines[i].split(/\s+/);
-                        const secondParts = secondLines[i].split(/\s+/);
-
-                        const id = firstParts[0]; // "cpu0", "cpu1", ...
-
-                        const firstTotal = firstParts.slice(1, 8).reduce((sum, val) => sum + parseInt(val), 0);
-                        const firstIdle = parseInt(firstParts[4]);
-
-                        const secondTotal = secondParts.slice(1, 8).reduce((sum, val) => sum + parseInt(val), 0);
-                        const secondIdle = parseInt(secondParts[4]);
-
-                        const totalDiff = secondTotal - firstTotal;
-                        const idleDiff = secondIdle - firstIdle;
-                        const usage = totalDiff > 0 ? ((totalDiff - idleDiff) / totalDiff) * 100 : 0;
-
-                        threads.push({ id, cpuUsage: usage.toFixed(2) });
-                    }
-
-                    resolve(threads);
-                });
-            }, 500); // 500ms delay between samples
-        });
-    });
-}
-
-
-
-// Function to get memory usage
-function getMemoryUsage() {
-  return new Promise((resolve, reject) => {
-      exec("free -m", (err, stdout) => {
-          if (err) return reject(err);
-          const lines = stdout.trim().split("\n");
-          const memValues = lines[1].split(/\s+/);
-          const memory = {
-              used: parseInt(memValues[2]),
-              buffers: parseInt(memValues[5]),
-              cached: parseInt(memValues[6]),
-              total: parseInt(memValues[1])
-          };
-          resolve(memory);
-      });
-  });
-}
-
-// Function to get CPU usage
-function getCpuUsage() {  
-  return new Promise((resolve, reject) => {
-      exec(`top -bn1 | grep "Cpu(s)" | awk '{print 100 - $8 "%"}'`, (err, stdout) => {
-          if (err) return reject(err);
-          const cpu = parseFloat(stdout);
-          resolve(cpu); 
-      });
-  });
-}
-
-function getCpuName() {
-  return new Promise((resolve, reject) => {
-      exec(`cat /proc/cpuinfo | grep "model name" | uniq | sed 's/.*: //'`, (err, stdout) => {
-          if (err) return reject(err);
-          const cpu = stdout.trim();
-          resolve(cpu); 
-      }
-      );
-  });
-}
-
 let snapshotHistory = []; // Store past 60 minutes of snapshots
 let lastSnapshotTime = 0;
 
@@ -920,10 +837,10 @@ let lastSnapshotTime = 0;
 async function captureSnapshot() {
     try {
         const [threads, memory, cpuUsage, cpuName] = await Promise.all([
-            getThreadUsage(),
-            getMemoryUsage(),
-            getCpuUsage(),
-            getCpuName()
+            commands.getPerCoreUsage(),
+            Promise.resolve(commands.getMemoryUsage()),
+            commands.getCpuUsage(),
+            Promise.resolve(commands.getCpuName())
         ]);
 
         let serversOnThreads = f.getServersOnThreads();

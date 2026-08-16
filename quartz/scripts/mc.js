@@ -6,6 +6,7 @@ const files = require("./files.js");
 const config = require("./utils.js").getConfig();
 const utils = require("./utils.js");
 const security = require("./security/rce.js");
+const commands = require("./commands.js");
 
 // Modpack/mod archive downloads use a URL the customer effectively chooses
 // (a CurseForge/Modrinth version's file link, or a hand-typed modpackURL).
@@ -31,16 +32,9 @@ const getDefaultStartupFlags = (allocatedRAM) => {
   return `-Xmx${allocatedRAM}G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Daikars.new.flags=true -Dusing.aikars.flags=https://mcflags.emc.gs`;
 };
 
-let amountOfThreads = 16;
+let amountOfThreads = commands.getCpuThreadCount() || 16;
 
 const {execSync} = require("child_process");
-try {
-let amountOfCores = parseInt(execSync(`lscpu | grep "^Core(s) per socket" | awk '{print $4}'`));
-let threadsPerCore = parseInt(execSync(`lscpu | grep "^Thread(s) per core" | awk '{print $4}'`));
-amountOfThreads = amountOfCores * threadsPerCore;
-} catch (e) {
-  console.log("error getting amount of threads: " + e);
-}
 
 
 let threads = [];
@@ -2396,21 +2390,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
 }
 
 function killObstructingProcess(id) {
-  try {
-    exec(
-      `docker ps --filter "publish=${portOffset + id}" --format "{{.ID}}"`,
-      (error, stdout, stderr) => {
-        let pid = stdout.trim();
-        exec("docker stop " + pid);
-
-        setTimeout(() => {
-          exec("docker kill " + pid);
-        }, 2500);
-      }
-    );
-  } catch (e) {
-    console.log(e);
-  }
+  commands.stopContainerOnPort(portOffset + id);
 }
 
 function getPlayerList(id) {
@@ -2429,21 +2409,12 @@ let imageMagickBin; // undefined = not looked up yet, null = not installed
 function findImageMagick() {
   if (imageMagickBin !== undefined) return imageMagickBin;
 
-  imageMagickBin = null;
-  for (const bin of ["magick", "convert"]) {
-    try {
-      execSync(`command -v ${bin}`, { stdio: "ignore" });
-      imageMagickBin = bin;
-      break;
-    } catch (e) {
-      // not on PATH
-    }
-  }
+  imageMagickBin = commands.findBinary(["magick", "convert"]);
 
   if (!imageMagickBin) {
     console.log(
       "ImageMagick not found — modpack artwork won't be used as the server icon. " +
-        "Install it with `apt install imagemagick`."
+        "Install it with `" + commands.installHint("imagemagick") + "`."
     );
   }
   return imageMagickBin;

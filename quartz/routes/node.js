@@ -1,7 +1,7 @@
 const express = require("express");
 const Router = express.Router();
 const fs = require("fs");
-const { execSync } = require("child_process");
+const commands = require("../scripts/commands.js");
 const readJSON = require("../scripts/utils.js").readJSON;
 const data = readJSON("assets/data.json");
 const files = require("../scripts/files.js");
@@ -92,11 +92,8 @@ Router.post("/account", (req, res) => {
 });
 
 Router.get("/qa", (req, res) => {
-  let zipInstalled = false;
-  try { execSync("which zip", { stdio: "ignore" }); zipInstalled = true; } catch {}
-
-  let unzipInstalled = false;
-  try { execSync("which unzip", { stdio: "ignore" }); unzipInstalled = true; } catch {}
+  const zipInstalled = commands.isToolInstalled("zip");
+  const unzipInstalled = commands.isToolInstalled("unzip");
 
   let latestPaper = null;
   try {
