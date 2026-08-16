@@ -10,13 +10,16 @@
     Zap,
     BarChart3,
     Download,
-    Boxes
+    Boxes,
+    Bug
   } from 'lucide-svelte';
   import { fileSizeShort } from '$lib/scripts/utils';
   import { getAdminDashboard } from '$lib/scripts/req';
   import ModpackChecksModal from '$lib/components/ui/ModpackChecksModal.svelte';
+  import DebugScraperModal from '$lib/components/ui/DebugScraperModal.svelte';
 
   let showModpackChecks = false;
+  let showDebugScraper = false;
 
   let accounts = [];
   let latestSnapshot: any = null;
@@ -126,6 +129,14 @@
         >
           <Boxes class="w-5 h-5 mr-1.5" />
           <span>Modpack Checker</span>
+        </button>
+        <button
+          on:click={() => (showDebugScraper = true)}
+          class="btn btn-ghost btn-sm text-primary hover:bg-primary/10"
+          title="Live progress of the jar-download scraper (assets/jars)"
+        >
+          <Bug class="w-5 h-5 mr-1.5" />
+          <span>Debug Scraper</span>
         </button>
         <button
           on:click={downloadAsJSON}
@@ -419,6 +430,10 @@
 
 {#if showModpackChecks}
   <ModpackChecksModal on:close={() => (showModpackChecks = false)} />
+{/if}
+
+{#if showDebugScraper}
+  <DebugScraperModal on:close={() => (showDebugScraper = false)} />
 {/if}
 
 <style lang="postcss">

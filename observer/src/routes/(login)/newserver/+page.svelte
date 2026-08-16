@@ -9,7 +9,7 @@
   import UploadWorld from "$lib/components/ui/UploadWorld.svelte";
   import SourceModal from "$lib/components/ui/SourceModal.svelte";
   import { SITE_URL } from "$lib/config";
-  import { Check, X } from "lucide-svelte";
+  import { Check, X, AlertCircle, AlertTriangle } from "lucide-svelte";
 
   import { alert } from "$lib/scripts/utils";
 
@@ -31,6 +31,10 @@
   ];
   let worldgen = null;
   let jarsList = [];
+  let jarsError = ""; // set when the /info/jars fetch itself fails
+  let versionsError = ""; // set when the selected software has zero available versions
+  let rawJarsResponse = ""; // exact body /info/jars last responded with, for the debug modal
+  let jarsApiUrl = ""; // full URL that was actually requested, for the debug modal
   let id = -1;
   let showGeyserBar = false;
   const quickVersions = ["1.20.1", "1.18.2", "1.16.5", "1.12.2"];
@@ -105,6 +109,23 @@
   );
   $: forgeLike = ["Forge", "NeoForge"].includes(software.split(" - ")[0]);
   $: availableQuick = forgeLike ? quickVersionsAvailable(software, jarsList) : [];
+  // The 4 quick-pick buttons are a fixed, hardcoded list - none of them
+  // being available doesn't mean the software has no versions at all (the
+  // dropdown below may still have plenty), so this gets its own message
+  // rather than reusing versionsError's "nothing available" wording.
+  $: quickPickUnavailable =
+    forgeLike && jarsList.length > 0 && availableQuick.length === 0 && !versionsError;
+  // Pretty-print if the raw body happens to be valid JSON (the success case,
+  // for versionsError/quickPickUnavailable), otherwise show it verbatim (a
+  // non-JSON error page, for jarsError) - either way it's exactly what the
+  // API sent, not a re-serialization of jarsList after-the-fact.
+  $: formattedJarsResponse = (() => {
+    try {
+      return JSON.stringify(JSON.parse(rawJarsResponse), null, 2);
+    } catch (e) {
+      return rawJarsResponse;
+    }
+  })();
 
   function quickVersionsAvailable(softwareName, jars) {
     const CVS = softwareName.split(" - ")[0].toLowerCase();
@@ -250,7 +271,8 @@
       }
     }, 100);
 
-    fetch(apiurl + "info/jars", {
+    jarsApiUrl = apiurl + "info/jars";
+    fetch(jarsApiUrl, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -258,13 +280,36 @@
         username: localStorage.getItem("accountEmail"),
       },
     })
-      .then((res) => res.json())
-      .then((res) => {
-        console.log(res);
-        jarsList = res;
+      // Read the body as text first (a response can only be consumed once)
+      // so the exact bytes the API sent are always available for the "view
+      // raw response" modal, whether or not they turn out to be valid JSON.
+      .then((res) =>
+        res.text().then((text) => ({ ok: res.ok, status: res.status, statusText: res.statusText, text }))
+      )
+      .then(({ ok, status, statusText, text }) => {
+        rawJarsResponse = text;
+        if (!ok) {
+          throw new Error(`Server responded with ${status} ${statusText}`);
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (e) {
+          throw new Error("Response wasn't valid JSON.");
+        }
+        if (!Array.isArray(parsed)) {
+          throw new Error("Server returned an unexpected response instead of a list of versions.");
+        }
+        console.log(parsed);
+        jarsError = "";
+        jarsList = parsed;
         findVersions();
         version = getLatestVersionForSoftware(software, jarsList);
         checkV();
+      })
+      .catch((err) => {
+        console.error("Failed to load available server versions:", err);
+        jarsError = `Couldn't load available versions from ${jarsApiUrl}: ${err.message}`;
       });
 
     //this checks if the user has paid for a modded plan
@@ -479,6 +524,16 @@
       return 0;
     });
 
+    // jarsList having entries but none matching this software's own jar
+    // naming (software-version-variant.ext) means there's genuinely nothing
+    // to put in the dropdown - surface that instead of leaving it empty with
+    // no explanation. Only fires once jarsList has actually loaded, so it
+    // doesn't flash on every software switch before the fetch resolves.
+    versionsError =
+      jarsList.length > 0 && versionOptions.length === 0
+        ? `No ${software.split(" - ")[0]} versions are available on this node.`
+        : "";
+
     // Append versions to dropdown
     let versionDropdown = document.getElementById("versionDropdown");
     versionDropdown.innerHTML = "";
@@ -665,6 +720,51 @@
               <option>1.16.5</option>
               <option>1.12.2</option>
             </select>
+          </div>
+
+          {#if jarsError}
+            <div class="bg-error w-full rounded-lg text-white p-2 py-2 flex items-start mt-2 space-x-2 text-sm">
+              <AlertCircle size="20" class="flex-shrink-0 mt-0.5" />
+              <span class="flex-1">{jarsError}</span>
+              <label for="jarsApiResponseModal" class="btn btn-xs btn-neutral shrink-0"
+                >View response</label
+              >
+            </div>
+          {:else if versionsError}
+            <div class="bg-error w-full rounded-lg text-white p-2 py-2 flex items-start mt-2 space-x-2 text-sm">
+              <AlertCircle size="20" class="flex-shrink-0 mt-0.5" />
+              <span class="flex-1">{versionsError}</span>
+              <label for="jarsApiResponseModal" class="btn btn-xs btn-neutral shrink-0"
+                >View response</label
+              >
+            </div>
+          {:else if quickPickUnavailable}
+            <div class="bg-warning w-full rounded-lg text-black p-2 py-2 flex items-start mt-2 space-x-2 text-sm">
+              <AlertTriangle size="20" class="flex-shrink-0 mt-0.5" />
+              <span class="flex-1"
+                >None of the quick-pick versions ({quickVersions.join(", ")}) are available for {software.split(
+                  " - "
+                )[0]} on this node — choose a version from the dropdown instead.</span
+              >
+              <label for="jarsApiResponseModal" class="btn btn-xs btn-neutral shrink-0"
+                >View response</label
+              >
+            </div>
+          {/if}
+
+          <input type="checkbox" id="jarsApiResponseModal" class="modal-toggle" />
+          <div class="modal">
+            <div class="modal-box bg-opacity-95 backdrop-blur relative max-w-2xl">
+              <label
+                for="jarsApiResponseModal"
+                class="btn btn-neutral btn-sm btn-circle absolute right-2 top-2">✕</label
+              >
+              <h3 class="text-xl font-bold mb-1">API response</h3>
+              <p class="text-xs text-base-content/60 mb-3 break-all">GET {jarsApiUrl}</p>
+              <pre
+                class="bg-base-300 rounded-lg p-3 text-xs overflow-auto max-h-[60vh] whitespace-pre-wrap break-all">{formattedJarsResponse ||
+                  "(empty response)"}</pre>
+            </div>
           </div>
 
           <div class="flex gap-2 mt-5">

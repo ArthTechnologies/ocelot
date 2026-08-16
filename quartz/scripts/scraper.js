@@ -196,7 +196,13 @@ async function downloadForgeJars() {
             let components = link.split("/").pop().split("-");
             let filename = "forge-" + components[1] + "-" + channel + ".jar";
             if (!components[1].includes("1.7.10_pre4")) {
-                if (!skipOldVersions || getMajorVersion(components[i], 1) >= 21) {
+                // `i` here would be the outer loop's index into minecraftVersions
+                // (up to ~80), not this version's own components - almost always
+                // out of range for the 4-element components array, silently
+                // caught by getMajorVersion's try/catch as 0, which failed the
+                // >= 21 check for virtually every real build in partial-download
+                // mode (skipOldVersions=true - i.e. every scheduled/boot run).
+                if (!skipOldVersions || getMajorVersion(components[1], 1) >= 21) {
                     await downloadAndLogJar(filename, link);
             }
             }
@@ -466,25 +472,80 @@ function downloadSnapshotJars() {
 }   
 
 
-async function fullDownload() {
-    skipOldVersions = false;
-    scraperLog = [];
-    try {
-        await downloadPaperJars();
-        await downloadVelocityJars();
-        await downloadForgeJars();
-        await downloadNeoforgeJars();
-        await downloadQuiltJars();
-        await downloadFabricJars();
-        await downloadGeyserJars();
-        await downloadWorldgenMods();
-        downloadSnapshotJars();
-        downloadVanillaJars();
-        setTimeout(() => done(), 5000);
-    } catch (e) {
-        //console.log(e);
+// Progress tracking for the admin "Debug Scraper" modal. This isn't a
+// concurrent/slotted job like the modpack checker - it's one sequential
+// chain of loaders - so all we need is "which step is running right now"
+// and the scraperLog itself, which already accumulates live as each jar
+// downloads. It's deliberately module-level and read by reference-copy in
+// getProgress(), same reasoning as modpackChecker.getProgress().
+let running = false;
+let currentPhase = "idle";
+let currentMode = null; // "full" | "partial"
+let startedAt = null;
+let finishedAt = null;
+
+// Each step gets its own try/catch, so one loader throwing (e.g. Paper's API
+// being down) doesn't abort every step after it - previously the whole
+// chain was wrapped in a single try/catch, so a single unhandled error early
+// in the list silently skipped everything from that point on.
+const SCRAPE_STEPS = [
+    { name: "paper", label: "Paper", fn: downloadPaperJars },
+    { name: "velocity", label: "Velocity", fn: downloadVelocityJars },
+    { name: "forge", label: "Forge", fn: downloadForgeJars },
+    { name: "neoforge", label: "NeoForge", fn: downloadNeoforgeJars },
+    { name: "quilt", label: "Quilt", fn: downloadQuiltJars },
+    { name: "fabric", label: "Fabric", fn: downloadFabricJars },
+    { name: "geyser", label: "Geyser/Floodgate", fn: downloadGeyserJars },
+    { name: "worldgen", label: "Worldgen datapacks", fn: downloadWorldgenMods },
+];
+
+async function runScrape(mode) {
+    if (running) {
+        console.log(`[scraper] Scrape already running (phase: ${currentPhase}) - ignoring ${mode} request`);
+        return;
     }
 
+    running = true;
+    currentMode = mode;
+    skipOldVersions = mode === "partial";
+    scraperLog = [];
+    startedAt = new Date().toISOString();
+    finishedAt = null;
+
+    try {
+        for (const step of SCRAPE_STEPS) {
+            currentPhase = step.name;
+            try {
+                await step.fn();
+            } catch (err) {
+                scraperLog.push({
+                    filename: `${step.name}-general`,
+                    url: "",
+                    success: false,
+                    timestamp: new Date().toISOString(),
+                    error: `${step.label} step failed: ${err.message}`,
+                });
+            }
+        }
+
+        // Vanilla/snapshot are fire-and-forget callback style (files.GET),
+        // not awaitable directly - the trailing wait below is what the
+        // original 5-second setTimeout before done() was already doing.
+        currentPhase = "vanilla";
+        downloadSnapshotJars();
+        downloadVanillaJars();
+        currentPhase = "finishing";
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        done();
+    } finally {
+        currentPhase = "idle";
+        finishedAt = new Date().toISOString();
+        running = false;
+    }
+}
+
+async function fullDownload() {
+    await runScrape("full");
 }
 
 function done() {
@@ -498,28 +559,30 @@ function done() {
 }
 
 async function partialDownload() {
+    await runScrape("partial");
+}
 
-    skipOldVersions = true;
-    scraperLog = [];
-    try {
-        await downloadPaperJars();
-        await downloadVelocityJars();
-        await downloadForgeJars();
-        await downloadNeoforgeJars();
-        await downloadQuiltJars();
-        await downloadFabricJars();
-        await downloadGeyserJars();
-        await downloadWorldgenMods();
-        downloadSnapshotJars();
-        downloadVanillaJars();
-        setTimeout(() => done(), 5000);
-    } catch (e) {
-        //console.log(e);
-    }
+function isRunning() {
+    return running;
+}
 
+// Live state while running, and the last completed run's summary once it
+// finishes (scraperLog/startedAt/finishedAt aren't reset until the *next*
+// run starts) - one object covers both the "watch it work" and "what
+// happened last time" cases the debug modal needs.
+function getProgress() {
+    return {
+        running,
+        phase: currentPhase,
+        mode: currentMode,
+        startedAt,
+        finishedAt,
+        steps: SCRAPE_STEPS.map((s) => ({ name: s.name, label: s.label })),
+        log: scraperLog.slice(),
+    };
 }
 
 partialDownload();
 
 
-module.exports = {fullDownload, partialDownload};
+module.exports = {fullDownload, partialDownload, isRunning, getProgress};

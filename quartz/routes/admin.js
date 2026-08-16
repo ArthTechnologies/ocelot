@@ -168,6 +168,39 @@ router.get("/modpack-checks/stream", (req, res) => {
   req.on("close", () => clearInterval(timer));
 });
 
+// Live status of the jar-download scraper (assets/jars) for the admin
+// "Debug Scraper" modal. Unlike the modpack checker this is a single
+// sequential job, not a slotted batch, so a plain poll is enough - no NDJSON
+// stream needed. `progress` doubles as "what's happening now" while running
+// and "what happened last run" once it finishes, since scraperLog/timestamps
+// aren't reset until the *next* run starts.
+router.get("/scraper-status", (req, res) => {
+  try {
+    const scraper = require("../scripts/scraper.js");
+    res.json({
+      running: scraper.isRunning(),
+      progress: scraper.getProgress(),
+    });
+  } catch (err) {
+    console.error("Error reading scraper status:", err);
+    res.status(500).json({ error: "Failed to read scraper status" });
+  }
+});
+
+// Kick off a scraper run on demand - the same functions the scheduled
+// downloadPartialJars/downloadFullJars tasks call. Fire-and-forget: the
+// frontend polls GET /admin/scraper-status for `running`/`progress`.
+router.post("/scraper/run", (req, res) => {
+  const scraper = require("../scripts/scraper.js");
+  if (scraper.isRunning()) {
+    return res.status(409).json({ error: "A scrape is already running." });
+  }
+  const mode = req.body?.mode === "full" ? "full" : "partial";
+  const runner = mode === "full" ? scraper.fullDownload : scraper.partialDownload;
+  runner().catch((err) => console.log("Scraper run failed: " + err.message));
+  res.json({ started: true, mode });
+});
+
 // Get system tasks
 router.get("/system-tasks", (req, res) => {
   try {
@@ -277,9 +310,16 @@ router.get("/dashboard", (req, res) => {
         try {
           const accountData = readJSON(accountPath);
           if (accountData.accountId) {
+            // The solo-mode bootstrap account (run.js writes accounts/noemail.json
+            // with no `email` field) doesn't follow the type:identifier.json naming
+            // every other account file uses, so there's no email to parse out of
+            // the filename - falling through to the parse below silently produced
+            // "unknown" for every solo-mode install. Label it plainly instead.
+            const isSoloAccount = file === "noemail.json";
             accountMap[accountData.accountId] = {
               accountId: accountData.accountId,
-              email: accountData.email || file.split(":")[1]?.split(".")[0] || "unknown",
+              email: accountData.email || (isSoloAccount ? "" : file.split(":")[1]?.split(".")[0] || "unknown"),
+              displayName: isSoloAccount ? "Solo Account" : null,
               servers: [],
               orphanedServers: [],
               subscriptions: [],
@@ -400,8 +440,10 @@ router.get("/dashboard", (req, res) => {
     // Convert map to array and sort
     for (const accountId in accountMap) {
       const account = accountMap[accountId];
-      // Parse name from email (part before @)
-      const name = account.email.split("@")[0] || account.email;
+      // Parse name from email (part before @), or use the precomputed
+      // display name for accounts (like the solo bootstrap one) that don't
+      // have a real email to parse a name out of.
+      const name = account.displayName || account.email.split("@")[0] || account.email || "unknown";
 
       accounts.push({
         id: accounts.length,

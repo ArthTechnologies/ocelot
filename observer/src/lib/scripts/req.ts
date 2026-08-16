@@ -516,6 +516,47 @@ export function runModpackCheck() {
     .catch(() => null);
 }
 
+// Live status of the jar-download scraper (assets/jars) for the admin
+// "Debug Scraper" modal. `progress` doubles as "what's happening now" while
+// running and "what happened last run" once it finishes.
+export function getScraperStatus() {
+  if (!browser) return Promise.resolve(null);
+
+  return fetch(apiurl + "admin/scraper-status", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      token: localStorage.getItem("token") || "",
+      username: localStorage.getItem("accountEmail") || "",
+    },
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .catch(() => null);
+}
+
+// Starts a scraper run on demand — the same functions the scheduled
+// downloadPartialJars/downloadFullJars tasks call. mode "partial" (default)
+// only refreshes recent Minecraft versions; "full" re-scrapes everything.
+// Fire-and-forget on the backend — call getScraperStatus() / poll it to
+// watch progress. Resolves to the parsed error body on failure (e.g.
+// already running) so the caller can show why nothing started, or null on a
+// network error.
+export function runScraper(mode: "full" | "partial" = "partial") {
+  if (!browser) return Promise.resolve(null);
+
+  return fetch(apiurl + "admin/scraper/run", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      token: localStorage.getItem("token") || "",
+      username: localStorage.getItem("accountEmail") || "",
+    },
+    body: JSON.stringify({ mode }),
+  })
+    .then(async (res) => ({ ok: res.ok, ...(await res.json().catch(() => ({}))) }))
+    .catch(() => null);
+}
+
 // Re-checks a single pack from a completed report row instead of the whole
 // batch — pass the row's platform/projectId/gameVersion/loader/name/slug.
 export function runOneModpackCheck(pack: {
