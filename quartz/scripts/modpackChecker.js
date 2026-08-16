@@ -771,9 +771,18 @@ async function runAttempt(pack, id, isSingleRecheck = false) {
           mods.installed = finalInstalled;
         }
 
-        // For server packs with no detected mods, add context to failure reason
-        if (outcome.status === "failed" && pack.serverPack && mods.installed === 0) {
-          outcome.reason += ` (Note: server pack extracted no mods — may indicate incomplete extraction.)`;
+        // A server pack has no manifest to sanity-check the download against
+        // (expected stays 0), so an empty mods/ folder would otherwise sail
+        // through as a "pass" — the base server boots fine vanilla, which
+        // proves nothing about the pack itself.
+        if (pack.serverPack && mods.installed === 0) {
+          outcome = {
+            status: "failed",
+            reason:
+              outcome.status === "passed"
+                ? "Reached an online state, but the server pack's mods/ folder was empty."
+                : `${outcome.reason} (Note: server pack extracted no mods — may indicate incomplete extraction.)`,
+          };
         }
       }
     }
