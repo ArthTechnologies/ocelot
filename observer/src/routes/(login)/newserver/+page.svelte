@@ -427,12 +427,20 @@
         localStorage.setItem("serverSoftware", sSoftware);
         if (res == true) {
           console.log("redricting to homepage...");
-          goto("/server/"+(10000 + id));
+          // dispatch "redrict" (tells the navbar to refresh its server list
+          // and update the highlighted icon) only after the navigation has
+          // actually landed - Nav.svelte's isViewingExistingServer() guard
+          // reads window.location.pathname synchronously, and firing this
+          // event before goto() resolves let it see the old (pre-navigation)
+          // path. That made Nav think the user wasn't viewing the server
+          // they just created, so it force-navigated back to /newserver -
+          // and the location.reload() below then reloaded THAT wrong page.
+          goto("/server/"+(10000 + id)).then(() => {
+            window.dispatchEvent(new Event("redrict"));
+          });
           setTimeout(() => {
       location.reload();
     }, 300);
-          //this tells the navbar to update the icon that is highligted
-          window.dispatchEvent(new Event("redrict"));
         } else {
           if (res.includes("Maximum servers"))
             alert($t("alert.maximumServersReached"));

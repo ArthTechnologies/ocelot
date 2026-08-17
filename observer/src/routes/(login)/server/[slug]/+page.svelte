@@ -174,8 +174,11 @@
     if (browser) {
       localStorage.setItem("serverCardRedrict", "false");
       port += parseInt(id);
-      //GET apiurl/server/id/getInfo
-      fetch(baseurl + "server/" + id + "/getInfo", {
+      // GET apiurl/server/id/settings - this used to hit /getInfo, which
+      // never existed as a backend route (always 404'd) and threw trying to
+      // parse the resulting error page as JSON. /settings already returns
+      // desc/secret in the same shape.
+      fetch(baseurl + "server/" + id + "/settings", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -197,7 +200,8 @@
 
           secret = data.secret;
 
-        });
+        })
+        .catch((err) => console.error("Failed to load server description:", err));
     }
   });
 

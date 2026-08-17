@@ -193,13 +193,14 @@ try {
     if (server.allowedAccounts.startsWith(",")) {
       server.allowedAccounts = server.allowedAccounts.substring(1);
     }
-    let allowedAccounts1 = server.allowedAccounts.split(",");
+    let allowedAccounts1 = server.allowedAccounts.split(",").filter((id) => id !== "");
     //scan accounts.tsv for each accountId and get the username
     allowedAccounts = [];
     let accountstsv = fs.readFileSync("accounts.tsv").toString().split("\n");
     for (let i = 0; i < accountstsv.length; i++) {
+      if (accountstsv[i] === "") continue;
       let account = accountstsv[i].split("\t");
-      if (allowedAccounts1.includes(account[0])) {
+      if (allowedAccounts1.includes(account[0]) && account[1] != undefined) {
         allowedAccounts.push(account[0] + ":" + account[1].split(":")[1]);
       }
     }

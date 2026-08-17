@@ -6,6 +6,7 @@
   import { apiurl, getServers } from "$lib/scripts/req";
   import { browser, dev } from "$app/environment";
   import { goto } from "$app/navigation";
+  import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { parse } from "path";
   import {
@@ -42,7 +43,31 @@
   let noserverlock = false;
   let amountOfServersForSkeletons = 1;
 
-  let slug = 0;
+  // Which server (if any) the sidebar should show as "selected". Derived
+  // reactively from the current route so it's always correct - including on
+  // browser back/forward, or any link that doesn't explicitly refresh it.
+  // This used to be a plain variable only refreshed by getSlug(), called
+  // from specific on:click handlers - reaching a page any other way (e.g.
+  // clicking "Admin", which had no such handler) left it pointing at
+  // whichever server was last viewed, so that server's card stayed rendered
+  // as "selected" (and inert - the selected card has no click handler)
+  // everywhere else in the app.
+  //
+  // The "not viewing any server" case must be `null`, not `0` - 0 is also a
+  // legitimate real server id (the first slot ever provisioned), and the
+  // uncreated-server comparison below matches on the raw id with no offset.
+  // Falling back to 0 meant server 0, if uncreated, showed as permanently
+  // "selected" (and inert) on every non-server page, since it always
+  // matched the "nothing selected" sentinel.
+  $: slug = (() => {
+    const pathname = $page.url.pathname;
+    if (pathname.includes("/server")) {
+      return parseInt(pathname.split("/")[2]);
+    } else if (pathname.includes("/newserver")) {
+      return parseInt($page.url.search.split("?id=")[1]);
+    }
+    return null;
+  })();
   let email: string = "";
 
   onMount(() => {
@@ -61,8 +86,6 @@
           adminAccess = data.adminAccess === true;
         })
         .catch((err) => console.error("Error fetching admin access:", err));
-
-      update(undefined, false);
     }
   });
   if (browser) {
@@ -192,7 +215,6 @@
 
                       goto("/server/" + (10000 + parseInt(servers[0].id)));
                     }
-                    update(servers[0].id, false);
                   }
                 }
               });
@@ -218,54 +240,24 @@
      return serversList.some(s => s.isStandard && parseInt(s.id) === viewedId);
    }
 
-   function getSlug() {
-           if (window.location.pathname.includes("/server")) {
-      slug = parseInt(window.location.pathname.split("/")[2]);
-     } else if (window.location.pathname.includes("/newserver")) {
-      console.log("TTTTTTT" + window.location.search.split("?id=")[1]);
-      slug = parseInt(window.location.search.split("?id=")[1]);
-      console.log("slug is " + slug);
-     } else {
-      slug = 0;
-     }
-   }
   let noserver = false;
 
   if (id == 0 && noserverlock) {
     noserver = true;
   }
 
-  function update(id, redirect) {
-    console.log("updating");
+  // Selects a server and navigates to its page. `slug` no longer needs a
+  // manual update here - it's derived reactively from the route, so it
+  // picks up the new server as soon as the navigation lands.
+  function selectServer(id) {
     id = parseInt(id);
-   
-       
-    
-
-      if (redirect) {
-      for (let i = 0; i < servers.length; i++) {
-        let newslug = 10000 + parseInt(id);
-        if (parseInt(servers[i].id) + 10000 == newslug) {
-          console.log("selecting server " + servers[i].name  + " with id " + servers[i].id + " " + id);
-          select(servers[i]);
-           slug = newslug;
-
-            window.location.href = "/server/" + newslug;
-
-          }
-        }
-      } else {
- getSlug();
-      setTimeout(() => {
-        getSlug();
-      }, 50);
-      setTimeout(() => {
-        getSlug();
-   
-      }, 250);
-      console.log("SLUG IS " + slug)
+    for (let i = 0; i < servers.length; i++) {
+      let newslug = 10000 + parseInt(id);
+      if (parseInt(servers[i].id) + 10000 == newslug) {
+        select(servers[i]);
+        window.location.href = "/server/" + newslug;
       }
-    
+    }
   }
 
   function select(server) {
@@ -369,7 +361,7 @@
 </a>
 {:else}
 <a
-  on:click={() => update(server.id, true)}
+  on:click={() => selectServer(server.id)}
   id="serverCard{10000 + parseInt(server.id)}"
   class="neutralGradientStrokeB flex gap-2.5 items-center p-4 w-14 sm:w-32 truncate md:w-full md:h-[5.5rem] rounded-xl bg-base-200 cursor-pointer"
 >
@@ -383,16 +375,16 @@
   </div>
   <div class="max-md:hidden flex flex-col w-full gap-1">
     {#if mode !== "solo"}
-        <a on:click={()=>{update(undefined, false)}} href="/referrals" class="font-ubuntu btn btn-ghost btn-ms flex justify-start hover:text-primary" style="gap: 0.4rem;">
+        <a href="/referrals" class="font-ubuntu btn btn-ghost btn-ms flex justify-start hover:text-primary" style="gap: 0.4rem;">
    Get <span class="text-[#edcfb0]">50%</span> off next month</a
     >
-  
-    <a on:click={()=>{update(undefined, false)}} href="/account" class="font-ubuntu btn btn-ghost btn-ms flex justify-start hover:text-primary">
+
+    <a href="/account" class="font-ubuntu btn btn-ghost btn-ms flex justify-start hover:text-primary">
       <User size="20" />Account</a
     >
 
 
-    <a on:click={()=>{update(undefined, false)}} href="/billing" class="font-ubuntu btn btn-ghost btn-ms flex justify-start hover:text-primary">
+    <a href="/billing" class="font-ubuntu btn btn-ghost btn-ms flex justify-start hover:text-primary">
       <ShoppingCart size="20" />Subscriptions</a
     >
     {/if}
@@ -427,12 +419,12 @@
         tabindex="0"
         class="dropdown-content menu bg-base-300 rounded-box z-[1] w-52 p-2 shadow-xl"
       >
-        <li><a on:click={()=>{update(undefined, false)}} href="/account">Account</a></li>
+        <li><a href="/account">Account</a></li>
         {#if mode !== "solo"}
-        <li><a on:click={()=>{update(undefined, false)}} href="/billing">Subscriptions</a></li>
+        <li><a href="/billing">Subscriptions</a></li>
         {/if}
         {#if adminAccess}
-        <li><a on:click={()=>{update(undefined, false)}} href="/admin">Admin</a></li>
+        <li><a href="/admin">Admin</a></li>
         {/if}
 <li>        <a onclick="modal_language.showModal()">
   Language</a
