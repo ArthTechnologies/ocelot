@@ -497,11 +497,13 @@ export function getPublicModpackChecks() {
     .catch(() => null);
 }
 
-// Starts a full modpack check on demand (the same job the weekly cron runs).
+// Starts a modpack check on demand — the same job the weekly cron runs, or
+// (passing `limit`) a quick custom run capped to that many packs total across
+// all Forge versions combined, e.g. runModpackCheck(5) for a smoke test.
 // Fire-and-forget on the backend — call getModpackChecks() / poll it to watch
 // progress. Resolves to the parsed error body on failure (e.g. already
 // running) so the caller can show why nothing started, or null on a network error.
-export function runModpackCheck() {
+export function runModpackCheck(limit?: number) {
   if (!browser) return Promise.resolve(null);
 
   return fetch(apiurl + "admin/modpack-checks/run", {
@@ -511,6 +513,7 @@ export function runModpackCheck() {
       token: localStorage.getItem("token") || "",
       username: localStorage.getItem("accountEmail") || "",
     },
+    body: JSON.stringify(limit ? { limit } : {}),
   })
     .then(async (res) => ({ ok: res.ok, ...(await res.json().catch(() => ({}))) }))
     .catch(() => null);

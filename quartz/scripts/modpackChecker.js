@@ -392,7 +392,7 @@ async function resolveForgePack(mod, gameVersion) {
 // (or MAX_CANDIDATES_PER_VERSION have been looked at) — a single fixed-size
 // page would leave a version with only however many of its candidates
 // happened to survive resolveForgePack, often well under the target.
-async function topForgeModpacks(gameVersion) {
+async function topForgeModpacks(gameVersion, targetCount = TARGET_CHECKED_PER_VERSION) {
   const apiKey = config.curseforgeKey;
   if (!apiKey) {
     log("No curseforgeKey configured — skipping the Forge half.");
@@ -403,7 +403,7 @@ async function topForgeModpacks(gameVersion) {
   let checkedCount = 0;
   let index = 0;
 
-  while (checkedCount < TARGET_CHECKED_PER_VERSION && index < MAX_CANDIDATES_PER_VERSION) {
+  while (checkedCount < targetCount && index < MAX_CANDIDATES_PER_VERSION) {
     const search = await fetchJson(
       `https://api.curseforge.com/v1/mods/search?gameId=${CF_GAME_ID}` +
         `&classId=${CF_MODPACK_CLASS}` +
@@ -440,7 +440,7 @@ async function topForgeModpacks(gameVersion) {
       const resolved = await resolveForgePack(mod, gameVersion);
       packs.push(resolved);
       if (!resolved.unavailable) checkedCount++;
-      if (checkedCount >= TARGET_CHECKED_PER_VERSION) break;
+      if (checkedCount >= targetCount) break;
     }
   }
 
@@ -892,7 +892,11 @@ async function checkOne(pack, id, isSingleRecheck = false) {
 
 // ------------------------------------------------------------------ public
 
-async function checkModpacks() {
+// options.limit caps the total number of packs checked across ALL versions
+// combined (not per version) — e.g. { limit: 5 } checks just the first 5
+// discovered packs rather than up to TARGET_CHECKED_PER_VERSION per version.
+// Meant for a quick on-demand smoke test rather than the full weekly sweep.
+async function checkModpacks(options = {}) {
   if (running) {
     log("A check is already running — ignoring this request.");
     return readLog();
@@ -909,6 +913,16 @@ async function checkModpacks() {
     return readLog();
   }
 
+  const maxLimit = TARGET_CHECKED_PER_VERSION * FORGE_GAME_VERSIONS.length;
+  const limit =
+    Number.isInteger(options.limit) && options.limit > 0
+      ? Math.min(options.limit, maxLimit)
+      : null;
+  // Each version only needs to discover up to `limit` candidates itself -
+  // discovering the usual TARGET_CHECKED_PER_VERSION from every version when
+  // the run will only keep 5 total would waste CurseForge requests.
+  const perVersionTarget = limit ? Math.min(limit, TARGET_CHECKED_PER_VERSION) : TARGET_CHECKED_PER_VERSION;
+
   running = true;
   const startedAt = Date.now();
   resetProgress();
@@ -916,21 +930,24 @@ async function checkModpacks() {
   progress.phase = "discovering";
   progress.startedAt = startedAt;
   log(
-    `Starting check of the top ${TARGET_CHECKED_PER_VERSION} checkable Forge modpacks by downloads on each of ` +
-      `${FORGE_GAME_VERSIONS.join(", ")}…`
+    limit
+      ? `Starting custom check of the first ${limit} checkable Forge modpacks across ${FORGE_GAME_VERSIONS.join(", ")}…`
+      : `Starting check of the top ${TARGET_CHECKED_PER_VERSION} checkable Forge modpacks by downloads on each of ` +
+          `${FORGE_GAME_VERSIONS.join(", ")}…`
   );
 
   try {
     const discovered = await Promise.all(
       FORGE_GAME_VERSIONS.map((gameVersion) =>
-        topForgeModpacks(gameVersion).catch((err) => {
+        topForgeModpacks(gameVersion, perVersionTarget).catch((err) => {
           log(`CurseForge discovery failed for ${gameVersion}: ${err.message}`);
           return [];
         })
       )
     );
 
-    const packs = discovered.flat();
+    let packs = discovered.flat();
+    if (limit) packs = packs.slice(0, limit);
     progress.total = packs.length;
     progress.phase = "checking";
     // Slot-indexed: currentPacks[i] is what slot i is checking right now,

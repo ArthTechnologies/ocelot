@@ -57,17 +57,25 @@ router.get("/modpack-checks", (req, res) => {
   }
 });
 
-// Kick off a full modpack check on demand — the same job the weekly cron runs.
-// Fire-and-forget: a run boots ~60 packs and can take hours, so the response
-// only confirms it started. The frontend polls GET /admin/modpack-checks for
+// Kick off a modpack check on demand — the same job the weekly cron runs, or
+// (with `limit` in the body) a quick custom run capped to that many packs
+// total across all Forge versions combined, e.g. { limit: 5 } for a smoke
+// test instead of the full ~60-pack sweep. Fire-and-forget: the response only
+// confirms it started. The frontend polls GET /admin/modpack-checks for
 // `running`/`progress`, exactly like it does for the scheduled run.
 router.post("/modpack-checks/run", (req, res) => {
   const modpackChecker = require("../scripts/modpackChecker.js");
   if (modpackChecker.isRunning()) {
     return res.status(409).json({ error: "A modpack check is already running." });
   }
+
+  const { limit } = req.body || {};
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 60)) {
+    return res.status(400).json({ error: "limit must be an integer between 1 and 60" });
+  }
+
   modpackChecker
-    .checkModpacks()
+    .checkModpacks(limit ? { limit } : {})
     .catch((err) => console.log("Modpack check failed: " + err.message));
   res.json({ started: true });
 });

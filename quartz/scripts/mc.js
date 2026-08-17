@@ -2024,6 +2024,31 @@ function whenClearToBoot(id, engaged, start) {
   check();
 }
 
+// Safety net for a server pack that still extracted with its mods/ folder
+// nested somewhere under the server root instead of at the top level Forge
+// actually reads - whatever the cause (an unwrap loop that gave up too early,
+// a pack nested deeper than expected, ...), a populated mods/ folder one level
+// down next to an empty top-level one is a strong signal extraction is at
+// fault, not the pack. Only checks one level down - deep enough for the
+// "whole pack landed as an unflattened wrapper folder" case without turning
+// into an open-ended filesystem walk.
+function findNestedModsFolder(root) {
+  let children;
+  try {
+    children = fs.readdirSync(root, { withFileTypes: true });
+  } catch (e) {
+    return null;
+  }
+  for (const entry of children) {
+    if (!entry.isDirectory() || entry.name === "mods" || entry.name === "temp") continue;
+    const candidate = root + "/" + entry.name + "/mods";
+    try {
+      if (fs.readdirSync(candidate).some((f) => f.endsWith(".jar"))) return candidate;
+    } catch (e) {}
+  }
+  return null;
+}
+
 function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Infinity) {
   const folder = "servers/" + id;
   resetDownloadProgress(id);
@@ -2187,24 +2212,38 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                 fs.unlinkSync(folder + "/temp/server.properties");
               }
 
-              //this detects if theres only one folder in the temp folder
-              let tempFiles = fs.readdirSync(folder + "/temp");
-              if (tempFiles.length == 1 && tempFiles[0] != "mods") {
-                let subfolderFiles = fs.readdirSync(
-                  folder + "/temp/" + tempFiles[0]
-                );
-                for (let i in subfolderFiles) {
-                  if (subfolderFiles[i] != "server.properties") {
-                    fs.renameSync(
-                      folder +
-                        "/temp/" +
-                        tempFiles[0] +
-                        "/" +
-                        subfolderFiles[i],
-                      folder + "/temp/" + subfolderFiles[i]
-                    );
-                  }
+              // Server pack zips are usually wrapped in one named folder
+              // (e.g. "DeceasedCraft_Server_v5.5.5/") rather than extracting
+              // flat. The old approach only checked for exactly one level of
+              // wrapping and silently gave up - no logging, no fallback - the
+              // moment that assumption didn't hold (see the .txt-file race
+              // this comment block already documents one instance of; there
+              // are other ways for an extra top-level entry to show up that
+              // aren't a race at all, just a pack with two-deep nesting or an
+              // extra loose file). Walk down through wrapper folders instead
+              // of asserting there's exactly one, so a pack that doesn't
+              // match the single-level assumption still gets unwrapped
+              // instead of being copied in unflattened with cp() none the
+              // wiser afterwards.
+              let contentDir = folder + "/temp";
+              let wrapDepth = 0;
+              while (wrapDepth++ < 4) {
+                let entries;
+                try {
+                  entries = fs.readdirSync(contentDir);
+                } catch (e) {
+                  break;
                 }
+                if (entries.length !== 1 || entries[0] === "mods") break;
+                const nested = contentDir + "/" + entries[0];
+                if (!fs.statSync(nested).isDirectory()) break;
+                contentDir = nested;
+              }
+              overridesFolder = contentDir.slice(folder.length);
+              if (overridesFolder !== "/temp") {
+                console.log(
+                  `Server pack for ${id} was wrapped ${wrapDepth - 1} folder(s) deep (${overridesFolder}) - unwrapped instead of copying it in as-is.`
+                );
               }
 
               console.log(overridesFolder);
@@ -2370,8 +2409,47 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                   // ships client-only mods like NotEnoughAnimations just as a
                   // client pack does. Both calls no-op on a missing mods/
                   // folder, which is what a failed download/unzip leaves here.
+                  // Recover a mods/ folder that still ended up nested one
+                  // level down despite the unwrap above - see
+                  // findNestedModsFolder. Runs before the filters below so
+                  // client-side/conflict mods get filtered out of the
+                  // recovered set too, not just whatever happened to already
+                  // be at the top level.
+                  try {
+                    const topHasJars = fs
+                      .readdirSync(folder + "/mods")
+                      .some((f) => f.endsWith(".jar"));
+                    if (!topHasJars) {
+                      const nested = findNestedModsFolder(folder);
+                      if (nested) {
+                        console.log(
+                          `Server pack for ${id} extracted with mods/ nested under ${nested} - recovering it into ${folder}/mods.`
+                        );
+                        for (const jar of fs.readdirSync(nested)) {
+                          fs.renameSync(nested + "/" + jar, folder + "/mods/" + jar);
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    console.log(
+                      "Could not check for a nested mods folder for server " + id + ": " + e.message
+                    );
+                  }
                   deleteClientSideMods(id);
                   resolveModConflicts(id);
+                  // There's no per-mod download loop on this branch to
+                  // populate downloadProgress, which otherwise left the live
+                  // check UI stuck showing "0/?" forever regardless of
+                  // outcome. Count the jars that actually survived filtering
+                  // and report them as done in one shot instead.
+                  let serverPackModCount = 0;
+                  try {
+                    serverPackModCount = fs
+                      .readdirSync(folder + "/mods")
+                      .filter((f) => f.endsWith(".jar")).length;
+                  } catch (e) {}
+                  downloadProgress[id].total = serverPackModCount;
+                  downloadProgress[id].completed = serverPackModCount;
                   exec("rm -r " + folder + "/temp");
                   finishModpackDownload(id, [], download);
                 }

@@ -60,11 +60,13 @@
     if (data?.running) pollTimer = setTimeout(load, POLL_MS);
   }
 
-  async function startFullCheck() {
+  // limit is undefined for the normal full weekly-style run, or a pack count
+  // for a quick "Custom Check" smoke test (see the dropdown next to the button).
+  async function startFullCheck(limit?: number) {
     if (starting || data?.running) return;
     starting = true;
     actionError = "";
-    const res = await runModpackCheck();
+    const res = await runModpackCheck(limit);
     if (!res || res.ok === false) {
       actionError = res?.error || "Couldn't start the check.";
       starting = false;
@@ -72,6 +74,14 @@
     }
     showLiveView = true;
     load();
+  }
+
+  const customCheckOptions = [1, 3, 5, 10, 20];
+
+  function startCustomCheck(limit: number) {
+    const menu = document.getElementById("customCheckDropdown") as HTMLDetailsElement | null;
+    if (menu) menu.open = false;
+    startFullCheck(limit);
   }
 
   async function recheckPack(row: any) {
@@ -225,7 +235,7 @@
         <button
           class="btn btn-primary btn-sm gap-1.5"
           disabled={starting || data?.running}
-          on:click={startFullCheck}
+          on:click={() => startFullCheck()}
           title="Run a full modpack check now"
         >
           {#if starting || data?.running}
@@ -235,6 +245,35 @@
           {/if}
           Run Check
         </button>
+        <details class="dropdown dropdown-end" id="customCheckDropdown">
+          <summary
+            class="btn btn-outline btn-sm gap-1.5"
+            class:btn-disabled={starting || data?.running}
+            title="Run a check limited to a handful of packs total, for a quick smoke test"
+          >
+            <Play size={14} />
+            Custom Check
+            <ChevronDown size={14} />
+          </summary>
+          <ul
+            tabindex="0"
+            class="p-2 shadow menu menu-compact bg-base-200 dropdown-content rounded-box w-48 z-20"
+          >
+            <li class="menu-title px-3 pt-1 pb-0.5">
+              <span class="text-xs text-base-content/50">Packs total, not per version</span>
+            </li>
+            {#each customCheckOptions as n}
+              <li>
+                <button
+                  disabled={starting || data?.running}
+                  on:click={() => startCustomCheck(n)}
+                >
+                  Check {n} pack{n === 1 ? "" : "s"}
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </details>
         <button class="btn btn-ghost btn-sm btn-circle" on:click={load} title="Refresh">
           <RefreshCw size={16} />
         </button>
