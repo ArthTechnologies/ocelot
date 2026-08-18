@@ -42,8 +42,8 @@
 </div>
 {/if}
 
-                  <div class="flex items-center gap-3.5 w-full mt-3">
-           
+                  <div class="flex items-center gap-3.5 w-full">
+
 
            <div class="flex w-full">
                <div class="flex flex-col w-full">

@@ -1388,3 +1388,101 @@ export function getAdminDashboard() {
     });
   }
 }
+
+// ---------------------------------------------------------------------------
+// Player access control (whitelist / blacklist)
+// ---------------------------------------------------------------------------
+
+function accessUrl(serverId: string, path = "") {
+  let baseurl = apiurl;
+  if (usingOcelot) baseurl = getServerNode(parseInt(serverId));
+  return baseurl + "server/" + serverId + "/access" + path;
+}
+
+function accessHeaders() {
+  return {
+    "Content-Type": "application/json",
+    token: localStorage.getItem("token"),
+    username: localStorage.getItem("accountEmail"),
+  };
+}
+
+// Shared tail for every mutation below: they all answer { msg } and all want
+// the same "show the server's own explanation, don't invent one" behaviour.
+async function accessRequest(url: string, method: string, body?: any) {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: accessHeaders(),
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(data.msg || "That didn't work. Try again in a moment.", "error");
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.error("Access request failed:", err);
+    alert("Couldn't reach the server.", "error");
+    return null;
+  }
+}
+
+// The full access picture: which mode the server is in, who's whitelisted,
+// who's banned, and whether Bedrock support is installed. All of it is read
+// back off the server's own files, so it stays right even when the change was
+// made from the console rather than the panel.
+export function getAccess(serverId: string) {
+  if (!browser) return Promise.resolve(null);
+  return fetch(accessUrl(serverId), GET)
+    .then((res) => (res.ok ? res.json() : null))
+    .catch((err) => {
+      console.error("Error fetching access settings:", err);
+      return null;
+    });
+}
+
+export function setAccessMode(serverId: string, mode: "whitelist" | "blacklist") {
+  if (!browser) return Promise.resolve(null);
+  return accessRequest(accessUrl(serverId, "/mode"), "POST", { mode });
+}
+
+// `platform` is passed explicitly rather than guessed, because a Bedrock
+// gamertag and a Java username can be the same string.
+// `uuid` is optional: passing one the panel already knows (a usercache entry,
+// or a rejection the log recorded the profile for) skips the name lookup
+// entirely, so it also works when Mojang is unreachable.
+export function addToWhitelist(
+  serverId: string,
+  name: string,
+  platform: "java" | "bedrock" | "auto" = "auto",
+  uuid = ""
+) {
+  if (!browser) return Promise.resolve(null);
+  return accessRequest(accessUrl(serverId, "/whitelist"), "POST", {
+    name,
+    platform,
+    uuid,
+  });
+}
+
+export function removeFromWhitelist(serverId: string, name: string, uuid: string) {
+  if (!browser) return Promise.resolve(null);
+  return accessRequest(accessUrl(serverId, "/whitelist"), "DELETE", { name, uuid });
+}
+
+export function kickPlayer(serverId: string, name: string, reason: string) {
+  if (!browser) return Promise.resolve(null);
+  return accessRequest(accessUrl(serverId, "/kick"), "POST", { name, reason });
+}
+
+export function banPlayer(serverId: string, name: string, uuid: string, reason: string) {
+  if (!browser) return Promise.resolve(null);
+  return accessRequest(accessUrl(serverId, "/ban"), "POST", { name, uuid, reason });
+}
+
+export function unbanPlayer(serverId: string, name: string, uuid: string) {
+  if (!browser) return Promise.resolve(null);
+  return accessRequest(accessUrl(serverId, "/unban"), "POST", { name, uuid });
+}
