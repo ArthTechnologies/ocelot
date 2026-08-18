@@ -640,6 +640,27 @@ export function streamModpackCheck(onEvent: (data: any) => void, signal?: AbortS
   });
 }
 
+// Raw manifest for whichever pack a reserved check slot (id) is currently
+// installing - backs the "View manifest" button in the live check view.
+// { available: false } if the install hasn't produced one yet (or never
+// will, for a server pack with no manifest of its own); otherwise either
+// { available: true, source, manifest } for valid JSON or
+// { available: true, source, raw, truncated } when it wasn't parseable JSON
+// or was too large to send in full.
+export function getModpackCheckManifest(id: number) {
+  if (!browser) return Promise.resolve(null);
+
+  return fetch(apiurl + "admin/modpack-checks/manifest/" + id, {
+    method: "GET",
+    headers: {
+      token: localStorage.getItem("token") || "",
+      username: localStorage.getItem("accountEmail") || "",
+    },
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .catch(() => null);
+}
+
 // Curated list of Forge-only CurseForge modpacks, keyed by numeric CF mod id.
 // The version picker uses this to treat a version with no loader tag as Forge
 // when the pack itself is known Forge-only (RLCraft's newest release does

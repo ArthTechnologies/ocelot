@@ -510,6 +510,13 @@ function removeFolder(folder) {
 }
 
 // A clean slot with just enough server.json for run() to read.
+// Individual rechecks get more headroom (and no CPU limit) than a batch
+// slot - also referenced by waitForOnline to explain an OOM-style silent
+// death in terms of the RAM this specific attempt actually had.
+function slotRamGB(isSingleRecheck) {
+  return isSingleRecheck ? 10 : CHECK_RAM_GB;
+}
+
 async function prepareSlot(id, pack, isSingleRecheck = false) {
   const folder = `servers/${id}`;
   await removeFolder(folder);
@@ -529,18 +536,13 @@ async function prepareSlot(id, pack, isSingleRecheck = false) {
     modpackCheck: true,
   };
 
-  if (isSingleRecheck) {
-    // Individual rechecks get more resources and no CPU limits
-    serverJson.ramOverrideGB = 10;
-    // Don't set cpuCoresOverride so it uses the default 4 cores
-  } else {
-    // Batch run slots get limited resources
-    // Big modded packs OOM at the 4GB a plain server.json falls back to.
-    serverJson.ramOverrideGB = CHECK_RAM_GB;
+  serverJson.ramOverrideGB = slotRamGB(isSingleRecheck);
+  if (!isSingleRecheck) {
     // A slot gets a single core rather than the default four — with several
     // checks in flight at once, handing each one four would oversubscribe the
     // box against the customer servers sharing it. Slower boots, so this
-    // trades against START_TIMEOUT_MS.
+    // trades against START_TIMEOUT_MS. Individual rechecks skip this and use
+    // the default four cores.
     serverJson.cpuCoresOverride = CHECK_CPU_CORES;
   }
 
@@ -646,8 +648,22 @@ function modInstallStats(id, pack, index) {
   return { expected, installed, manifest, removedClientSide, disabledByConflict, failedMods };
 }
 
-// Poll until the server is online, gives up, or dies.
-function waitForOnline(id) {
+// A process killed by SIGKILL (or the shell/docker convention of exit code
+// 137, i.e. 128+9) never gets a chance to log anything - no exception, no
+// crash report, no "Stopping server" line - which otherwise looks exactly
+// like an ordinary silent death. That signature is the OS/cgroup OOM killer,
+// not a broken pack: distinguishing it matters because a check slot is
+// deliberately given far less RAM than a real customer server (see
+// CHECK_RAM_GB), so a pack that's merely heavier than that budget shouldn't
+// be reported the same way as one that's actually broken.
+function looksLikeOOMKill(exitInfo) {
+  return !!exitInfo && (exitInfo.signal === "SIGKILL" || exitInfo.code === 137);
+}
+
+// Poll until the server is online, gives up, or dies. isSingleRecheck only
+// affects the wording of an OOM-looking death, to name the RAM this specific
+// attempt actually had (a recheck gets more than a batch slot - see slotRamGB).
+function waitForOnline(id, isSingleRecheck = false) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
     let sawLive = false;
@@ -669,6 +685,16 @@ function waitForOnline(id) {
       // first poll can land before run() has set a state.
       if (state === "false" && sawLive) {
         clearInterval(timer);
+        const exitInfo = mc().getLastExitInfo(id);
+        if (looksLikeOOMKill(exitInfo)) {
+          return resolve({
+            status: "skipped",
+            reason:
+              `Killed (${exitInfo.signal || "exit code " + exitInfo.code}) during startup - likely ran out ` +
+              `of memory in the ${slotRamGB(isSingleRecheck)}GB this check allocates, not necessarily a ` +
+              `problem with the pack itself.`,
+          });
+        }
         return resolve({ status: "failed", reason: "Server stopped before coming online." });
       }
 
@@ -755,7 +781,7 @@ async function runAttempt(pack, id, isSingleRecheck = false) {
         // modpackURL is deliberately undefined: the pack is already on disk and
         // passing it would make run() download it a second time.
         mc().run(id, pack.software, pack.gameVersion || GAME_VERSION, [], [], undefined, true, undefined);
-        outcome = await waitForOnline(id);
+        outcome = await waitForOnline(id, isSingleRecheck);
 
         // Recount mods after successful boot — manifest mods may have arrived
         // during startup, and server packs might populate the folder during boot.
@@ -790,9 +816,12 @@ async function runAttempt(pack, id, isSingleRecheck = false) {
     outcome = { status: "failed", reason: `Check errored: ${err.message}` };
   }
 
-  // Console tail is only interesting when something went wrong.
+  // Console tail is only interesting when something went wrong - including an
+  // OOM-looking skip, where it's the evidence for that call (output stopping
+  // mid-line with no exception is what makes it look like a kill rather than
+  // an ordinary crash).
   let consoleTail = "";
-  if (outcome.status === "failed") {
+  if (outcome.status === "failed" || looksLikeOOMKill(mc().getLastExitInfo(id))) {
     try {
       consoleTail = mc().getTerminalTail(id, 4000);
     } catch (e) {

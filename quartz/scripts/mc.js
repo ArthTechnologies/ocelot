@@ -123,6 +123,19 @@ function getState(id) {
   }
   return states[id];
 }
+
+// How the server process's OS-level process last exited - code/signal off
+// Node's child_process "exit" event, keyed by server id. A process that dies
+// with signal SIGKILL (or the docker convention of exit code 137, i.e.
+// 128+9) never gets a chance to log anything, including its own crash report -
+// that silence is otherwise indistinguishable from a clean-looking stop, but
+// it's the fingerprint of the OS/cgroup OOM killer. Read by the modpack
+// checker to tell "this pack is broken" apart from "this pack needed more RAM
+// than the check slot had."
+const lastExitInfo = {};
+function getLastExitInfo(id) {
+  return lastExitInfo[id] || null;
+}
 function checkServer(id) {
   if (states[id] == undefined) {
     states[id] = "false";
@@ -1124,8 +1137,9 @@ function run(
           eventEmitter.on("writeCmd:" + id, function () {
             ls.stdin.write(terminalInput + "\n");
           });
-          ls.on("exit", () => {
+          ls.on("exit", (code, signal) => {
             states[id] = "false";
+            lastExitInfo[id] = { code, signal, at: Date.now() };
             console.log("setting status of " + id + " to false on line #7");
             clearInterval(intervalID);
           });
@@ -1197,9 +1211,10 @@ ls.stderr.on("data", data => {
       eventEmitter.on("writeCmd:" + id, function () {
         ls.stdin.write(terminalInput + "\n");
       });
-      ls.on("exit", (code) => {
+      ls.on("exit", (code, signal) => {
                   // terminalOutput[id] already up to date via stdout append
         states[id] = "false";
+        lastExitInfo[id] = { code, signal, at: Date.now() };
         console.log("Server " + id + " stopped (exit code " + code + ")");
         // The last 2000 chars go to logs/crash.txt below when this wasn't a
         // clean stop — no need to mirror server output into the panel console.
@@ -1673,10 +1688,14 @@ function downloadModFileWithRetry(destPath, url, attempt = 1) {
 // mods extracted" with no indication the download itself was the problem.
 // The timeout is longer than the per-mod one since these archives (server
 // packs especially) can run into the hundreds of MB.
-function downloadModpackArchiveWithRetry(destPath, url, attempt = 1) {
+function downloadModpackArchiveWithRetry(id, destPath, url, attempt = 1) {
   const MAX_ATTEMPTS = 3;
   const BACKOFF_MS = [2000, 6000];
-  const MAX_TIME_SEC = 300;
+  // Some server packs (Better MC-style megapacks especially) run close to
+  // 1GB - 300s wasn't enough to finish one at typical transfer rates, so
+  // every attempt hit the cap and restarted from scratch, guaranteeing failure.
+  const MAX_TIME_SEC = 480;
+  const POLL_MS = 750;
 
   if (!security.isAllowedURL(url, MODPACK_ALLOWED_HOSTS)) {
     return Promise.resolve({
@@ -1686,12 +1705,45 @@ function downloadModpackArchiveWithRetry(destPath, url, attempt = 1) {
   }
 
   return new Promise((resolve) => {
-    security.curlDownloadFile(url, destPath, { maxTimeSec: MAX_TIME_SEC }).then(
-      () => downloadModpackArchiveFinish(null),
-      (error) => downloadModpackArchiveFinish(error)
-    );
+    // curl writes response headers here as they arrive, well before the body
+    // finishes - that's where Content-Length comes from for the progress bar.
+    const headerPath = destPath + ".headers";
+    archiveDownloadProgress[id] = {
+      active: true,
+      url,
+      bytesDownloaded: 0,
+      totalBytes: null,
+      startedAt: Date.now(),
+    };
+
+    const poll = setInterval(() => {
+      const progress = archiveDownloadProgress[id];
+      if (!progress) return;
+      try {
+        progress.bytesDownloaded = fs.statSync(destPath).size;
+      } catch (e) {}
+      if (progress.totalBytes == null) {
+        try {
+          const match = fs.readFileSync(headerPath, "utf8").match(/content-length:\s*(\d+)/i);
+          if (match) progress.totalBytes = parseInt(match[1], 10);
+        } catch (e) {}
+      }
+    }, POLL_MS);
+
+    security
+      .curlDownloadFile(url, destPath, { maxTimeSec: MAX_TIME_SEC, extraArgs: ["-D", headerPath] })
+      .then(
+        () => downloadModpackArchiveFinish(null),
+        (error) => downloadModpackArchiveFinish(error)
+      );
 
     function downloadModpackArchiveFinish(error) {
+      clearInterval(poll);
+      if (archiveDownloadProgress[id]) archiveDownloadProgress[id].active = false;
+      try {
+        fs.unlinkSync(headerPath);
+      } catch (e) {}
+
       // Same reasoning as downloadModFileWithRetryFinish: curl can leave a
       // truncated but non-empty archive behind on a timed-out or reset
       // transfer, so size alone isn't enough to call this a success.
@@ -1710,7 +1762,7 @@ function downloadModpackArchiveWithRetry(destPath, url, attempt = 1) {
             ` - retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS}).`
         );
         setTimeout(() => {
-          downloadModpackArchiveWithRetry(destPath, url, attempt + 1).then(resolve);
+          downloadModpackArchiveWithRetry(id, destPath, url, attempt + 1).then(resolve);
         }, delay);
         return;
       }
@@ -2049,10 +2101,63 @@ function findNestedModsFolder(root) {
   return null;
 }
 
+// A file literally named manifest.json existing after extraction isn't proof
+// it's a CurseForge modpack manifest - some server packs bundle a manifest.json
+// of their own from a different tool, most commonly ServerPackCreator, whose
+// `files` array is a flat list of extracted file paths rather than
+// {projectID, fileID} mod references. Trusting the filename alone sent every
+// entry in a pack like that through a per-file CurseForge download lookup
+// that could only ever 404 - real CurseForge manifests always carry
+// manifestType, and any files entries they do have are always objects with a
+// projectID, so either signal is enough to tell the two apart.
+function looksLikeCurseForgeManifest(modpack) {
+  if (!modpack || !Array.isArray(modpack.files)) return false;
+  if (modpack.manifestType === "minecraftModpack") return true;
+  if (modpack.files.length === 0) return true;
+  const first = modpack.files[0];
+  return !!first && typeof first === "object" && "projectID" in first;
+}
+
+// Shared tail end for a server pack install: mods are already bundled in the
+// zip (recovering a still-nested mods/ first if needed), so there's nothing
+// to download per-mod - just filter, count what's there, and settle the
+// download record. Used both when there's no manifest.json at all and when
+// one exists but isn't actually a CurseForge manifest (see
+// looksLikeCurseForgeManifest).
+function finishServerPackInstall(id, folder, download) {
+  try {
+    const topHasJars = fs.readdirSync(folder + "/mods").some((f) => f.endsWith(".jar"));
+    if (!topHasJars) {
+      const nested = findNestedModsFolder(folder);
+      if (nested) {
+        console.log(
+          `Server pack for ${id} extracted with mods/ nested under ${nested} - recovering it into ${folder}/mods.`
+        );
+        for (const jar of fs.readdirSync(nested)) {
+          fs.renameSync(nested + "/" + jar, folder + "/mods/" + jar);
+        }
+      }
+    }
+  } catch (e) {
+    console.log("Could not check for a nested mods folder for server " + id + ": " + e.message);
+  }
+  deleteClientSideMods(id);
+  resolveModConflicts(id);
+  let serverPackModCount = 0;
+  try {
+    serverPackModCount = fs.readdirSync(folder + "/mods").filter((f) => f.endsWith(".jar")).length;
+  } catch (e) {}
+  downloadProgress[id].total = serverPackModCount;
+  downloadProgress[id].completed = serverPackModCount;
+  exec("rm -r " + folder + "/temp");
+  finishModpackDownload(id, [], download);
+}
+
 function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Infinity) {
   const folder = "servers/" + id;
   resetDownloadProgress(id);
   resetModFilterStats(id);
+  resetArchiveDownloadProgress(id);
   beginModpackDownload(id);
   // Every finish below names this record so a finish outliving this call
   // can't settle a newer install's record - see finishModpackDownload.
@@ -2069,7 +2174,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
   }
 
   if (modpackURL.includes("modrinth.com")) {
-    downloadModpackArchiveWithRetry(folder + "/modpack.mrpack", modpackURL).then(({ ok, reason }) => {
+    downloadModpackArchiveWithRetry(id, folder + "/modpack.mrpack", modpackURL).then(({ ok, reason }) => {
       if (!ok) {
         console.log("Modpack archive download failed for server " + id + ": " + reason);
         return finishModpackDownload(id, [], download);
@@ -2175,7 +2280,7 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
   } else if (modpackURL.includes("forge")) {
     const apiKey = config.curseforgeKey;
 
-    downloadModpackArchiveWithRetry(folder + "/modpack.zip", modpackURL).then(({ ok, reason }) => {
+    downloadModpackArchiveWithRetry(id, folder + "/modpack.zip", modpackURL).then(({ ok, reason }) => {
       if (!ok) {
         console.log("Modpack archive download failed for server " + id + ": " + reason);
         return finishModpackDownload(id, [], download);
@@ -2264,6 +2369,17 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     let modpack = JSON.parse(
                       fs.readFileSync(folder + "/curseforge.index.json")
                     );
+
+                    if (!looksLikeCurseForgeManifest(modpack)) {
+                      console.log(
+                        `Server pack for ${id} has a manifest.json that isn't a CurseForge manifest ` +
+                          `(likely from a packaging tool like ServerPackCreator) - installing it as a ` +
+                          `plain server pack instead of trying to download its "files" entries from CurseForge.`
+                      );
+                      fs.unlinkSync(folder + "/curseforge.index.json");
+                      return finishServerPackInstall(id, folder, download);
+                    }
+
                     console.log("modpackID:" + modpackID);
                     //don't scan/filter mods or clean up until every mod
                     //download above has actually finished writing to disk
@@ -2398,60 +2514,12 @@ function downloadModpack(id, modpackURL, modpackID, versionID, concurrency = Inf
                     });
                   });
                 } else {
-                  // No manifest usually means this is a server pack - mods
-                  // pre-bundled, nothing to download per-mod - and sometimes
-                  // that the download or unzip fell over. Either way there is
-                  // nothing to hold the server for, so settle the record and
-                  // clear the extracted copy (the manifest path does this
-                  // after its downloads; without it every server-pack install
-                  // kept a full second copy of the pack in temp/).
-                  // The pre-bundled jars still need filtering - a server pack
-                  // ships client-only mods like NotEnoughAnimations just as a
-                  // client pack does. Both calls no-op on a missing mods/
-                  // folder, which is what a failed download/unzip leaves here.
-                  // Recover a mods/ folder that still ended up nested one
-                  // level down despite the unwrap above - see
-                  // findNestedModsFolder. Runs before the filters below so
-                  // client-side/conflict mods get filtered out of the
-                  // recovered set too, not just whatever happened to already
-                  // be at the top level.
-                  try {
-                    const topHasJars = fs
-                      .readdirSync(folder + "/mods")
-                      .some((f) => f.endsWith(".jar"));
-                    if (!topHasJars) {
-                      const nested = findNestedModsFolder(folder);
-                      if (nested) {
-                        console.log(
-                          `Server pack for ${id} extracted with mods/ nested under ${nested} - recovering it into ${folder}/mods.`
-                        );
-                        for (const jar of fs.readdirSync(nested)) {
-                          fs.renameSync(nested + "/" + jar, folder + "/mods/" + jar);
-                        }
-                      }
-                    }
-                  } catch (e) {
-                    console.log(
-                      "Could not check for a nested mods folder for server " + id + ": " + e.message
-                    );
-                  }
-                  deleteClientSideMods(id);
-                  resolveModConflicts(id);
-                  // There's no per-mod download loop on this branch to
-                  // populate downloadProgress, which otherwise left the live
-                  // check UI stuck showing "0/?" forever regardless of
-                  // outcome. Count the jars that actually survived filtering
-                  // and report them as done in one shot instead.
-                  let serverPackModCount = 0;
-                  try {
-                    serverPackModCount = fs
-                      .readdirSync(folder + "/mods")
-                      .filter((f) => f.endsWith(".jar")).length;
-                  } catch (e) {}
-                  downloadProgress[id].total = serverPackModCount;
-                  downloadProgress[id].completed = serverPackModCount;
-                  exec("rm -r " + folder + "/temp");
-                  finishModpackDownload(id, [], download);
+                  // No manifest.json at all - a plain server pack, mods
+                  // pre-bundled with nothing to download per-mod. Same
+                  // finish as the "manifest.json exists but isn't really a
+                  // CurseForge manifest" case above - see
+                  // finishServerPackInstall.
+                  finishServerPackInstall(id, folder, download);
                 }
               }
             );
@@ -2629,6 +2697,28 @@ function resetDownloadProgress(id) {
 function getDownloadProgress(id) {
   const progress = downloadProgress[id] || emptyDownloadProgress();
   return { ...progress, inFlight: [...progress.inFlight], failedMods: [...progress.failedMods] };
+}
+
+// Live progress of the raw archive download (modpack.zip/.mrpack) itself,
+// keyed by server id - separate from downloadProgress (per-mod downloads)
+// above, since a large server pack's archive can be the better part of a
+// gigabyte and take several minutes on its own with nothing else happening
+// yet. Without this the admin dashboard had no way to tell "still downloading
+// a huge zip" apart from "stuck" during that stretch. totalBytes is null
+// until the response headers arrive (or forever, if the server never sends
+// Content-Length) - callers should treat that as "unknown size", not zero.
+const archiveDownloadProgress = {};
+
+function emptyArchiveDownloadProgress() {
+  return { active: false, url: null, bytesDownloaded: 0, totalBytes: null, startedAt: null };
+}
+
+function resetArchiveDownloadProgress(id) {
+  archiveDownloadProgress[id] = emptyArchiveDownloadProgress();
+}
+
+function getArchiveDownloadProgress(id) {
+  return { ...(archiveDownloadProgress[id] || emptyArchiveDownloadProgress()) };
 }
 
 // Project IDs already known to be client-side, sourced from
@@ -2826,6 +2916,8 @@ module.exports = {
   resetModFilterStats,
   getDownloadProgress,
   resetDownloadProgress,
+  getArchiveDownloadProgress,
+  getLastExitInfo,
   getPendingManualMods,
   resumeManualMods,
   releaseManualModsHold,

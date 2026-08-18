@@ -2,6 +2,7 @@
   import { createEventDispatcher, onMount, onDestroy, tick as svelteTick } from "svelte";
   import { streamModpackCheck } from "$lib/scripts/req";
   import CurseForgeModInfoModal from "$lib/components/ui/CurseForgeModInfoModal.svelte";
+  import ManifestModal from "$lib/components/ui/ManifestModal.svelte";
   import {
     X,
     Loader,
@@ -14,6 +15,7 @@
     Trash2,
     AlertTriangle,
     RefreshCw,
+    Braces,
   } from "lucide-svelte";
 
   const dispatch = createEventDispatcher();
@@ -21,6 +23,7 @@
   let controller = new AbortController();
   let finished = false;
   let inspectingProjectId: string | number | null = null;
+  let inspectingManifestServerId: number | null = null;
   let sawAnything = false;
   let streamError = false;
   let event: any = null;
@@ -82,6 +85,19 @@
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `${m}m ${s}s`;
+  }
+
+  function formatBytes(n: number | null | undefined) {
+    if (!n || n <= 0) return "0 MB";
+    const mb = n / (1024 * 1024);
+    return mb >= 1024 ? (mb / 1024).toFixed(2) + " GB" : mb.toFixed(0) + " MB";
+  }
+
+  // null when the server never sent (or hasn't yet sent) a Content-Length -
+  // callers fall back to an indeterminate bar rather than treating it as 0%.
+  function archivePercent(archiveDownload: any) {
+    if (!archiveDownload?.totalBytes) return null;
+    return Math.min(100, Math.round((archiveDownload.bytesDownloaded / archiveDownload.totalBytes) * 100));
   }
 
   async function handleEvent(data: any) {
@@ -238,8 +254,44 @@
                     {slot.pack?.loader} {slot.pack?.gameVersion}
                   </span>
                 </div>
-                <span class="text-xs text-base-content/50 shrink-0">{meta.label}</span>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs gap-1"
+                    on:click={() => (inspectingManifestServerId = slot.id)}
+                    title="View this install's manifest.json, if it has one"
+                  >
+                    <Braces size={12} /> Manifest
+                  </button>
+                  <span class="text-xs text-base-content/50">{meta.label}</span>
+                </div>
               </div>
+
+              <!-- Archive download - a large server pack's zip can itself
+                   take several minutes with nothing else visible yet (no
+                   terminal output, nothing in the per-mod panel below), which
+                   otherwise looked indistinguishable from a stuck check. -->
+              {#if slot.archiveDownload?.active}
+                {@const pct = archivePercent(slot.archiveDownload)}
+                <div class="px-4 py-2.5 bg-primary/5 border-b border-base-300/40">
+                  <div class="flex items-center justify-between text-xs mb-1">
+                    <span class="flex items-center gap-1.5 text-base-content/70">
+                      <Download size={12} class="animate-pulse" /> Downloading pack archive
+                    </span>
+                    <span class="font-medium">
+                      {formatBytes(slot.archiveDownload.bytesDownloaded)}
+                      {#if slot.archiveDownload.totalBytes}
+                        / {formatBytes(slot.archiveDownload.totalBytes)} ({pct}%)
+                      {/if}
+                    </span>
+                  </div>
+                  {#if pct !== null}
+                    <progress class="progress progress-primary w-full h-1.5" value={pct} max="100"></progress>
+                  {:else}
+                    <progress class="progress progress-primary w-full h-1.5"></progress>
+                  {/if}
+                </div>
+              {/if}
 
               <!-- Terminal + download progress, side by side -->
               <div class="flex flex-col lg:flex-row">
@@ -335,5 +387,12 @@
   <CurseForgeModInfoModal
     projectId={inspectingProjectId}
     on:close={() => (inspectingProjectId = null)}
+  />
+{/if}
+
+{#if inspectingManifestServerId !== null}
+  <ManifestModal
+    serverId={inspectingManifestServerId}
+    on:close={() => (inspectingManifestServerId = null)}
   />
 {/if}

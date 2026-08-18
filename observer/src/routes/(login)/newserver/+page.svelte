@@ -106,7 +106,9 @@
   $: isModded = ["Forge", "NeoForge", "Fabric", "Quilt"].includes(
     software.split(" - ")[0]
   );
-  $: forgeLike = ["Forge", "NeoForge"].includes(software.split(" - ")[0]);
+  // NeoForge deliberately isn't included here - unlike Forge it doesn't get
+  // a curated quick-version button row, just the plain dropdown (like Paper).
+  $: forgeLike = software.split(" - ")[0] === "Forge";
   $: availableQuick = forgeLike ? quickVersionsAvailable(software, jarsList) : [];
   // The 4 quick-pick buttons are a fixed, hardcoded list - none of them
   // being available doesn't mean the software has no versions at all (the
@@ -576,7 +578,9 @@
     const modpackElement = document.getElementById("modpacks");
     findVersions();
 
-    if (software.split(" - ")[0] == "Forge" || software.split(" - ")[0] == "NeoForge") {
+    // NeoForge is excluded - see the forgeLike comment above, it uses the
+    // plain dropdown like Paper rather than the quick-version buttons.
+    if (software.split(" - ")[0] == "Forge") {
       const available = quickVersionsAvailable(software, jarsList);
       quickVersion = available.includes(quickVersion)
         ? quickVersion

@@ -1,6 +1,11 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
-  import { getModpackChecks, runModpackCheck, runOneModpackCheck } from "$lib/scripts/req";
+  import {
+    getModpackChecks,
+    runModpackCheck,
+    runOneModpackCheck,
+    getCurseForgeModInfo,
+  } from "$lib/scripts/req";
   import ModpackCheckStream from "$lib/components/ui/ModpackCheckStream.svelte";
   import {
     X,
@@ -15,6 +20,7 @@
     RotateCw,
     TerminalSquare,
     Clock,
+    Search,
   } from "lucide-svelte";
 
   const dispatch = createEventDispatcher();
@@ -108,6 +114,52 @@
   // Fired by the live view once its stream reports the check has finished -
   // the row it was watching just changed, so refresh the table underneath it.
   function onLiveFinished() {
+    load();
+  }
+
+  // "Check a specific pack" - checkOneModpack (backing runOneModpackCheck)
+  // already accepts a bare platform/projectId/gameVersion with no dependency
+  // on the pack already having a row in the log, so this needed no backend
+  // changes - just a way to reach it for an id that isn't in the table yet
+  // (e.g. a pack a customer reported broken that isn't popular enough to have
+  // been picked up by the weekly top-N sweep).
+  let customPackId = "";
+  let customPackVersion = "";
+  let checkingById = false;
+
+  $: defaultVersions = data?.forgeGameVersions?.length
+    ? data.forgeGameVersions
+    : ["1.20.1", "1.18.2", "1.16.5", "1.12.2"];
+  $: if (!customPackVersion && defaultVersions.length) customPackVersion = defaultVersions[0];
+
+  async function checkPackById() {
+    if (checkingById || data?.running) return;
+    const projectId = parseInt(customPackId.trim(), 10);
+    if (!customPackId.trim() || !Number.isInteger(projectId) || projectId <= 0) {
+      actionError = "Enter a valid CurseForge project ID.";
+      return;
+    }
+    checkingById = true;
+    actionError = "";
+    // Best-effort - the check itself only needs the id, this is purely so
+    // the pack shows up with a real name instead of a bare number while it's
+    // running and in the results table afterwards.
+    const info = await getCurseForgeModInfo(projectId);
+    const res = await runOneModpackCheck({
+      platform: "cf",
+      projectId,
+      gameVersion: customPackVersion,
+      loader: "forge",
+      name: info?.name || `CurseForge project ${projectId}`,
+      slug: info?.slug,
+    });
+    checkingById = false;
+    if (!res || res.ok === false) {
+      actionError = res?.error || "Couldn't start the check.";
+      return;
+    }
+    customPackId = "";
+    showLiveView = true;
     load();
   }
 
@@ -292,6 +344,56 @@
       {#if actionError}
         <div class="alert alert-error bg-error/10 border border-error/30 text-sm">{actionError}</div>
       {/if}
+
+      <!-- Check a specific pack by CurseForge project ID, independent of
+           whether it's already in the results table below. -->
+      <div class="rounded-xl border border-base-300/40 bg-base-200/30 p-3 flex flex-wrap items-end gap-2">
+        <div class="flex-1 min-w-[10rem]">
+          <label class="label py-0" for="customPackId">
+            <span class="label-text text-xs">Check a specific pack - CurseForge project ID</span>
+          </label>
+          <input
+            id="customPackId"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            placeholder="e.g. 452013"
+            class="input input-bordered input-sm w-full"
+            bind:value={customPackId}
+            disabled={checkingById || data?.running}
+            on:keydown={(e) => e.key === "Enter" && checkPackById()}
+          />
+        </div>
+        <div>
+          <label class="label py-0" for="customPackVersion">
+            <span class="label-text text-xs">Game version</span>
+          </label>
+          <select
+            id="customPackVersion"
+            class="select select-bordered select-sm"
+            bind:value={customPackVersion}
+            disabled={checkingById || data?.running}
+          >
+            {#each defaultVersions as v}
+              <option value={v}>{v}</option>
+            {/each}
+          </select>
+        </div>
+        <button
+          class="btn btn-sm btn-outline gap-1.5"
+          disabled={checkingById || data?.running || !customPackId.trim()}
+          on:click={checkPackById}
+          title="Check this exact pack, whether or not it's already in the results below"
+        >
+          {#if checkingById}
+            <Loader size={14} class="animate-spin" />
+          {:else}
+            <Search size={14} />
+          {/if}
+          Check pack
+        </button>
+      </div>
+
       {#if loading}
         <div class="flex items-center gap-3 text-base-content/60">
           <span class="loading loading-spinner loading-md text-primary"></span>
