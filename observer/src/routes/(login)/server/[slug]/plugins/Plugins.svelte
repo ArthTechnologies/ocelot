@@ -77,7 +77,7 @@
 
 
   <div
-    class="bg-base-100 rounded-xl px-4 py-3 shadow-xl neutralGradietStroke w-full space-y-2 min-h-[30rem]"
+    class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradietStroke w-full space-y-2 min-h-[30rem]"
   >
 
 <div class="flex justify-between items-center">
@@ -90,7 +90,7 @@
       {#await promise}
         <div class="flex flex-col">
           <div
-            class="flex items-center justify-between bg-base-300 rounded-t-lg w-full h-[2.75rem] pr-3 py-2 pl-2.5 space-x-1"
+            class="flex items-center justify-between bg-base-200 rounded-t-lg w-full h-[2.75rem] pr-3 py-2 pl-2.5 space-x-1"
           >
             <div class="flex items-center space-x-1">
               <div
@@ -110,7 +110,7 @@
             </div>
           </div>
           <div
-            class="h-[4.5rem] bg-base-200 rounded-b-lg px-3 pt-[1.125rem] pb-[.75rem] flex flex-col justify-between"
+            class="h-[4.5rem] bg-base-100 rounded-b-lg px-3 pt-[1.125rem] pb-[.75rem] flex flex-col justify-between"
           >
             <div class="flex space-x-1 items-end">
               <div class="bg-slate-700 rounded-lg w-[5rem] h-4 animate-pulse" />
@@ -135,7 +135,7 @@
               icon={mod.icon_url}
             />
           {:else}
-            <div class="px-3 py-2 rounded-lg bg-base-300 flex justify-between">
+            <div class="px-3 py-2 rounded-lg bg-base-200 flex justify-between">
               <div class="flex items-center space-x-1 break-all">
                 <p>{mod.filename}</p>
                 <button
@@ -148,7 +148,7 @@
                 >
               </div>
               <div
-                class="bg-base-200 flex px-2 py-1 rounded-md place-items-center text-sm w-[13rem]"
+                class="bg-base-100 flex px-2 py-1 rounded-md place-items-center text-sm w-[13rem]"
               >
                 <Clock size="16" class="mr-1.5" />
                 {mod.time}

@@ -309,42 +309,6 @@ send(input);
       });
     }
   }
-  function calculateElementWidth(screenWidth) {
-  let ratio;
-
-  if (screenWidth <= 1500) {
-    ratio = 0.0002335 * screenWidth + 0.13105; // Segment 1
-  } else if (screenWidth <= 1700) {
-    ratio = 0.000176 * screenWidth + 0.2173;   // Segment 2
-  } else if (screenWidth <= 1900) {
-    ratio = 0.0001385 * screenWidth + 0.28105; // Segment 3
-  } else if (screenWidth <= 2100) {
-    ratio = 0.0001125 * screenWidth + 0.33045; // Segment 4
-  } else if (screenWidth <= 2300) {
-    ratio = 0.0000905 * screenWidth + 0.37665; // Segment 5
-  } else {
-    // Extrapolate for larger widths (use last segment's slope)
-    ratio = 0.0000905 * screenWidth + 0.37665;
-  }
-
-  return ratio * screenWidth + 40;
-}
-
-function updateElementWidth() {
-  const screenWidth = window.innerWidth;
-  const elementWidth = calculateElementWidth(screenWidth);
-  //if larger than 1280px, set to elementWidth. otherwise, full
-  const terminalContainer = document.getElementById("terminalContainerContainer");
-  const input = document.getElementById("input");
-  if (screenWidth > 1280) {
-    terminalContainer.style.width = elementWidth + "px";
-    input.style.width = elementWidth + "px";
-  } else {
-    terminalContainer.style.width = "100%";
-    input.style.width = "100%";
-  }
-}
-
 
 </script>
 
@@ -387,10 +351,8 @@ function handleKeyDown(e: KeyboardEvent) {
 
 if (browser) {
   onMount(() => {
-    window.addEventListener("resize", updateElementWidth);
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("mousedown", handleClickOutside);
-    updateElementWidth(); // Initial call to set width on mount
     window.toggleTerminalLine = toggleLineCollapse;
     (window as any).renderTerminalLines = renderTerminalLines;
 
@@ -403,7 +365,6 @@ if (browser) {
   });
 
   onDestroy(() => {
-    window.removeEventListener("resize", updateElementWidth);
     window.removeEventListener("keydown", handleKeyDown);
     window.removeEventListener("mousedown", handleClickOutside);
     delete window.toggleTerminalLine;
@@ -412,7 +373,7 @@ if (browser) {
 }
 </script>
 
-<div class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradientStroke" id="terminalContainerContainer">
+<div class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradientStroke w-full" id="terminalContainerContainer">
   <div class="flex items-center justify-between mb-2">
     <p class="font-ubuntu text-gray-200 text-lg ml-1">Server Console</p>
     <div class="flex items-center gap-3">
@@ -462,7 +423,7 @@ if (browser) {
       </div>
     </div>
   </div>
-  <div  class="relative mb-3 w-full ">
+  <div class="terminal-body relative mb-3 w-full ">
     <FullscreenTerminal />
     <TerminalFinder isVisible={showFinder} fullscreen={false} on:close={() => showFinder = false} />
     <div
@@ -490,6 +451,30 @@ if (browser) {
 </div>
 
 <style lang="scss">
+  // The parent page forces this component's root to flex:1 on tall screens
+  // (see +page.svelte's .tab-content-wrapper rule) so it can grow to fill
+  // the leftover vertical space - but that only stretches the outer card.
+  // Without this, the console kept its fixed h-[30rem]/2xl:h-[35rem] and the
+  // extra height just became blank space below it instead of more console.
+  @media (min-height: 700px) and (min-width: 1024px) {
+    #terminalContainerContainer {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .terminal-body {
+      flex: 1 1 0%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #terminalContainer {
+      flex: 1 1 0%;
+      min-height: 0;
+      height: auto;
+    }
+  }
+
   .terminal-prefs-dropdown {
     position: absolute;
     right: 0;

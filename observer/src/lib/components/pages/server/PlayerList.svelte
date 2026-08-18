@@ -9,12 +9,13 @@
     Globe,
     LogOut,
     Ban,
+    Hammer,
     UserMinus,
     UserPlus,
-    ChevronRight,
     Loader,
     Settings2,
-    DoorClosed,
+    Check,
+    X,
   } from "lucide-svelte";
 
   export let id: string | number;
@@ -27,8 +28,6 @@
   // Everything about who may join comes from /access, which reads the server's
   // own files — so a whitelist change made in the console shows up here too.
   let access: any = null;
-  let bansOpen = false;
-  let attemptsOpen = false;
   let addingUuid = "";
   let modeModalOpen = false;
   let pending: { action: any; player: any } | null = null;
@@ -132,8 +131,28 @@
         })()
       : [];
 
-  $: isEmpty =
-    onlineRows.length === 0 && offlineRows.length === 0 && neverJoined.length === 0;
+  // Dismissing an attempt just clears it from view for this session - there's
+  // no backend concept of "ignored", the log line that produced it is still
+  // there on the next poll.
+  let dismissedAttempts = new Set<string>();
+  $: visibleAttempted = attemptedRows.filter(
+    (p: any) => !dismissedAttempts.has(p.uuid || p.name)
+  );
+  function dismissAttempt(player: any) {
+    dismissedAttempts.add(player.uuid || player.name);
+    dismissedAttempts = dismissedAttempts;
+  }
+
+  // The alternating stripe reads as a list even before real rows exist - pad
+  // the box out to a minimum row count with blank filler bars rather than
+  // letting it collapse to nothing.
+  const MIN_ROWS = 6;
+  $: realRowCount =
+    onlineRows.length + offlineRows.length + neverJoined.length + visibleAttempted.length;
+  $: fillerRows = Math.max(0, MIN_ROWS - realRowCount);
+  // Always single-column - splitting into two ever made the list harder to
+  // scan than it helped.
+  const columns = 1;
 
   let playerTimer: any;
   let accessTimer: any;
@@ -213,6 +232,13 @@
   }
 
   async function actionDone() {
+    // Removing someone from the whitelist puts them right back in
+    // playersOffline-and-not-whitelisted, which is also how the attempted-
+    // joins list is built - without this they'd immediately reappear there
+    // asking to be added back.
+    if (pending?.action === "unwhitelist" && pending.player) {
+      dismissAttempt(pending.player);
+    }
     pending = null;
     // The console command the backend issues is asynchronous — the server
     // needs a beat to write the list back out before a re-read sees it.
@@ -235,23 +261,6 @@
       addName = "";
       refreshAccess();
     }
-  }
-
-  // The log prints a time of day on the *server's* clock, which under Docker
-  // is usually UTC while the browser is not — so the time is shown exactly as
-  // the server wrote it and only the date is reconstructed, by counting back
-  // from the log file's mtime. Converting the time would shift every entry by
-  // the offset between the two clocks.
-  function attemptWhen(entry: any) {
-    if (!entry?.lastAttemptTime) return "";
-    const anchor = new Date(entry.logUpdated);
-    if (isNaN(anchor.getTime())) return entry.lastAttemptTime;
-    anchor.setDate(anchor.getDate() - (entry.lastAttemptDaysAgo || 0));
-    const day = anchor.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    });
-    return day + ", " + entry.lastAttemptTime;
   }
 
   // The obvious thing to do about someone standing at the door. Passes the
@@ -284,7 +293,7 @@
   }
 </script>
 
-<div class="bg-base-300 w-full shadow-xl rounded-xl px-4 py-3 neutralGradientStroke">
+<div class="player-list-root bg-base-300 w-full shadow-xl rounded-xl px-4 py-3 neutralGradientStroke flex flex-col">
   <div class="flex items-center justify-between gap-2 mb-3">
     <p class="font-bold font-ubuntu text-gray-100">Players</p>
 
@@ -314,19 +323,19 @@
     {/if}
   </div>
 
-  <ul class="flex flex-col gap-1.5">
-    {#each onlineRows as player (player.uuid)}
+  <ul class="player-list-scroll grid grid-cols-1 content-start bg-base-100 rounded-t-lg overflow-hidden">
+    {#each onlineRows as player, i (player.uuid)}
       <li
-        class="group text-gray-200 bg-base-100 w-full p-2 px-2.5 rounded-xl font-mono text-sm flex items-center gap-2"
+        class="group text-gray-200 {(Math.floor(i / columns) + (i % columns)) % 2 === 0 ? 'bg-base-100' : 'bg-base-200'} w-full h-8 shrink-0 px-2.5 font-mono text-sm flex items-center gap-2"
       >
         <div class="relative shrink-0">
           {#if loadingStates[player.uuid]}
-            <div class="w-6 h-6 bg-gray-600 rounded animate-pulse" />
+            <div class="w-5 h-5 bg-gray-600 rounded animate-pulse" />
           {/if}
           <img
             src={`https://mc-heads.net/avatar/${player.uuid}`}
             alt={player.displayName + "'s head"}
-            class={`w-6 h-6 rounded ${loadingStates[player.uuid] ? "hidden" : "block"}`}
+            class={`w-5 h-5 rounded ${loadingStates[player.uuid] ? "hidden" : "block"}`}
             on:load={() => handleImageLoad(player.uuid)}
           />
           {#if player.bedrock}
@@ -372,18 +381,18 @@
       </li>
     {/each}
 
-    {#each offlineRows as player (player.uuid)}
+    {#each offlineRows as player, i (player.uuid)}
       <li
-        class="group text-gray-400 bg-base-100 w-full p-2 px-2.5 rounded-xl font-mono text-sm flex items-center gap-2"
+        class="group text-gray-400 {(Math.floor(i / columns) + (i % columns)) % 2 === 0 ? 'bg-base-100' : 'bg-base-200'} w-full h-8 shrink-0 px-2.5 font-mono text-sm flex items-center gap-2"
       >
         <div class="relative shrink-0">
           {#if loadingStates[player.uuid]}
-            <div class="w-6 h-6 bg-gray-600 rounded animate-pulse" />
+            <div class="w-5 h-5 bg-gray-600 rounded animate-pulse" />
           {/if}
           <img
             src={`https://mc-heads.net/avatar/${player.uuid}`}
             alt={player.displayName + "'s head"}
-            class={`w-6 h-6 grayscale opacity-75 rounded ${loadingStates[player.uuid] ? "hidden" : "block"}`}
+            class={`w-5 h-5 grayscale opacity-75 rounded ${loadingStates[player.uuid] ? "hidden" : "block"}`}
             on:load={() => handleImageLoad(player.uuid)}
           />
           {#if player.bedrock}
@@ -417,15 +426,15 @@
       </li>
     {/each}
 
-    {#each neverJoined as player (player.uuid)}
+    {#each neverJoined as player, i (player.uuid)}
       <li
-        class="group text-gray-400 bg-base-100/60 w-full p-2 px-2.5 rounded-xl font-mono text-sm flex items-center gap-2 border border-dashed border-base-content/10"
+        class="group text-gray-400 {(Math.floor(i / columns) + (i % columns)) % 2 === 0 ? 'bg-base-100/60' : 'bg-base-200/60'} w-full h-8 shrink-0 px-2.5 font-mono text-sm flex items-center gap-2 border border-dashed border-base-content/10"
       >
         <div class="relative shrink-0">
           <img
             src={`https://mc-heads.net/avatar/${player.uuid}`}
             alt=""
-            class="w-6 h-6 grayscale opacity-50 rounded"
+            class="w-5 h-5 grayscale opacity-50 rounded"
           />
           {#if player.bedrock}
             <img
@@ -451,183 +460,155 @@
       </li>
     {/each}
 
-    {#if isEmpty}
+    {#each visibleAttempted as player, i (player.uuid || player.name)}
       <li
-        class="text-gray-400 bg-base-100 w-full p-2 px-2.5 rounded-xl font-mono text-sm flex items-center"
+        class="group text-gray-300 {(Math.floor((onlineRows.length + offlineRows.length + neverJoined.length + i) / columns) + ((onlineRows.length + offlineRows.length + neverJoined.length + i) % columns)) % 2 === 0 ? 'bg-base-100' : 'bg-base-200'} w-full h-8 shrink-0 px-2.5 font-mono text-sm flex items-center gap-2"
       >
-        {mode === "whitelist"
-          ? "Nobody is whitelisted yet."
-          : "No players have joined yet."}
+        <span class="truncate">
+          Add {player.name.length > 10 ? player.name.slice(0, 10) : player.name}?
+        </span>
+        <span class="ml-auto flex items-center gap-1 shrink-0">
+          <button
+            class="btn btn-ghost btn-xs h-6 min-h-0 px-1.5 text-success"
+            disabled={addingUuid === (player.uuid || player.name)}
+            on:click={() => letThemIn(player)}
+            title="Allow"
+          >
+            {#if addingUuid === (player.uuid || player.name)}
+              <Loader size={13} class="animate-spin" />
+            {:else}
+              <Check size={13} />
+            {/if}
+          </button>
+          <button
+            class="btn btn-ghost btn-xs h-6 min-h-0 px-1.5 text-error"
+            on:click={() => dismissAttempt(player)}
+            title="Dismiss"
+          >
+            <X size={13} />
+          </button>
+        </span>
       </li>
-    {/if}
+    {/each}
+
+    {#each Array(fillerRows) as _, j}
+      <li
+        class="{(Math.floor((realRowCount + j) / columns) + ((realRowCount + j) % columns)) % 2 === 0 ? 'bg-base-100' : 'bg-base-200'} w-full h-8 shrink-0"
+        aria-hidden="true"
+      ></li>
+    {/each}
   </ul>
 
-  {#if mode === "whitelist" && attemptedRows.length > 0}
-    <!-- The mirror of the banned list in the other mode: collapsed by default,
-         because it's something you check when someone says "I can't get in",
-         not something you watch. -->
-    <div class="mt-3 pt-3 border-t border-base-content/10">
-      <button
-        class="w-full flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-base-content/45 hover:text-base-content/70 transition-colors"
-        on:click={() => (attemptsOpen = !attemptsOpen)}
-      >
-        <ChevronRight
-          size={13}
-          class="transition-transform duration-200 {attemptsOpen ? 'rotate-90' : ''}"
-        />
-        <DoorClosed size={12} />
-        Attempted joins
-        <span class="badge badge-xs badge-ghost ml-0.5">{attemptedRows.length}</span>
-      </button>
-
-      {#if attemptsOpen}
-        <ul class="flex flex-col gap-1.5 mt-2">
-          {#each attemptedRows as player (player.name)}
-            <li
-              class="group bg-base-100 w-full p-2 px-2.5 rounded-xl flex items-center gap-2"
-            >
-              <div class="relative shrink-0">
-                <img
-                  src={`https://mc-heads.net/avatar/${player.uuid || player.name}`}
-                  alt=""
-                  class="w-6 h-6 rounded grayscale opacity-60"
-                />
-                {#if player.bedrock}
-                  <img
-                    class="w-3 h-3 rounded absolute -bottom-1 -right-1 opacity-75"
-                    src="/images/bedrock.webp"
-                    alt="Bedrock"
-                  />
-                {/if}
-              </div>
-              <div class="min-w-0 flex-1">
-                <p class="font-mono text-sm text-gray-400 truncate">
-                  {player.displayName || player.name}
-                </p>
-                <p class="text-[10px] text-base-content/35 truncate">
-                  {#if player.attempts > 0}
-                    {player.attempts}
-                    {player.attempts === 1 ? "attempt" : "attempts"}
-                    {#if attemptWhen(player)}
-                      &middot; last {attemptWhen(player)}
-                    {/if}
-                  {:else}
-                    Has played here, but isn't whitelisted
-                  {/if}
-                </p>
-              </div>
-              <button
-                class="btn btn-ghost btn-xs h-6 min-h-0 px-2 text-success opacity-0 group-hover:opacity-100 transition-opacity shrink-0 gap-1"
-                disabled={addingUuid === (player.uuid || player.name)}
-                on:click={() => letThemIn(player)}
-              >
-                {#if addingUuid === (player.uuid || player.name)}
-                  <Loader size={12} class="animate-spin" />
-                {:else}
-                  <UserPlus size={12} />
-                {/if}
-                Allow
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
-  {/if}
-
   {#if mode === "whitelist"}
-    <!-- Whitelist mode's job is letting people in, so the add form is the
-         permanent fixture at the bottom rather than a collapsed section. -->
-    <div class="mt-3 pt-3 border-t border-base-content/10">
-      <p
-        class="text-[11px] font-semibold uppercase tracking-wide text-base-content/45 mb-2 flex items-center gap-1.5"
-      >
-        <UserPlus size={12} />
-        Add someone to the whitelist
-      </p>
-
-      {#if bedrockEnabled}
-        <div class="flex gap-1 mb-2">
-          <button
-            class="flex-1 text-[11px] font-semibold rounded-lg py-1.5 transition-colors border {addPlatform ===
-            'java'
-              ? 'bg-primary/15 border-primary/40 text-primary'
-              : 'bg-base-100 border-base-content/10 text-base-content/50 hover:border-base-content/25'}"
-            on:click={() => (addPlatform = "java")}
-          >
-            Java Edition
-          </button>
-          <button
-            class="flex-1 text-[11px] font-semibold rounded-lg py-1.5 transition-colors border flex items-center justify-center gap-1.5 {addPlatform ===
-            'bedrock'
-              ? 'bg-primary/15 border-primary/40 text-primary'
-              : 'bg-base-100 border-base-content/10 text-base-content/50 hover:border-base-content/25'} {canAddBedrock
-              ? ''
-              : 'opacity-40 cursor-not-allowed'}"
-            disabled={!canAddBedrock}
-            on:click={() => (addPlatform = "bedrock")}
-          >
-            <img src="/images/bedrock.webp" alt="" class="w-3 h-3 rounded" />
-            Bedrock
-          </button>
-        </div>
-      {/if}
-
-      <form class="flex gap-1.5" on:submit|preventDefault={submitAdd}>
-        <input
-          type="text"
-          bind:value={addName}
-          maxlength="32"
-          placeholder={addPlatform === "bedrock" && bedrockEnabled
-            ? "Xbox gamertag"
-            : "Minecraft username"}
-          class="input input-sm input-bordered bg-base-100 font-mono text-sm flex-1 min-w-0"
-        />
-        <button
-          class="btn btn-primary btn-sm px-3"
-          disabled={adding || !addName.trim()}
-          type="submit"
-        >
-          {#if adding}
-            <Loader size={14} class="animate-spin" />
-          {:else}
-            <UserPlus size={14} />
-          {/if}
-        </button>
-      </form>
-
-      <p class="text-[10px] text-base-content/40 mt-1.5 leading-relaxed">
-        {#if addPlatform === "bedrock" && bedrockEnabled}
-          Enter their Xbox gamertag exactly as it appears in game. Spaces become
-          underscores, and they need to have joined a Bedrock server at least
-          once before their account can be looked up.
-        {:else}
-          Enter their exact Minecraft username. They don't need to have joined
-          this server before.
-        {/if}
-      </p>
-    </div>
-  {:else if bannedRows.length > 0}
-    <!-- Collapsed by default: on a healthy server the ban list is something
-         you check occasionally, not something you watch. -->
-    <div class="mt-3 pt-3 border-t border-base-content/10">
+    <!-- Same panel format as the Banned trigger in the other mode: flush
+         against the divider, capped at the bottom, buttons open modals
+         instead of taking up permanent inline space. -->
+    <div class="border-t border-base-content/10 bg-base-100 rounded-b-lg py-1 flex items-center justify-center gap-2">
       <button
-        class="w-full flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-base-content/45 hover:text-base-content/70 transition-colors"
-        on:click={() => (bansOpen = !bansOpen)}
+        class="btn btn-ghost btn-xs gap-1.5 text-[11px] font-semibold uppercase tracking-wide"
+        on:click={() => document.getElementById("addPlayerModal").showModal()}
       >
-        <ChevronRight
-          size={13}
-          class="transition-transform duration-200 {bansOpen ? 'rotate-90' : ''}"
-        />
-        <Ban size={12} />
-        Banned
-        <span class="badge badge-xs badge-error badge-outline ml-0.5">
-          {bannedRows.length}
-        </span>
+        <UserPlus size={12} class="mr-1.5" />
+        Add Player
       </button>
+    </div>
 
-      {#if bansOpen}
-        <ul class="flex flex-col gap-1.5 mt-2">
+    <dialog id="addPlayerModal" class="modal">
+      <div class="modal-box">
+        <h3 class="text-lg font-bold flex items-center gap-2">
+          <UserPlus size={16} />
+          Add someone to the whitelist
+        </h3>
+
+        {#if bedrockEnabled}
+          <div class="flex gap-1 mt-4 mb-2">
+            <button
+              class="flex-1 text-[11px] font-semibold rounded-lg py-1.5 transition-colors border {addPlatform ===
+              'java'
+                ? 'bg-primary/15 border-primary/40 text-primary'
+                : 'bg-base-100 border-base-content/10 text-base-content/50 hover:border-base-content/25'}"
+              on:click={() => (addPlatform = "java")}
+            >
+              Java Edition
+            </button>
+            <button
+              class="flex-1 text-[11px] font-semibold rounded-lg py-1.5 transition-colors border flex items-center justify-center gap-1.5 {addPlatform ===
+              'bedrock'
+                ? 'bg-primary/15 border-primary/40 text-primary'
+                : 'bg-base-100 border-base-content/10 text-base-content/50 hover:border-base-content/25'} {canAddBedrock
+                ? ''
+                : 'opacity-40 cursor-not-allowed'}"
+              disabled={!canAddBedrock}
+              on:click={() => (addPlatform = "bedrock")}
+            >
+              <img src="/images/bedrock.webp" alt="" class="w-3 h-3 rounded" />
+              Bedrock
+            </button>
+          </div>
+        {/if}
+
+        <form class="flex gap-1.5 mt-4" on:submit|preventDefault={submitAdd}>
+          <input
+            type="text"
+            bind:value={addName}
+            maxlength="32"
+            placeholder={addPlatform === "bedrock" && bedrockEnabled
+              ? "Xbox gamertag"
+              : "Minecraft username"}
+            class="input input-sm input-bordered bg-base-100 font-mono text-sm flex-1 min-w-0"
+          />
+          <button
+            class="btn btn-primary btn-sm px-3"
+            disabled={adding || !addName.trim()}
+            type="submit"
+          >
+            {#if adding}
+              <Loader size={14} class="animate-spin" />
+            {:else}
+              <UserPlus size={14} />
+            {/if}
+          </button>
+        </form>
+
+        <p class="text-[10px] text-base-content/40 mt-1.5 leading-relaxed">
+          {#if addPlatform === "bedrock" && bedrockEnabled}
+            Enter their Xbox gamertag exactly as it appears in game. Spaces become
+            underscores, and they need to have joined a Bedrock server at least
+            once before their account can be looked up.
+          {:else}
+            Enter their exact Minecraft username. They don't need to have joined
+            this server before.
+          {/if}
+        </p>
+
+        <div class="modal-action">
+          <form method="dialog">
+            <button class="btn">Close</button>
+          </form>
+        </div>
+      </div>
+    </dialog>
+  {:else if bannedRows.length > 0}
+    <!-- The list box above only rounds its top corners in this mode so this
+         panel sits flush against the divider instead of leaving a gap -
+         together they read as one card, capped at the bottom by this panel. -->
+    <div class="border-t border-base-content/10 bg-base-100 rounded-b-lg py-1 flex items-center justify-center">
+      <button
+        class="btn btn-ghost btn-xs gap-1.5 text-[11px] font-semibold uppercase tracking-wide"
+        on:click={() => document.getElementById("bannedModal").showModal()}
+      >
+        <Hammer size={12} class="mr-1.5" />
+        Open Ban List
+      </button>
+    </div>
+
+    <dialog id="bannedModal" class="modal">
+      <div class="modal-box">
+        <h3 class="text-lg font-bold flex items-center gap-2">
+          <Ban size={16} />
+          Banned
+        </h3>
+        <ul class="flex flex-col gap-1.5 mt-4">
           {#each bannedRows as player (player.uuid)}
             <li
               class="group bg-base-100 w-full p-2 px-2.5 rounded-xl flex items-center gap-2"
@@ -660,7 +641,7 @@
                 {/if}
               </div>
               <button
-                class="btn btn-ghost btn-xs h-6 min-h-0 px-2 text-success opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                class="btn btn-ghost btn-xs h-6 min-h-0 px-2 text-success shrink-0"
                 on:click={() => act("unban", player)}
               >
                 Unban
@@ -668,10 +649,32 @@
             </li>
           {/each}
         </ul>
-      {/if}
-    </div>
+        <div class="modal-action">
+          <form method="dialog">
+            <button class="btn">Close</button>
+          </form>
+        </div>
+      </div>
+    </dialog>
   {/if}
 </div>
+
+<style>
+  /* The parent page forces .player-list-root (the last card in the right
+     column) to flex:1 on tall screens (see +page.svelte's .right-side-cards
+     rule) so it can grow into the leftover vertical space. Without this, that
+     extra height just sat blank below the online-players list - this makes
+     the list itself the scrollable region that actually claims it, while the
+     header and the banned/attempted-joins section below keep their natural
+     size. */
+  @media (min-height: 700px) and (min-width: 1024px) {
+    .player-list-scroll {
+      flex: 1 1 0%;
+      min-height: 0;
+      overflow-y: auto;
+    }
+  }
+</style>
 
 {#if modeModalOpen && access}
   <AccessModeModal

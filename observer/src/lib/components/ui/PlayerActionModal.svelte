@@ -37,7 +37,7 @@
       icon: Ban,
       accent: "text-error",
       title: "Ban this player?",
-      body: "They'll be disconnected and won't be able to rejoin until you unban them. Their builds and items are left alone.",
+      body: "They'll be disconnected and won't be able to rejoin until you unban them.",
       confirm: "Ban",
       button: "btn-error",
       wantsReason: true,

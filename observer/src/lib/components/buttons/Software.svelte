@@ -227,7 +227,7 @@
 <label
   for="softwaremodal"
   style="margin:0rem;"
-  class="btn bg-base-100 btn-ms w-36"
+  class="btn bg-base-100 btn-ms"
   on:click={onModalOpen}
   ><Cpu size=20 />
   {$t("button.software")}</label

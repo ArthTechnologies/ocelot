@@ -8,7 +8,7 @@
     <Sidebar />
   </div>
   <div class="w-full md:w-[78%] flex-1 overflow-y-auto">
-    <div class="p-4 sm:p-6 md:p-8 pb-12 lg:pt-16">
+    <div class="p-4 sm:p-6 md:p-8 pb-6 lg:pt-16">
       <slot />
     </div>
   </div>

@@ -8,12 +8,17 @@ export function numShort(num: number) {
   return `${(num / 1000000000).toFixed(3)}b`;
 }
 
+// Drops a trailing ".0" so whole numbers don't carry a pointless decimal - "5GB" not "5.0GB".
+function trimTrailingZero(value: string) {
+  return value.replace(/\.0$/, "");
+}
+
 export function fileSizeShort(bytes: number) {
 
   if (bytes < 100) return bytes.toString();
-  if (bytes < 100000) return `${(bytes / 1000).toFixed(1)}kB`;
-  if (bytes < 100000000) return `${(bytes / 1000000).toFixed(1)}mB`;
-  return `${(bytes / 1000000000).toFixed(1)}gB`;
+  if (bytes < 100000) return `${trimTrailingZero((bytes / 1000).toFixed(1))}kB`;
+  if (bytes < 100000000) return `${trimTrailingZero((bytes / 1000000).toFixed(1))}mB`;
+  return `${trimTrailingZero((bytes / 1000000000).toFixed(1))}gB`;
 }
 
 // Moves the node (and its children) to document.body on mount, so fixed-position
@@ -52,10 +57,8 @@ if (total < 1024 * 100) { // For kilobytes (kB)
     unitDivisor = 1024;
 }
 
-  console.error("total = " + total + ", shortened = " + (total / unitDivisor).toFixed(1) + unit);
-
-  total = (total / unitDivisor).toFixed(1);
-  current = (current / unitDivisor).toFixed(1);
+  total = trimTrailingZero((total / unitDivisor).toFixed(1));
+  current = trimTrailingZero((current / unitDivisor).toFixed(1));
 
   return `${current}/${total}${unit}`;
 

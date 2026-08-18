@@ -13,6 +13,8 @@
   import DeleteServer from "$lib/components/ui/DeleteServer.svelte";
   import SettingsLayout from "./SettingsLayout.svelte";
   import SettingsScheduler from "./SettingsScheduler.svelte";
+  import Versions from "$lib/components/buttons/Versions.svelte";
+  import Software from "$lib/components/buttons/Software.svelte";
 
   let id: string;
   let icon = "";
@@ -181,6 +183,11 @@
 
   function copyChar() {
     navigator.clipboard.writeText("§");
+  }
+
+  function copySubuserSignupLink() {
+    navigator.clipboard.writeText(window.location.origin + "/signup/subuser");
+    alert("Link copied to clipboard", "success");
   }
 
   function allowAccount() {
@@ -584,6 +591,14 @@
           <div class="divider my-3"></div>
         {/if}
 
+        <div class="space-y-1 mb-4">
+          <p class="text-xs text-gray-400">
+            Don't have their account ID? Tell your friend to make an account with
+            <button class="link link-primary" on:click={copySubuserSignupLink}>this link</button>
+            — it won't ask them to check out, just to sign up.
+          </p>
+        </div>
+
         <div class="space-y-2">
           <label for="allowAccountInput" class="block text-sm font-semibold">
             Add Sub-User
@@ -617,6 +632,16 @@
     <div>
       <h2 class="text-2xl font-bold">Advanced Settings</h2>
       <p class="text-sm text-gray-400 mt-1">Fine-tune your server's Java configuration and startup parameters</p>
+    </div>
+
+    <!-- Minecraft Version / Software -->
+    <div class="space-y-4">
+      <h3 class="text-lg font-semibold">Minecraft Version & Software</h3>
+      <div class="bg-base-200 rounded-lg p-4 flex gap-2">
+        <Versions />
+        <Software />
+      </div>
+      <p class="text-xs text-gray-400">Changing either restarts the server to apply.</p>
     </div>
 
     <!-- Java Version -->

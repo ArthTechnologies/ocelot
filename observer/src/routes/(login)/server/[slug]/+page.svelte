@@ -476,7 +476,7 @@
   />
 {/if}
 
-<div class="lg:-mt-5">
+<div class="server-page-root -mt-1 sm:-mt-1.5 md:-mt-2 lg:-mt-[30px]">
   <!-- Start Top Section-->
   <div class="flex justify-between mb-2 items-center">
     <div>
@@ -599,11 +599,11 @@
 
   <!-- Start Bottom Section-->
   <div
-    class="md:space-x-7 flex xs:flex-col-reverse max-lg:flex-col max-lg:items-center gap-0 justify-between md:px-5"
+    class="bottom-section md:space-x-7 flex xs:flex-col-reverse max-lg:flex-col max-lg:items-center gap-0 justify-between md:px-5"
   >
     <!-- Start Left Side-->
-    <div class="flex flex-col space-y-3 w-full">
-      <div role="tablist" class="tabs font-ubuntu tabs-boxed bg-base-300  w-fit  p-2 flex flex-wrap p-0 gap-1">
+    <div class="left-side flex flex-col space-y-3 w-full">
+      <div role="tablist" class="tabs font-ubuntu tabs-boxed bg-base-300  w-full  p-2 flex flex-wrap p-0 gap-1">
         {#each tabs as label, index}
           {#if label == "mods"}
             <a
@@ -640,7 +640,7 @@
         {/each}
       </div>
 
-      <div>
+      <div class="tab-content-wrapper">
         {#if tab == "terminal"}
           <Terminal />
         {:else if tab == "plugins"}
@@ -664,9 +664,9 @@
     <!-- End Left Side-->
     <!-- Start Right Side-->
     <div
-      class="flex flex-col items-center place-content-start mb-20 lg:pl-0 mt-[3.75rem] gap-5 w-full lg:w-[18.5rem] xl:w-[19.75rem]"
+      class="right-side flex flex-col items-center place-content-start mb-20 lg:pl-0 mt-[3.75rem] lg:mt-0 gap-5 w-full lg:w-[18.5rem] xl:w-[19.75rem]"
     >
-      <div class="space-y-5 w-full">
+      <div class="right-side-cards space-y-5 w-full">
     <ServerInfo {name} {address} {port} {subdomain} {modded} {geyser} description={rawDesc} />
 
     <PlayerList {id}/>
@@ -851,6 +851,93 @@
 
 
 <style>
+  /*
+   * The (login) layout wraps every page's slot in its own padding (p-4/sm:p-6/
+   * md:p-8/pb-6/lg:pt-16) that this element's negative top margin only partly
+   * cancels - a flat `height: 100vh` here still leaves that leftover padding
+   * poking past the viewport, which is what kept the outer layout scrollable.
+   * Each breakpoint below subtracts its own net top offset (padding minus the
+   * negative margin already applied above) plus the actual bottom padding in
+   * effect at that width - pb-6 (24px) only wins at the base breakpoint;
+   * sm:p-6/md:p-8's `padding` shorthand is compiled later and overrides it
+   * back to 24px/32px, and lg:pt-16 only touches padding-top so bottom
+   * stays at md:p-8's 32px from lg upward.
+   */
+  @media (min-height: 700px) {
+    .server-page-root {
+      height: calc(100vh - 36px);
+      overflow: hidden;
+    }
+  }
+  @media (min-height: 700px) and (min-width: 640px) {
+    .server-page-root {
+      height: calc(100vh - 42px);
+    }
+  }
+  @media (min-height: 700px) and (min-width: 768px) {
+    .server-page-root {
+      height: calc(100vh - 56px);
+    }
+  }
+  @media (min-height: 700px) and (min-width: 1024px) {
+    .server-page-root {
+      height: calc(100vh - 66px);
+    }
+
+    /*
+     * With the root's height locked above, let the tab body (Terminal,
+     * Plugins, Datapacks, etc.) and PlayerList stretch to use the leftover
+     * space instead of sitting at their natural content height with blank
+     * room below them. server-page-root becomes a column so the bottom
+     * section can flex-grow into whatever the title/status row didn't use;
+     * that section is still a row (left/right side), so its children get
+     * their height for free via flexbox's default cross-axis stretch - the
+     * rest just plumbs that height down to the one element in each column
+     * that should actually claim it.
+     */
+    .server-page-root {
+      display: flex;
+      flex-direction: column;
+    }
+    .bottom-section {
+      flex: 1 1 0%;
+      min-height: 0;
+    }
+    .left-side {
+      min-height: 0;
+    }
+    .tab-content-wrapper {
+      flex: 1 1 0%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Whichever tab component is mounted renders as this wrapper's one child. */
+    .tab-content-wrapper > :global(*) {
+      flex: 1 1 0%;
+      min-height: 0;
+    }
+    .right-side {
+      min-height: 0;
+      /* mb-20 is meant for the normal (unstretched) layout - under
+         align-items:stretch it gets counted against the box's height, so
+         80px of the intended growth was disappearing as margin instead of
+         becoming space PlayerList could actually fill. */
+      margin-bottom: 0;
+    }
+    .right-side-cards {
+      flex: 1 1 0%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    /* ServerInfo keeps its natural height; PlayerList (the last card) grows. */
+    .right-side-cards > :global(*:last-child) {
+      flex: 1 1 0%;
+      min-height: 0;
+    }
+  }
+
    .neutralGradientStroke {
     position: relative;
 

@@ -85,13 +85,14 @@
 <div>
   <div class="flex items-start justify-between gap-2 font-poppins mb-2">
 
-  <p><span class="">Storage:</span>
-  <span class="text-gray-400 font-semibold px-0.5 text-sm text-zinc-200">{storageRatio}</span></p>
+  <p><span class="text-sm font-light font-poppins">Storage</span>
+  <span class="text-sm font-light font-poppins">&bull;</span>
+  <span class="text-sm font-light font-mono">{storageRatio}</span></p>
 <span class="badge text-xs mt-0.5 hidden">Upgrade for more</span>
 </div>
 <div
   id="ratioVisualizer"
-  class="relative bg-base-200 border-base-100 border-0 rounded-lg px-4 flex items-center w-full h-4 -my-1 font-semibold text-sm uppercase text-gray-200 gap-1.5 justify-center"
+  class="relative bg-base-200 border-base-100 border-0 rounded-lg px-4 flex items-center w-full h-[21px] -my-1 font-semibold text-sm uppercase text-gray-200 gap-1.5 justify-center"
 >
 
 

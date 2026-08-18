@@ -22,6 +22,12 @@ let terminalOutput = [];
 let terminalInput = "";
 
 let players = [];
+// Name->uuid cache from "UUID of player" lines, keyed by server id. That line
+// fires on every connection attempt - including ones the whitelist or ban
+// list reject - so it can't be trusted as a join by itself; it's only used to
+// supply the uuid once "joined the game" confirms the connection actually
+// succeeded.
+let pendingUuids = [];
 
 const portOffset = 10000;
 const idOffset = parseInt(config.idOffset);
@@ -1454,20 +1460,37 @@ function readTerminal(id) {
   // Process each line individually
   let lines = newOutput.split('\n');
   for (let line of lines) {
-    // Java player join
+    // Java player connection attempt - resolves the uuid, but fires whether
+    // or not the whitelist/ban list goes on to let them in, so it only
+    // primes the cache below rather than marking them online directly.
     if (line.includes("UUID of player")) {
       let match = line.match(/UUID of player (\w+) is ([a-f0-9-]+)/);
       if (match) {
         let name = match[1];
         let uuid = match[2];
-        
-        players[id] = players[id] || [];
-        if (!players[id].some(p => p.uuid === uuid)) {
-          players[id].push({ name, uuid });
+
+        pendingUuids[id] = pendingUuids[id] || {};
+        pendingUuids[id][name] = uuid;
+      }
+    }
+
+    // Java player join - the actual game-state event, symmetric with "left
+    // the game" below. A rejected connection never reaches this line, so it
+    // can't get stuck online with no matching leave to remove it.
+    if (line.includes(" joined the game")) {
+      let match = line.match(/: (\S+) joined the game$/);
+      if (match) {
+        let name = match[1];
+        let uuid = pendingUuids[id] && pendingUuids[id][name];
+        if (uuid) {
+          players[id] = players[id] || [];
+          if (!players[id].some(p => p.uuid === uuid)) {
+            players[id].push({ name, uuid });
+          }
         }
       }
     }
-    
+
     // Bedrock player join
     if (line.includes(" joined (UUID: ")) {
       let match = line.match(/(.*) joined \(UUID: ([a-f0-9-]+)\)/);
