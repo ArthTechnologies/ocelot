@@ -75,7 +75,7 @@
 
 
   <div
-    class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradietStroke w-full space-y-2 min-h-[30rem]"
+    class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradietStroke w-full space-y-2 min-h-[30rem] flex flex-col"
   >
 
 <div class="flex justify-between items-center">
@@ -84,7 +84,7 @@
 </div>
 
 
-    <div class="space-y-2">
+    <div class="space-y-2 flex-1 overflow-y-auto">
       {#await promise}
         {#each Array(3) as _}
           <ManagePluginSkele />
