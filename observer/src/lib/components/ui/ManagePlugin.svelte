@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { apiurl, usingOcelot, getServerNode } from "$lib/scripts/req";
+  import { apiurl, usingOcelot, getServerNode, writeTerminal } from "$lib/scripts/req";
   import { lrurl } from "$lib/scripts/req";
   import { browser } from "$app/environment";
   import { t } from "$lib/scripts/i18n";
-  import { BoxIcon, ChevronDown, ChevronUp, Clock, InfoIcon, Trash, Trash2 } from "lucide-svelte";
+  import { BoxIcon, ChevronDown, ChevronUp, Clock, ExternalLink, InfoIcon, Send, Trash, Trash2 } from "lucide-svelte";
   import ChooseVersion from "./ChooseVersion.svelte";
   import ChooseModVersion from "./ChooseModVersion.svelte";
   import TranslateableText from "./TranslateableText.svelte";
@@ -30,6 +30,27 @@
 
   let time = new Date(date).toLocaleString();
   let serverId = "";
+  const webmapurl =
+    "http://" + apiurl.substring(0, apiurl.length - 1).split("https://")[1];
+  let pregenRadius = "";
+
+  $: lowerName = (name || "").toLowerCase();
+  $: lowerFile = (filename || "").toLowerCase();
+  $: isDynmap = modtype === "plugin" && (lowerName.includes("dynmap") || lowerFile.includes("dynmap"));
+  $: isBluemap = modtype === "plugin" && (lowerName.includes("bluemap") || lowerFile.includes("bluemap"));
+  $: isVoicechat = modtype === "plugin" && (lowerName.includes("voice chat") || lowerFile.includes("voicechat") || lowerFile.includes("voice-chat"));
+  $: isChunky = modtype === "plugin" && (lowerName.includes("chunky") || lowerFile.includes("chunky"));
+  $: isDiscordsrv = modtype === "plugin" && (lowerName.includes("discordsrv") || lowerFile.includes("discordsrv"));
+  $: hasSpecial = isDynmap || isBluemap || isVoicechat || isChunky || isDiscordsrv;
+
+  function dynmapRender() {
+    writeTerminal(parseInt(serverId), "dynmap fullrender world");
+  }
+
+  function pregen() {
+    writeTerminal(parseInt(serverId), "chunky start world circle 0 0 " + pregenRadius);
+    pregenRadius = "";
+  }
 
   let prefixToHandleFlexOnSM = "";
   if (platform == "cf" || platform == "lr") {
@@ -166,7 +187,7 @@
 {:else if state == "normal"}
 <div>
   <div
-    class="p-2 rounded-lg bg-base-200 flex justify-between items-center h-16"
+    class="p-2 {hasSpecial ? 'rounded-t-lg' : 'rounded-lg'} bg-base-200 flex justify-between items-center h-16"
   >
     <div class="{prefixToHandleFlexOnSM}flex items-center gap-1 break-all">
       <div class="flex gap-2 mr-1 items-center max-{prefixToHandleFlexOnSM}mb-1">
@@ -221,6 +242,97 @@
 
     </div>
   </div>
+
+  {#if isDynmap}
+    <div class="bg-base-100 rounded-b-lg p-2 flex flex-wrap items-center gap-2">
+      <div
+        style="text-wrap: nowrap;"
+        class="tooltip tooltip-top tooltip-info z-50 hidden sm:block"
+        data-tip="Only renders overworld. See guide for more info."
+      >
+        <button on:click={dynmapRender} class="btn btn-neutral btn-sm items-center"
+          >{$t("plugins.dynmap.render")}</button
+        >
+      </div>
+      <a href="https://arthmc.xyz/knowledgebase/using-dynmap" target="_blank" rel="noreferrer">
+        <button class="btn btn-neutral btn-sm items-center"
+          >{$t("plugins.dynmap.guide")}
+          <ExternalLink size="18" class="ml-1" /></button
+        >
+      </a>
+      <a href="{webmapurl}:{parseInt(serverId) + 10066}" target="_blank" rel="noreferrer">
+        <button class="btn btn-sm items-center hover:bg-base-100"
+          >{$t("plugins.dynmap.map")}
+          <ExternalLink size="18" class="ml-1" /></button
+        >
+      </a>
+    </div>
+  {/if}
+
+  {#if isBluemap}
+    <div class="bg-base-100 rounded-b-lg p-2 flex flex-wrap items-center gap-2">
+      <a href="https://arthmc.xyz/knowledgebase/using-bluemap" target="_blank" rel="noreferrer">
+        <button class="btn btn-neutral btn-sm items-center"
+          >{$t("plugins.voicechat.guide")}
+          <ExternalLink size="18" class="ml-1" /></button
+        >
+      </a>
+      <a href="{webmapurl}:{parseInt(serverId) + 10066}" target="_blank" rel="noreferrer">
+        <button class="btn btn-sm items-center hover:bg-base-100"
+          >Open Webmap
+          <ExternalLink size="18" class="ml-1" /></button
+        >
+      </a>
+    </div>
+  {/if}
+
+  {#if isVoicechat}
+    <div class="bg-base-100 rounded-b-lg p-2 flex flex-wrap items-center gap-2">
+      <a href="https://arthmc.xyz/knowledgebase/using-simple-voice-chat" target="_blank" rel="noreferrer">
+        <button class="btn btn-neutral btn-sm items-center"
+          >{$t("plugins.voicechat.guide")}
+          <ExternalLink size="18" class="ml-1" /></button
+        >
+      </a>
+      <a href="https://modrinth.com/plugin/simple-voice-chat/versions?l=fabric" target="_blank" rel="noreferrer">
+        <button class="btn btn-sm items-center hover:bg-base-100"
+          >{$t("plugins.voicechat.downloadMod")}
+          <ExternalLink size="18" class="ml-1" /></button
+        >
+      </a>
+    </div>
+  {/if}
+
+  {#if isChunky}
+    <div class="bg-base-100 rounded-b-lg p-2 flex flex-wrap items-center gap-2">
+      <input
+        bind:value={pregenRadius}
+        class="input input-sm w-32 input-bordered"
+        placeholder={$t("plugins.chunky.l.radius")}
+        type="text"
+      />
+      <button on:click={pregen} class="btn btn-secondary btn-sm btn-square"
+        ><Send size="18" /></button
+      >
+      <a href="https://github.com/pop4959/Chunky/wiki/Commands" target="_blank" rel="noreferrer">
+        <button class="btn btn-neutral btn-sm items-center"
+          >{$t("plugins.voicechat.guide")}
+          <ExternalLink size="18" class="ml-1" /></button
+        >
+      </a>
+    </div>
+  {/if}
+
+  {#if isDiscordsrv}
+    <div class="bg-base-100 rounded-b-lg p-2 flex flex-wrap items-center gap-2">
+      <a href="https://knowledgebase.discordsrv.com/installation/initial-setup" target="_blank" rel="noreferrer">
+        <button class="btn btn-neutral btn-sm items-center"
+          >{$t("plugins.discordsrv.guide")}
+          <ExternalLink size="18" class="ml-1" /></button
+        >
+      </a>
+    </div>
+  {/if}
 
 </div>
 {/if}

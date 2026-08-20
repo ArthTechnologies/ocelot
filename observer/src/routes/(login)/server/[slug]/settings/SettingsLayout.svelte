@@ -57,4 +57,16 @@
   aside :global(button) {
     will-change: background-color;
   }
+
+  /* The parent page forces this component's root to flex:1 on tall screens
+     (see +page.svelte's .tab-content-wrapper rule) so it can grow to fill
+     the leftover vertical space. Without this, a section's content (e.g.
+     the sub-users or scheduler list) kept its natural height and got
+     clipped by .server-page-root's overflow:hidden instead of scrolling. */
+  @media (min-height: 700px) and (min-width: 1024px) {
+    main {
+      min-height: 0;
+      overflow-y: auto;
+    }
+  }
 </style>

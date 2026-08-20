@@ -5,7 +5,6 @@
   import {
     changeServerState,
     deleteServer,
-    writeTerminal,
     readTerminal,
     apiurl,
     usingOcelot,
@@ -32,8 +31,6 @@
     PlayCircle,
     Repeat,
     StopCircle,
-    ExternalLink,
-    Send,
     FileCog,
     MemoryStick,
     Users,
@@ -94,13 +91,6 @@
   let secret = "";
   let geyser = false;
   let baseurl = apiurl;
-  let dynmap = false;
-  let bluemap = false;
-  let webmapurl =
-    "http://" + apiurl.substring(0, apiurl.length - 1).split("https://")[1];
-  let voicechat = false;
-  let chunky = false;
-  let discordsrv = false;
   let subdomain = undefined;
   let memoryStats = [];
   let memoryReq = null;
@@ -133,26 +123,6 @@
 
     if (localStorage.getItem("serverSubdomain") != undefined) {
       subdomain = localStorage.getItem("serverSubdomain");
-    }
-
-    if (localStorage.getItem("serverDynmap") == "true") {
-      dynmap = true;
-    }
-
-    if (localStorage.getItem("serverBluemap") == "true") {
-      bluemap = true;
-    }
-
-    if (localStorage.getItem("serverVoicechat") == "true") {
-      voicechat = true;
-    }
-
-    if (localStorage.getItem("serverChunky") == "true") {
-      chunky = true;
-    }
-
-    if (localStorage.getItem("serverDiscordSRV") == "true") {
-      discordsrv = true;
     }
 
     if (usingOcelot) {
@@ -215,56 +185,7 @@
       );
       localStorage.setItem("serverVersion", response.version);
       if (response.specialPlugins != undefined) {
-        localStorage.setItem(
-          "serverDynmap",
-          response.specialPlugins.includes("dynmap")
-        );
-        localStorage.setItem(
-          "serverBluemap",
-          response.specialPlugins.includes("bluemap")
-        );
-        localStorage.setItem(
-          "serverChunky",
-          response.specialPlugins.includes("chunky")
-        );
-        localStorage.setItem(
-          "serverDiscordSRV",
-          response.specialPlugins.includes("discordsrv")
-        );
-        localStorage.setItem(
-          "serverVoicechat",
-          response.specialPlugins.includes("voicechat")
-        );
         geyser = response.specialPlugins.includes("geyser");
-      }
-
-      if (response.specialPlugins.includes("dynmap") && dynmap == false) {
-        setTimeout(() => {
-          dynmap = true;
-        }, 5000);
-      }
-      if (response.specialPlugins.includes("bluemap") && bluemap == false) {
-        setTimeout(() => {
-          bluemap = true;
-        }, 5000);
-      }
-      if (response.specialPlugins.includes("voicechat") && voicechat == false) {
-        setTimeout(() => {
-          voicechat = true;
-        }, 5000);
-      }
-      if (response.specialPlugins.includes("chunky") && chunky == false) {
-        setTimeout(() => {
-          chunky = true;
-        }, 5000);
-      }
-      if (
-        response.specialPlugins.includes("discordsrv") &&
-        discordsrv == false
-      ) {
-        setTimeout(() => {
-          discordsrv = true;
-        }, 5000);
       }
 
       //set state to response
@@ -381,19 +302,6 @@
   if (tab == "terminal") {
     readCmd();
   }
-
-  function dynmapRender() {
-    writeTerminal(id, "dynmap fullrender world");
-  }
-
-  function pregen() {
-    let radius = document.getElementById("pregenRadius").value;
-    writeTerminal(id, "chunky start world circle 0 0 " + radius);
-    document.getElementById("pregenRadius").value = "";
-  }
-
-
-
 
   if (browser) {
     fetchRam();
@@ -671,178 +579,6 @@
 
     <PlayerList {id}/>
       </div>
-
-
-      {#if dynmap}
-        <div
-          class=" bg-base-100 rounded-lg mt-3 p-2 flex items-center gap-2 w-[20.75rem]"
-        >
-          <img
-            alt="dynmap-icon"
-            class="w-8 h-8 rounded-lg bg-base-200"
-            src="/images/dynmap.webp"
-          />
-
-          <div class="w-0.5 h-8 bg-base-300 opacity-75 m-0"></div>
-          <div
-            style="text-wrap: nowrap;"
-            class="tooltip tooltip-top tooltip-info z-50 hidden sm:block"
-            data-tip="Only renders overworld. See guide for more info."
-          >
-            <button
-              on:click={dynmapRender}
-              class="btn btn-neutral btn-sm items-center"
-              >{$t("plugins.dynmap.render")}</button
-            >
-          </div>
-          <a
-            href="https://arthmc.xyz/knowledgebase/using-dynmap"
-            target="_blank"
-            rel="noreferrer"
-            ><button class="btn btn-neutral btn-sm items-center"
-              >{$t("plugins.dynmap.guide")}
-              <ExternalLink size="18" class="ml-1" /></button
-            ></a
-          >
-          <a
-            href="{webmapurl}:{parseInt(id) + 10066}"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <button class="btn btn-sm items-center hover:bg-base-100"
-              >{$t("plugins.dynmap.map")}
-              <ExternalLink size="18" class="ml-1" /></button
-            ></a
-          >
-        </div>
-      {/if}
-      {#if bluemap}
-        <div
-          class=" bg-base-100 rounded-lg mt-3 p-2 flex items-center gap-2 w-[20.75rem]"
-        >
-          <div class="dropdown dropdown-hover">
-            <img
-              alt="bluemap-icon"
-              class="w-8 h-8 rounded-lg bg-base-200"
-              src="/images/bluemap.webp"
-            />
-          </div>
-
-          <div class="w-0.5 h-8 bg-base-300 opacity-75 m-0"></div>
-          <a
-            href="https://arthmc.xyz/knowledgebase/using-bluemap"
-            target="_blank"
-            rel="noreferrer"
-            ><button class="btn btn-neutral btn-sm items-center"
-              >{$t("plugins.voicechat.guide")}
-              <ExternalLink size="18" class="ml-1" /></button
-            ></a
-          >
-          <a
-            href="{webmapurl}:{parseInt(id) + 10066}"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <button class="btn btn-sm items-center hover:bg-base-100"
-              >Open Webmap
-              <ExternalLink size="18" class="ml-1" /></button
-            ></a
-          >
-        </div>
-      {/if}
-      {#if voicechat}
-        <div
-          class=" bg-base-100 rounded-lg mt-3 p-2 flex items-center gap-2 w-[20.75rem]"
-        >
-          <div class="dropdown dropdown-hover">
-            <img
-              alt="dynmap-icon"
-              class="w-8 h-8 rounded-lg bg-base-200"
-              src="/images/voicechat.webp"
-            />
-          </div>
-
-          <div class="w-0.5 h-8 bg-base-300 opacity-75 m-0"></div>
-          <a
-            href="https://arthmc.xyz/knowledgebase/using-simple-voice-chat"
-            target="_blank"
-            rel="noreferrer"
-            ><button class="btn btn-neutral btn-sm items-center"
-              >{$t("plugins.voicechat.guide")}
-              <ExternalLink size="18" class="ml-1" /></button
-            ></a
-          >
-          <a
-            href="https://modrinth.com/plugin/simple-voice-chat/versions?l=fabric"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <button class="btn btn-sm items-center hover:bg-base-100"
-              >{$t("plugins.voicechat.downloadMod")}
-              <ExternalLink size="18" class="ml-1" /></button
-            ></a
-          >
-        </div>
-      {/if}
-      {#if chunky}
-        <div
-          class=" bg-base-100 rounded-lg mt-3 p-2 flex items-center gap-2 w-[20.75rem]"
-        >
-          <div class="dropdown dropdown-hover">
-            <img
-              alt="dynmap-icon"
-              class="w-8 h-8 rounded-lg bg-base-200"
-              src="/images/chunky.webp"
-            />
-          </div>
-          <div class="w-0.5 h-8 bg-base-300 opacity-75 m-0"></div>
-          <input
-            id="pregenRadius"
-            class="input input-sm w-32 input-bordered"
-            placeholder={$t("plugins.chunky.l.radius")}
-            type="text"
-          />
-          <button on:click={pregen} class="btn btn-secondary btn-sm btn-square"
-            ><Send size="18" /></button
-          >
-
-          <a
-            href="https://github.com/pop4959/Chunky/wiki/Commands"
-            target="_blank"
-            rel="noreferrer"
-            ><button class="btn btn-neutral btn-sm items-center"
-              >{$t("plugins.voicechat.guide")}
-              <ExternalLink size="18" class="ml-1" /></button
-            ></a
-          >
-        </div>
-      {/if}
-      {#if discordsrv}
-        <div
-          class=" bg-base-100 rounded-lg mt-3 p-2 flex items-center gap-2 w-[20.75rem]"
-        >
-          <div class="dropdown dropdown-hover">
-            <img
-              alt="dynmap-icon"
-              class="w-8 h-8 rounded-lg bg-base-200"
-              src="/images/discordsrv.webp"
-            />
-          </div>
-
-          <div class="w-0.5 h-8 bg-base-300 opacity-75 m-0"></div>
-          <a
-            href="https://knowledgebase.discordsrv.com/installation/initial-setup"
-            target="_blank"
-            rel="noreferrer"
-            ><button class="btn btn-neutral btn-sm items-center"
-              >{$t("plugins.discordsrv.guide")}
-              <ExternalLink size="18" class="ml-1" /></button
-            ></a
-          >
-        </div>
-      {/if}
-    
-
     </div>
     <!-- End Right Side-->
   </div>

@@ -391,11 +391,11 @@
   $: treeRoot.set(rootPath());
 </script>
 
-<div class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradientStroke">
+<div class="bg-base-300 rounded-xl px-4 py-3 shadow-xl neutralGradientStroke" id="filesRoot">
   <p class="font-ubuntu text-gray-200 text-lg ml-1 mb-2">Server Files</p>
-  
+
   {#if tab == "list"}
-    <div class="flex flex-col items-start gap-3 w-full">
+    <div class="flex flex-col items-start gap-3 w-full" id="filesListWrapper">
       <!-- Search Bar -->
       <div class="w-full">
         <div class="relative">
@@ -487,7 +487,10 @@
       </div>
     </div>
   {:else if tab == "editor"}
-    <div class="bg-base-100 rounded-xl p-3 h-[30rem] w-full lg:h-[35rem] xl:h-[45rem] flex flex-col">
+    <div
+      class="bg-base-100 rounded-xl p-3 h-[30rem] w-full lg:h-[35rem] xl:h-[45rem] flex flex-col"
+      id="filesEditorWrapper"
+    >
       <div class="flex justify-between shrink-0">
         <div class="flex mb-2 justify-between w-full">
           <button
@@ -515,42 +518,42 @@
   {/if}
 
   <!-- FTP info -->
-  <div class="flex flex-col items-start gap-5 w-full mt-5 ">
-    <div class="bg-base-100 rounded-xl px-5 py-3 w-full relative">
-      <div class="badge badge-outline absolute top-2 right-2 badge-lg text-sm flex gap-1 items-center">
-        <FlaskConical size="14" class="mt-0.5"/>Beta
+  <div class="w-full mt-3">
+    <div class="bg-base-100 rounded-lg px-3 py-2 w-full relative">
+      <div class="badge badge-outline badge-sm absolute top-1.5 right-1.5 text-xs flex gap-1 items-center">
+        <FlaskConical size="10" />Beta
       </div>
-      <h1 class="text-xl font-poppins-bold mb-1">SFTP Info</h1>
-      <div class="flex flex-col gap-2">
-        <div class="flex gap-2 items-center">
-          <div class="flex bg-neutral p-1.5 rounded-lg items-center text-sm font-bold gap-1">
-            <LinkIcon size="16" />
+      <h1 class="text-sm font-poppins-bold mb-1.5">SFTP Info</h1>
+      <div class="flex flex-wrap gap-x-4 gap-y-1">
+        <div class="flex gap-1.5 items-center text-xs">
+          <div class="flex bg-neutral px-1.5 py-0.5 rounded items-center font-bold gap-1">
+            <LinkIcon size="11" />
             Host
           </div>
           sftp://{localStorage.getItem("userNode")?.includes("https://")
             ? localStorage.getItem("userNode").split("https://")[1].split("/")[0]
             : ''}
         </div>
-        
-        <div class="flex gap-2 items-center">
-          <div class="flex bg-neutral p-1.5 rounded-lg items-center text-sm font-bold gap-1">
-            <Hash size="16" />
+
+        <div class="flex gap-1.5 items-center text-xs">
+          <div class="flex bg-neutral px-1.5 py-0.5 rounded items-center font-bold gap-1">
+            <Hash size="11" />
             Port
           </div>
           {10000+(Math.floor(parseInt(localStorage.getItem("serverID")) / 100) * 100)+99}
         </div>
-        
-        <div class="flex gap-2 items-center">
-          <div class="flex bg-neutral p-1.5 rounded-lg items-center text-sm font-bold gap-1">
-            <UserIcon size="16" />
+
+        <div class="flex gap-1.5 items-center text-xs">
+          <div class="flex bg-neutral px-1.5 py-0.5 rounded items-center font-bold gap-1">
+            <UserIcon size="11" />
             Username
           </div>
           {username}
         </div>
 
-        <div class="flex gap-2 items-center">
-          <div class="flex bg-neutral p-1.5 rounded-lg items-center text-sm font-bold gap-1">
-            <KeyIcon size="16" />
+        <div class="flex gap-1.5 items-center text-xs">
+          <div class="flex bg-neutral px-1.5 py-0.5 rounded items-center font-bold gap-1">
+            <KeyIcon size="11" />
             Password
           </div>
           <p id="ftpToken">
@@ -560,7 +563,7 @@
               ********
             {/if}
           </p>
-          <button class="btn btn-xs" on:click={toggleFtpPassword}>
+          <button class="btn btn-xs btn-ghost" on:click={toggleFtpPassword}>
             {#if showFtpPassword}Hide{:else}Show{/if}
           </button>
           <button class="btn btn-xs btn-neutral" on:click={copyPassword}>
@@ -584,3 +587,37 @@
     />
   {/key}
 {/if}
+
+<style>
+  /* The parent page forces this component's root to flex:1 on tall screens
+     (see +page.svelte's .tab-content-wrapper rule) so it can grow to fill
+     the leftover vertical space. Without this, the file tree/editor kept
+     their natural content height and got clipped by .server-page-root's
+     overflow:hidden instead of scrolling internally. */
+  @media (min-height: 700px) and (min-width: 1024px) {
+    #filesRoot {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    /* Whichever tab body is mounted (list or editor) grows into the leftover
+       space; the SFTP info card below it keeps its natural height. */
+    #filesListWrapper,
+    #filesEditorWrapper {
+      flex: 1 1 0%;
+      min-height: 0;
+    }
+    /* The search bar stays fixed; only the actual file/folder listing (which
+       can run to hundreds of rows) becomes the scrollbox. */
+    #filetree {
+      flex: 1 1 0%;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    /* Overrides the fixed h-[30rem]/lg:h-[35rem]/xl:h-[45rem] classes - the
+       editor's own flex-1/min-h-0 child already scrolls its content. */
+    #filesEditorWrapper {
+      height: auto;
+    }
+  }
+</style>
