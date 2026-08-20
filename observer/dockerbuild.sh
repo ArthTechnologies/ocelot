@@ -2,29 +2,18 @@
 
 #if script is running with sudo privileges...
 if [ $(id -u) -eq 0 ]; then
-# Run the 'docker info' command and capture its output
-docker_info=$(docker info 2>/dev/null)
+# Check the daemon is reachable at all
+if docker info >/dev/null 2>&1; then
 
-# Check if the 'docker info' command was successful
-if [ $? -eq 0 ]; then
-    # Check if the output contains information about authentication
-    if echo "$docker_info" | grep -q "Username:"; then
-        
-  
   CI= npm run build
 
+  echo "Building and pushing docker image (linux/amd64, linux/arm64)..."
+  if ! docker buildx build --platform linux/amd64,linux/arm64 -t arthmc/observer:latest --push .; then
+    echo "Build/push failed. Run 'sudo docker login' and try again."
+    exit 1
+  fi
 
-  arch=$(uname -m)
-  
-    echo "Building docker image..."
-    docker build -t arthmc/observer:latest .
-  
-
-  docker push arthmc/observer:latest
   exit 0
-    else
-        echo "You are not logged into Docker."
-    fi
 else
     echo "Docker is not installed or not running."
 fi
