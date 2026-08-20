@@ -746,7 +746,12 @@ async function buildRestorePlan(email, account, rawId) {
   let targetId = rawId;
   let needsNewSlot = false;
 
-  if (kind === "archive") {
+  if (kind === "archive" || kind === "missing") {
+    // "missing" (no archive, no live server we own) still has to check
+    // whether servers/{rawId} is free before writing a fresh server there -
+    // otherwise a stale plain account entry pointing at an id that's since
+    // been reassigned to a different customer would let this restore
+    // overwrite that customer's live server.json.
     if (originalSlot.state === "taken") {
       needsNewSlot = true;
       const free = findFreeSlot(accountIds, claimed);
@@ -763,12 +768,14 @@ async function buildRestorePlan(email, account, rawId) {
           code: "slot_changed",
           message: `Your original slot (#${rawId}) was reassigned, so your server will be restored as #${free}. Its IP address will change.`,
         });
-        const archiveServer = readJSON(`${archives[0].path}/server.json`);
-        if (archiveServer && archiveServer.subdomain) {
-          warnings.push({
-            code: "subdomain_released",
-            message: `Your custom address (${archiveServer.subdomain}) is tied to the old slot and will need to be claimed again.`,
-          });
+        if (kind === "archive") {
+          const archiveServer = readJSON(`${archives[0].path}/server.json`);
+          if (archiveServer && archiveServer.subdomain) {
+            warnings.push({
+              code: "subdomain_released",
+              message: `Your custom address (${archiveServer.subdomain}) is tied to the old slot and will need to be claimed again.`,
+            });
+          }
         }
       }
     }
@@ -1081,9 +1088,13 @@ async function runRestore(job, email, account, rawId, restoreWorld) {
     let targetId = rawId;
     let oldSlotTakenByOthers = false;
 
-    if (plan.kind === "archive") {
+    if (plan.kind === "archive" || plan.kind === "missing") {
       // Re-checked under the lock: the plan's answer is already a few hundred
       // milliseconds old, and /server/reserve hands out ids continuously.
+      // "missing" needs this exactly as much as "archive" does — without it,
+      // a stale account entry pointing at an id that's since been reassigned
+      // to a different customer would let this job write a fresh server.json
+      // straight into that customer's live folder.
       const reserved = await withSlotLock(() => {
         const claimed = claimedIds();
         const groupNames = members.map((m) => m.name);
@@ -1180,7 +1191,19 @@ async function runRestore(job, email, account, rawId, restoreWorld) {
       }
       finishStep(job, "data", "Server files moved back from storage");
     } else if (plan.kind === "missing") {
-      // No world data — create a fresh server
+      // No world data — create a fresh server. The slot step above already
+      // re-verified this id is free/empty under the lock, but never write a
+      // server.json over one that's already there — that would be someone
+      // else's live server, not an empty folder.
+      if (fs.existsSync(`${serverDir}/server.json`)) {
+        failJob(
+          job,
+          "data",
+          "That slot is no longer available. Please contact support."
+        );
+        return;
+      }
+
       try {
         if (!fs.existsSync("servers")) fs.mkdirSync("servers");
         if (!fs.existsSync(serverDir)) fs.mkdirSync(serverDir);
