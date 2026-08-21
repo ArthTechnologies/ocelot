@@ -59,9 +59,5 @@ cloudflareVerifySecretKey=
 # Enable a 2-week free trial for new customers (set to false to disable without code changes):
 enableFreeTrial=false
 
-# The list of places (can also be on other computers via ssh) to backup to [Seperate with commas]:
-backupsList=
-enableBackups=
-
 # Do not modify
 setup=false

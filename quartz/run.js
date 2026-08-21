@@ -202,9 +202,6 @@ if (!migrationsStatus.mergeDuplicateEmailAccounts) {
   migrations.mergeDuplicateEmailAccounts();
 }
 
-exec = require("child_process").exec;
-
-
 // Warn if servers/ isn't owned by the group Quartz itself runs as (what
 // refreshServerPermissions() would set it to) - FTP reads/writes to that
 // folder as that identity.
@@ -330,61 +327,6 @@ function downloadJars(type) {
     scraper.partialDownload();
   }
 }
-
-function backup() {
-  console.log("Backing up");
-  try {
-    console.log("Backing up");
-    if (JSON.parse(config.enableBackups)) {
-      let backupsList = config.backupsList.split(",");
-      let spaceLimit = 512;
-
-      for (let i in backupsList) {
-        if (backupsList[i] != "") {
-          //if backupsList[i]'s last character is a /, remove it
-          if (backupsList[i].charAt(backupsList[i].length - 1) == "/") {
-            backupsList[i] = backupsList[i].slice(0, -1);
-          }
-
-          //date in dd-mm-yyyy format
-          let date = new Date();
-          let day = date.getDate();
-          let month = date.getMonth() + 1;
-          let year = date.getFullYear();
-          let date2 = day + "-" + month + "-" + year;
-          if(!fs.existsSync(`/${backupsList[i]}/quartz-backups`)){
-            fs.mkdirSync(`/${backupsList[i]}/quartz-backups`);
-          }
-          let currentSpace = 0;
-          currentSpace = files.getFolderSize(`/${backupsList[i]}/quartz-backups`);
-          //convert it to GB
-          currentSpace = parseInt(currentSpace) / 1000000000;
-          if (fs.existsSync(`/${backupsList[i]}/quartz-backups/${date2}`)) {
-            console.log("Backup already exists for " + backupsList[i]);
-          } else if (currentSpace + 64 >= spaceLimit) {
-            console.log("Backup space limit reached for " + backupsList[i]);
-          } else {
-          exec(
-            `rsync -a --delete . /${backupsList[i]}/quartz-backups/${date2}`,
-            (err, stdout, stderr) => {
-              if (err) {
-                console.log(err);
-              } else {
-                console.log("Backup to " + backupsList[i] + " successful");
-              }
-            }
-          );
-        }
-        }
-      }
-    }
-  } catch (e) {
-    console.log("Backup error: " + e);
-  }
-}
-
-
-
 
 function removeUnusedAccounts() {
   const accounts = fs.readdirSync("accounts");
